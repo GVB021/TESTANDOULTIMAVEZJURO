@@ -1478,12 +1478,62 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  app.put("/api/takes/:id/preferred", requireAuth, async (req, res) => {
+    try {
+      const [take] = await db.select().from(takes).where(eq(takes.id, req.params.id));
+      if (!take) return res.status(404).json({ message: "Take nao encontrado" });
+      
+      const user = (req as any).user!;
+      const session = await storage.getSession(take.sessionId);
+      if (!session) return res.status(404).json({ message: "Sessao nao encontrada" });
+      
+      const canManage = await canManageSessionTakes(user, take.sessionId, session.studioId);
+      if (!canManage) return res.status(403).json({ message: "Acesso negado" });
+
+      const updated = await storage.setPreferredTake(req.params.id);
+      await createAudioAuditLog(req, "take.set_preferred", {
+        takeId: take.id,
+        sessionId: take.sessionId,
+        lineIndex: take.lineIndex,
+      });
+      res.status(200).json(updated);
+    } catch (err: any) {
+      res.status(500).json({ message: err?.message || "Erro ao atualizar take" });
+    }
+  });
+
   app.delete("/api/takes/:id", requireAuth, async (req, res) => {
     try {
-      if (!requirePlatformOwnerDelete(req, res)) return;
       const [takeRecord] = await db.select().from(takes).where(eq(takes.id, req.params.id));
       if (!takeRecord) return res.status(404).json({ message: "Take nao encontrado" });
+
+      const user = (req as any).user!;
+      const session = await storage.getSession(takeRecord.sessionId);
+      
+      // Allow Platform Owner OR Session Managers (Director/Admin) to delete
+      const isPlatformOwner = normalizePlatformRole(user.role) === "platform_owner" || isMasterEmail(user.email);
+      const canManage = session ? await canManageSessionTakes(user, takeRecord.sessionId, session.studioId) : false;
+
+      if (!isPlatformOwner && !canManage) {
+        return res.status(403).json({ message: "Acesso negado para excluir este take" });
+      }
+
       await storage.deleteTake(req.params.id);
+      
+      // Attempt to clean up from storage if needed (optional implementation detail)
+      if (isSupabaseConfigured() && takeRecord.audioUrl && !takeRecord.audioUrl.startsWith("discarded://")) {
+        try {
+           const parsed = parseSupabaseStorageUrl(takeRecord.audioUrl);
+           if (parsed) {
+             await deleteFromSupabaseStorage(parsed.bucket, [parsed.path]);
+           } else {
+             // Fallback search logic if needed, but usually URL has path
+           }
+        } catch (e) {
+          logger.warn("Failed to cleanup Supabase file", { error: e });
+        }
+      }
+
       await createAudioAuditLog(req, "take.deleted.permanent", {
         takeId: takeRecord.id,
         sessionId: takeRecord.sessionId,

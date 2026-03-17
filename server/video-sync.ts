@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
 import { pool } from "./db";
-import { isPrivilegedStudioRole, normalizePlatformRole, normalizeStudioRole } from "@shared/roles";
+import { isPrivilegedStudioRole, normalizePlatformRole, normalizeStudioRole, hasMinStudioRole } from "@shared/roles";
 
 interface SyncMessage {
   type:
@@ -15,6 +15,8 @@ interface SyncMessage {
     | "video:loop-preparing"
     | "video:loop-silence-window"
     | "video:sync-loop"
+    | "video:take-ready-for-review"
+    | "video:take-decision"
     | "grant-permission"
     | "revoke-permission"
     | "toggle-global-control"
@@ -29,7 +31,11 @@ interface SyncMessage {
     | "text-control:grant-controller"
     | "text-control:revoke-controller"
     | "text-control:update-line"
-    | "video:take-status";
+    | "video:take-status"
+    | "video:ack"
+    | "text:lock-line"
+    | "text:unlock-line"
+    | "text:live-change";
   currentTime?: number;
   lineIndex?: number;
   targetUserId?: string;
@@ -56,12 +62,26 @@ interface SyncMessage {
   initiatorUserId?: string;
   delayMs?: number;
   isPlaying?: boolean;
+  // Review flow fields
+  takeId?: string;
+  audioUrl?: string;
+  duration?: number;
+  metrics?: any;
+  decision?: "approved" | "rejected";
+  // Ack fields
+  command?: string;
 }
 
 const rooms = new Map<string, Set<WebSocket & { userId?: string; role?: string; name?: string; sessionId?: string }>>();
 const tempPermissions = new Map<string, Set<string>>();
 const globalControlSessions = new Map<string, boolean>();
 const textControllerSessions = new Map<string, Set<string>>();
+const lineLocks = new Map<string, Map<number, { userId: string; at: number }>>();
+
+function getLineLocks(sessionId: string) {
+  if (!lineLocks.has(sessionId)) lineLocks.set(sessionId, new Map());
+  return lineLocks.get(sessionId)!;
+}
 
 function getTextControllers(sessionId: string) {
   return textControllerSessions.get(sessionId) || new Set<string>();
@@ -206,12 +226,15 @@ export function setupVideoSync(httpServer: Server) {
 
       if (!sessionId) {
         ws.close(1008, "sessionId required");
+        console.log("[WS] Conexão rejeitada: sessionId ausente");
         return;
       }
 
+      console.log(`[WS] Nova conexão tentando entrar na sala: ${sessionId}`);
       const identity = await getWsIdentity(sessionId, req);
       if (!identity) {
         ws.close(1008, "unauthorized");
+        console.log(`[WS] Conexão rejeitada: não autorizado na sala ${sessionId}`);
         return;
       }
 
@@ -227,24 +250,37 @@ export function setupVideoSync(httpServer: Server) {
       const perms = Array.from(tempPermissions.get(sessionId) || []);
       const globalControl = globalControlSessions.get(sessionId) || false;
       const controllerUserIds = Array.from(getTextControllers(sessionId));
+      
+      console.log(`[WS] Usuário ${identity.name} (${identity.role}) entrou na sala ${sessionId}. Total clientes na sala: ${room.size}`);
+
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "permission-sync", permissions: perms, globalControl } satisfies SyncMessage));
         ws.send(JSON.stringify({ type: "presence-sync", users: getRoster(room) } satisfies SyncMessage));
         ws.send(JSON.stringify({ type: "text-control:state", controllerUserIds } satisfies SyncMessage));
       }
+      
       broadcast(room as any, { type: "presence-sync", users: getRoster(room) } satisfies SyncMessage);
       broadcast(room as any, { type: "text-control:state", controllerUserIds } satisfies SyncMessage);
-    })().catch(() => {
+    })().catch((err) => {
+      console.error("[WS] Erro na conexão:", err);
       ws.close(1011, "internal");
     });
 
     ws.on("message", (data) => {
       try {
-        if (!ws.userId || !ws.role) return;
+        if (!ws.userId || !ws.role) {
+          console.warn("[WS] Mensagem ignorada: Usuário sem role/id definido");
+          return;
+        }
         const msg = JSON.parse(data.toString()) as SyncMessage;
         const sessionId = String(ws.sessionId || "");
         const room = rooms.get(sessionId);
-        if (!room) return;
+        if (!room) {
+          console.warn(`[WS] Sala ${sessionId} não encontrada para mensagem de ${ws.name}`);
+          return;
+        }
+
+        console.log(`[WS] Recebido ${msg.type} de ${ws.name} (${ws.userId}) na sala ${sessionId}`);
 
         const isPrivileged = isPrivilegedStudioRole(ws.role);
         const controllerUserIds = getTextControllers(sessionId);
@@ -261,7 +297,10 @@ export function setupVideoSync(httpServer: Server) {
           msg.type === "text-control:grant-controller" ||
           msg.type === "text-control:revoke-controller"
         ) {
-          if (!isPrivileged) return;
+          if (!isPrivileged) {
+            console.warn(`[WS] Ação administrativa ${msg.type} bloqueada para ${ws.name} (${ws.role})`);
+            return;
+          }
 
           if (msg.type === "grant-permission" && msg.targetUserId) {
             if (!tempPermissions.has(sessionId)) tempPermissions.set(sessionId, new Set());
@@ -307,22 +346,140 @@ export function setupVideoSync(httpServer: Server) {
         }
 
         if (msg.type === "text-control:update-line") {
-          if (!isPrivileged && !isController) return;
+          if (!isPrivileged && !isController) {
+             console.warn(`[WS] Edição de texto bloqueada para ${ws.name}`);
+             return;
+          }
           if (typeof msg.lineIndex !== "number") return;
           if (typeof msg.text !== "string" && typeof msg.character !== "string" && typeof msg.start !== "number") return;
+
+          // Persistir alteração no banco de dados
+          const targetLineIndex = msg.lineIndex;
+          const targetText = msg.text;
+          const targetChar = msg.character;
+          const targetStart = msg.start;
+
+          (async () => {
+            try {
+              const sessionRes = await pool.query("SELECT production_id FROM recording_sessions WHERE id = $1", [sessionId]);
+              const productionId = sessionRes.rows[0]?.production_id;
+
+              if (productionId) {
+                const prodRes = await pool.query("SELECT script_json FROM productions WHERE id = $1", [productionId]);
+                let scriptJson = prodRes.rows[0]?.script_json;
+                let script: any = [];
+                
+                try { 
+                  if (typeof scriptJson === 'string') script = JSON.parse(scriptJson);
+                  else if (typeof scriptJson === 'object' && scriptJson !== null) script = scriptJson;
+                } catch {}
+                
+                // Handle different script structures ({ lines: [] } or just [])
+                if (!Array.isArray(script) && script && typeof script === 'object' && 'lines' in script) {
+                   script = (script as any).lines;
+                }
+                if (!Array.isArray(script)) script = [];
+
+                if (script[targetLineIndex]) {
+                  if (targetText !== undefined) script[targetLineIndex].text = targetText;
+                  // Fallback para campos comuns de script
+                  if (targetText !== undefined) script[targetLineIndex].fala = targetText; 
+                  
+                  if (targetChar !== undefined) script[targetLineIndex].character = targetChar;
+                  if (targetChar !== undefined) script[targetLineIndex].personagem = targetChar;
+
+                  if (targetStart !== undefined) script[targetLineIndex].start = targetStart;
+                  if (targetStart !== undefined) script[targetLineIndex].timecode = new Date(targetStart * 1000).toISOString().substr(11, 8); // Simple conversion
+
+                  await pool.query("UPDATE productions SET script_json = $1 WHERE id = $2", [JSON.stringify(script), productionId]);
+                  console.log(`[WS] Script persistido para produção ${productionId} linha ${targetLineIndex}`);
+                }
+              }
+            } catch (err) {
+              console.error("[WS] Erro ao persistir script:", err);
+            }
+          })();
         }
 
         if (msg.type === "video:seek" && typeof msg.lineIndex === "number") {
           if (!isPrivileged && !isController) return;
         }
 
+        // Eventos de revisão de take
+        if (msg.type === "video:take-decision") {
+          // Apenas Diretores ou superior podem tomar decisão sobre take
+          const hasDirectorRole = hasMinStudioRole(ws.role, "diretor");
+          const isPlatformOwner = ws.role === "platform_owner";
+          if (!hasDirectorRole && !isPlatformOwner) {
+            console.warn(`[WS] Decisão de take bloqueada para ${ws.name} (${ws.role})`);
+            return;
+          }
+        }
+
+        // ACK de comando de vídeo
+        if (msg.type === "video:ack") {
+          // Apenas retransmite para que o diretor saiba quem recebeu
+          // Não precisa de permissão especial, qualquer um pode confirmar recebimento
+        }
+
+        // Bloqueio de linhas de texto (concorrência)
+        if (msg.type === "text:lock-line") {
+          if (!isPrivileged && !isController) return;
+          if (typeof msg.lineIndex !== "number") return;
+          const locks = getLineLocks(sessionId);
+          const existing = locks.get(msg.lineIndex);
+          // Se já bloqueado por outro, ignora (ou poderia enviar erro)
+          if (existing && existing.userId !== ws.userId) {
+            return;
+          }
+          locks.set(msg.lineIndex, { userId: ws.userId, at: Date.now() });
+        }
+
+        if (msg.type === "text:unlock-line") {
+          if (!isPrivileged && !isController) return;
+          if (typeof msg.lineIndex !== "number") return;
+          const locks = getLineLocks(sessionId);
+          const existing = locks.get(msg.lineIndex);
+          
+          const isDirector = hasMinStudioRole(ws.role, "diretor");
+          const isOwner = ws.role === "platform_owner";
+          const canForceUnlock = isDirector || isOwner;
+
+          // Só quem bloqueou (ou admin/diretor) pode desbloquear
+          if (existing) {
+            if (existing.userId === ws.userId || canForceUnlock) {
+              locks.delete(msg.lineIndex);
+            } else {
+              // Bloqueado por outro e não sou admin -> ignora
+              return;
+            }
+          }
+        }
+
+        // Edição em tempo real (apenas broadcast, sem persistência no backend aqui)
+        if (msg.type === "text:live-change") {
+          if (typeof msg.lineIndex !== "number") return;
+          // Verificar se usuário tem permissão de edição (controller ou privilegiado)
+          if (!isPrivileged && !isController) return;
+        }
+
+        console.log(`[WS] Fazendo broadcast de ${msg.type} para sala ${sessionId}. Remetente: ${ws.name}`);
+        
+        const clientsInRoom = Array.from(room).map(c => (c as any).name || (c as any).userId);
+        console.log(`[WS] Clientes na sala ${sessionId}: ${clientsInRoom.join(", ")}`);
+
         const payload = JSON.stringify({ ...msg, userId: ws.userId });
+        let sentCount = 0;
         room.forEach((client) => {
           if (client !== ws && client.readyState === WebSocket.OPEN) {
             client.send(payload);
+            sentCount++;
           }
         });
-      } catch {}
+        console.log(`[WS] Broadcast enviado para ${sentCount} clientes (total na sala: ${room.size})`);
+      } catch (err) {
+        console.error("[WS] Erro ao processar mensagem:", err);
+      }
     });
 
     const cleanup = () => {

@@ -187,7 +187,7 @@ type UiPermission = "text_control" | "audio_control" | "presence_view" | "approv
 const UI_ROLE_PERMISSIONS: Record<UiRole, UiPermission[]> = {
   viewer: [],
   text_controller: ["text_control", "presence_view"],
-  audio_controller: ["audio_control", "approve_take", "dashboard_access", "presence_view"],
+  audio_controller: ["audio_control", "dashboard_access", "presence_view"],
   admin: ["text_control", "audio_control", "approve_take", "dashboard_access", "presence_view"],
 };
 
@@ -472,6 +472,47 @@ function CountdownOverlay({ count }: { count: number }) {
   );
 }
 
+function DirectorConsole({
+  users,
+  clientAcks,
+  onClose
+}: {
+  users: any[];
+  clientAcks: Record<string, { lastAck: number; command: string }>;
+  onClose: () => void;
+}) {
+  return (
+    <div className="absolute top-20 right-4 z-50 w-64 bg-zinc-950/95 backdrop-blur border border-white/10 rounded-xl shadow-2xl p-4 animate-in slide-in-from-right-10 fade-in">
+      <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-white">Console do Diretor</h3>
+        <button onClick={onClose} className="text-white/50 hover:text-white transition-colors">
+          <X className="w-3 h-3" />
+        </button>
+      </div>
+      <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
+        {users.map((u) => {
+          const ack = clientAcks[String(u.userId)];
+          const hasRecentAck = ack && (Date.now() - ack.lastAck < 2000);
+          return (
+            <div key={u.userId} className="flex items-center justify-between text-xs p-2 rounded bg-white/5">
+              <div className="flex flex-col">
+                <span className="font-bold text-white truncate max-w-[120px]">{u.name || "Usuario"}</span>
+                <span className="text-[10px] text-white/40">{normalizeRoomRole(u.role)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {hasRecentAck && (
+                  <span className="text-[9px] text-emerald-400 font-mono animate-pulse">ACK: {ack.command}</span>
+                )}
+                <div className={cn("w-2 h-2 rounded-full transition-all", hasRecentAck ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-zinc-600")} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function RecordingRoom() {
   const { studioId, sessionId } = useParams<{ studioId: string; sessionId: string }>();
   const [isMobile, setIsMobile] = useState(false);
@@ -580,6 +621,24 @@ export default function RecordingRoom() {
     lineIndex: number;
     startTimeSeconds: number;
   } | null>(null);
+
+  // Estados para o fluxo de revisão do diretor
+  const [reviewingTake, setReviewingTake] = useState<{
+    takeId: string;
+    audioUrl: string;
+    duration: number;
+    metrics: any;
+    lineIndex: number;
+    userId: string;
+    characterName: string;
+    startTimeSeconds: number;
+  } | null>(null);
+  const [isWaitingReview, setIsWaitingReview] = useState(false);
+
+  // Estados para sincronia avançada e locks
+  const [lockedLines, setLockedLines] = useState<Record<number, { userId: string; at: number }>>({});
+  const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
+  const [clientAcks, setClientAcks] = useState<Record<string, { lastAck: number; command: string }>>({});
 
   const lastTapRef = useRef<number>(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -1144,6 +1203,7 @@ export default function RecordingRoom() {
 
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
+      console.log("[WS] Recebido:", msg);
       
       if (msg.type === "video:sync") {
         const video = videoRef.current;
@@ -1154,13 +1214,26 @@ export default function RecordingRoom() {
           else if (!msg.isPlaying && !video.paused) video.pause();
         }
       } else if (msg.type === "video:play") {
+        console.log("[WS] Executando comando video:play");
         const video = videoRef.current;
         if (video) {
           if (typeof msg.currentTime === "number" && Number.isFinite(msg.currentTime)) {
             const drift = Math.abs(video.currentTime - msg.currentTime);
-            if (drift > 0.12) video.currentTime = msg.currentTime;
+            if (drift > 0.12) {
+              console.log(`[WS] Ajustando drift de ${drift.toFixed(3)}s`);
+              video.currentTime = msg.currentTime;
+            }
           }
-          if (video.paused) video.play().catch(() => {});
+          if (video.paused) {
+            console.log("[WS] Vídeo estava pausado, iniciando reprodução...");
+            video.play().catch((e) => console.error("[WS] Erro ao dar play:", e));
+          } else {
+            console.log("[WS] Vídeo já estava reproduzindo.");
+          }
+          // Enviar ACK de confirmação
+          emitVideoEvent("ack", { command: "play", userId: user?.id });
+        } else {
+          console.warn("[WS] Elemento de vídeo não encontrado!");
         }
       } else if (msg.type === "video:pause") {
         const video = videoRef.current;
@@ -1169,6 +1242,37 @@ export default function RecordingRoom() {
             video.currentTime = msg.currentTime;
           }
           if (!video.paused) video.pause();
+          // Enviar ACK de confirmação
+          emitVideoEvent("ack", { command: "pause", userId: user?.id });
+        }
+      } else if (msg.type === "video:ack") {
+        if (msg.userId) {
+          setClientAcks(prev => ({
+            ...prev,
+            [msg.userId!]: { lastAck: Date.now(), command: msg.command || "unknown" }
+          }));
+        }
+      } else if (msg.type === "text:lock-line") {
+        if (typeof msg.lineIndex === "number" && msg.userId) {
+          setLockedLines(prev => ({
+            ...prev,
+            [msg.lineIndex!]: { userId: msg.userId!, at: Date.now() }
+          }));
+        }
+      } else if (msg.type === "text:unlock-line") {
+        if (typeof msg.lineIndex === "number") {
+          setLockedLines(prev => {
+            const next = { ...prev };
+            delete next[msg.lineIndex!];
+            return next;
+          });
+        }
+      } else if (msg.type === "text:live-change") {
+        if (typeof msg.lineIndex === "number" && typeof msg.text === "string") {
+          setLiveDrafts(prev => ({
+            ...prev,
+            [msg.lineIndex!]: msg.text!
+          }));
         }
       } else if (msg.type === "video:seek") {
         if (videoRef.current && typeof msg.currentTime === "number") {
@@ -1215,6 +1319,41 @@ export default function RecordingRoom() {
         setTextControllerUserIds(new Set(ids || []));
       } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
         setPresenceUsers(msg.users);
+      } else if (msg.type === "video:take-ready-for-review") {
+        // Se eu sou aprovador, recebo o take para revisar
+        if (canApproveTake && msg.takeId && msg.audioUrl) {
+          setReviewingTake({
+            takeId: msg.takeId,
+            audioUrl: msg.audioUrl,
+            duration: msg.duration || 0,
+            metrics: msg.metrics || {},
+            lineIndex: msg.lineIndex || 0,
+            userId: msg.userId || "",
+            characterName: msg.character || "Desconhecido",
+            startTimeSeconds: msg.start || 0,
+          });
+          toast({ title: "Novo take para revisão", description: "Um dublador enviou um take." });
+        }
+      } else if (msg.type === "video:take-decision") {
+        // Se a decisão for sobre um take meu
+        if (msg.takeId === lastUploadedTakeId) {
+          setIsWaitingReview(false);
+          if (msg.decision === "approved") {
+            toast({ title: "Take Aprovado!", description: "O diretor aprovou seu take.", variant: "default" });
+            // Limpa estado local se ainda estiver pendente (embora upload já tenha ocorrido)
+            setPendingTake(null);
+            setRecordingStatus("idle");
+          } else {
+            toast({ title: "Take Rejeitado", description: "O diretor solicitou uma nova gravação.", variant: "destructive" });
+            // Mantém o estado para regravação rápida ou limpa? Vamos limpar para forçar nova gravação
+            setPendingTake(null);
+            setRecordingStatus("idle");
+          }
+        }
+        // Se eu sou o diretor que estava revisando, limpo meu estado
+        if (reviewingTake?.takeId === msg.takeId) {
+          setReviewingTake(null);
+        }
       } else if (msg.type === "video:take-status") {
         if (String(msg.targetUserId || "") !== String(user?.id || "")) return;
         if (msg.status === "deleted") {
@@ -1668,6 +1807,49 @@ export default function RecordingRoom() {
     }, 1000);
   }, [recordingStatus, micState, emitVideoEvent, logAudioStep, user?.id, isLooping, customLoop, preRoll]);
 
+  const handleDirectorApprove = useCallback(async () => {
+    if (!reviewingTake) return;
+    try {
+      setIsSaving(true);
+      // Opcional: Marcar como preferred no backend se necessário
+      await authFetch(`/api/takes/${reviewingTake.takeId}/preferred`, { method: "PUT" });
+      
+      emitVideoEvent("take-decision", {
+        takeId: reviewingTake.takeId,
+        decision: "approved",
+        userId: user?.id
+      });
+      
+      toast({ title: "Take Aprovado", description: "O dublador foi notificado." });
+      setReviewingTake(null);
+    } catch (err) {
+      toast({ title: "Erro ao aprovar", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [reviewingTake, emitVideoEvent, user?.id, toast]);
+
+  const handleDirectorReject = useCallback(async () => {
+    if (!reviewingTake) return;
+    try {
+      setIsSaving(true);
+      await authFetch(`/api/takes/${reviewingTake.takeId}`, { method: "DELETE" });
+      
+      emitVideoEvent("take-decision", {
+        takeId: reviewingTake.takeId,
+        decision: "rejected",
+        userId: user?.id
+      });
+      
+      toast({ title: "Take Rejeitado", description: "O take foi excluído." });
+      setReviewingTake(null);
+    } catch (err) {
+      toast({ title: "Erro ao rejeitar", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [reviewingTake, emitVideoEvent, user?.id, toast]);
+
   const handleStopRecording = useCallback(async () => {
     if (recordingStatus !== "recording" || !micState) return;
     if (countdownTimerRef.current) {
@@ -1716,12 +1898,12 @@ export default function RecordingRoom() {
       }
     }
 
-    // Gerar blob local para preview
+    // Gerar blob local para preview imediato do dublador
     const wavBuffer = encodeWav(result.samples);
     const wavBlob = wavToBlob(wavBuffer);
     const objectUrl = URL.createObjectURL(wavBlob);
 
-    setPendingTake({
+    const localTakeData = {
       samples: result.samples,
       durationSeconds: result.durationSeconds,
       sampleRate: result.sampleRate,
@@ -1730,11 +1912,47 @@ export default function RecordingRoom() {
       url: objectUrl,
       lineIndex: currentLine,
       startTimeSeconds: Number(videoRef.current?.currentTime || 0),
-    });
+    };
 
+    setPendingTake(localTakeData);
     setRecordingStatus("recorded");
     setLastRecording(result);
-  }, [recordingStatus, micState, emitVideoEvent, logAudioStep, toast, isLooping, customLoop, currentLine]);
+
+    // Upload Automático para o Diretor
+    setIsSaving(true);
+    setIsWaitingReview(true);
+    
+    try {
+      const uploadedTake = await uploadTakeForDirector({
+        wavBlob: wavBlob,
+        durationSeconds: result.durationSeconds,
+        qualityScore: metrics.score,
+        autoApprove: false,
+        lineIndex: currentLine,
+        startTimeSeconds: Number(videoRef.current?.currentTime || 0),
+      });
+
+      emitVideoEvent("take-ready-for-review", {
+        takeId: uploadedTake.id,
+        audioUrl: uploadedTake.audioUrl,
+        duration: result.durationSeconds,
+        metrics: metrics,
+        lineIndex: currentLine,
+        userId: user?.id,
+        character: recordingProfile?.characterName || "Personagem",
+        start: Number(videoRef.current?.currentTime || 0)
+      });
+      
+      toast({ title: "Enviado para revisão", description: "Aguardando aprovação do diretor..." });
+    } catch (error: any) {
+      console.error("Auto-upload failed:", error);
+      toast({ title: "Falha no envio automático", description: "Tente enviar manualmente.", variant: "destructive" });
+      setIsWaitingReview(false);
+      // Mantém o pendingTake para retry manual se necessário
+    } finally {
+      setIsSaving(false);
+    }
+  }, [recordingStatus, micState, emitVideoEvent, logAudioStep, toast, isLooping, customLoop, currentLine, uploadTakeForDirector, user?.id, recordingProfile]);
 
   const handleApproveTake = useCallback(async () => {
     if (!pendingTake) return;
@@ -1923,18 +2141,45 @@ export default function RecordingRoom() {
     setRecordingStatus("idle");
   }, []);
 
+  const [directorConsoleOpen, setDirectorConsoleOpen] = useState(true);
+
+  // Debounce para live updates de texto
+  useEffect(() => {
+    if (!editingField) return;
+    const handler = setTimeout(() => {
+      emitTextControlEvent("text:live-change", {
+        lineIndex: editingField.lineIndex,
+        text: editingDraftValue
+      });
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [editingDraftValue, editingField, emitTextControlEvent]);
+
   const startInlineEdit = useCallback((lineIndex: number, field: "character" | "text" | "timecode") => {
+    // Verificar lock
+    const lock = lockedLines[lineIndex];
+    if (lock && lock.userId !== user?.id) {
+      toast({ title: "Linha bloqueada", description: "Outro usuário está editando esta linha.", variant: "destructive" });
+      return;
+    }
+
     const line = scriptLines[lineIndex];
     if (!line) return;
     const initial = field === "character" ? line.character : field === "text" ? line.text : formatTimecodeByFormat(line.start, "HH:MM:SS", 24);
     setEditingField({ lineIndex, field });
     setEditingDraftValue(initial);
-  }, [scriptLines]);
+    
+    // Emitir lock
+    emitTextControlEvent("text:lock-line", { lineIndex, userId: user?.id });
+  }, [scriptLines, lockedLines, user?.id, emitTextControlEvent, toast]);
 
   const cancelInlineEdit = useCallback(() => {
+    if (editingField) {
+      emitTextControlEvent("text:unlock-line", { lineIndex: editingField.lineIndex });
+    }
     setEditingField(null);
     setEditingDraftValue("");
-  }, []);
+  }, [editingField, emitTextControlEvent]);
 
   const saveInlineEdit = useCallback(() => {
     if (!editingField) return;
@@ -1972,11 +2217,16 @@ export default function RecordingRoom() {
     }
     applyScriptLinePatch(editingField.lineIndex, patch);
     pushEditHistory(editingField.lineIndex, editingField.field, before, after, by);
+    
     emitTextControlEvent("text-control:update-line", {
       lineIndex: editingField.lineIndex,
       ...patch,
       history: { field: editingField.field, before, after, by },
     });
+    
+    // Unlock ao salvar
+    emitTextControlEvent("text:unlock-line", { lineIndex: editingField.lineIndex });
+
     setEditingField(null);
     setEditingDraftValue("");
     toast({ title: "Alteração salva", description: `${editingField.field} atualizado com sucesso.` });
@@ -3165,16 +3415,23 @@ export default function RecordingRoom() {
                   const isActive = i === currentLine;
                   const isDone = savedTakes.has(i);
                   const isInLoop = customLoop ? line.start >= customLoop.start && line.end <= customLoop.end : false;
+                  
+                  const lock = lockedLines[i];
+                  const isLockedByOther = lock && lock.userId !== user?.id;
+                  const lockingUser = isLockedByOther ? presenceUsers.find(u => u.userId === lock.userId)?.name || "Alguém" : null;
+                  const liveText = isLockedByOther && liveDrafts[i] ? liveDrafts[i] : line.text;
+
                   return (
                     <div
                       key={i}
                       ref={(el) => { lineRefs.current[i] = el; }}
-                      onClick={canTextControl ? (() => handleLineClick(i)) : undefined}
+                      onClick={canTextControl && !isLockedByOther ? (() => handleLineClick(i)) : undefined}
                       className={cn(
                         "mb-4 px-5 py-4 rounded-xl transition-all duration-300 relative overflow-hidden",
                         isActive ? "bg-background/85 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.22)] backdrop-blur-md" : "bg-transparent",
                         isInLoop && "shadow-[inset_0_0_0_1px_rgba(129,140,248,0.45)] bg-indigo-500/10",
-                        canTextControl ? "cursor-pointer" : "cursor-default"
+                        canTextControl && !isLockedByOther ? "cursor-pointer" : "cursor-default",
+                        isLockedByOther && "opacity-70 border border-amber-500/30 bg-amber-500/5"
                       )}
                     >
                       <div className="flex items-center gap-3 mb-2">
@@ -3183,14 +3440,20 @@ export default function RecordingRoom() {
                           {line.character}
                         </span>
                         {isDone && <CheckCircle2 className="w-4 h-4 ml-auto text-emerald-500" />}
+                        {isLockedByOther && (
+                          <span className="ml-auto text-[10px] text-amber-500 flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            {lockingUser} editando...
+                          </span>
+                        )}
                       </div>
                       <p 
-                        className={cn("leading-relaxed", isActive ? "text-foreground font-medium" : "text-muted-foreground")}
+                        className={cn("leading-relaxed transition-all", isActive ? "text-foreground font-medium" : "text-muted-foreground", isLockedByOther && "italic text-amber-200/80")}
                         style={{ fontSize: `${scriptFontSize}px` }}
                       >
-                        {line.text}
+                        {liveText}
                       </p>
-                      {canTextControl && (
+                      {canTextControl && !isLockedByOther && (
                         <div className="mt-3 flex items-center gap-2">
                           <button
                             onClick={(event) => {
@@ -3228,12 +3491,16 @@ export default function RecordingRoom() {
                               value={editingDraftValue}
                               onChange={(event) => setEditingDraftValue(event.target.value)}
                               className="w-full min-h-20 rounded-md border border-border/70 bg-background px-3 py-2 text-sm text-foreground outline-none"
+                              readOnly={isLockedByOther}
+                              disabled={isLockedByOther}
                             />
                           ) : (
                             <input
                               value={editingDraftValue}
                               onChange={(event) => setEditingDraftValue(event.target.value)}
                               className="w-full h-9 rounded-md border border-border/70 bg-background px-3 text-sm text-foreground outline-none"
+                              readOnly={isLockedByOther}
+                              disabled={isLockedByOther}
                             />
                           )}
                           <div className="mt-2 flex items-center justify-end gap-2">
@@ -3243,12 +3510,14 @@ export default function RecordingRoom() {
                             >
                               Cancelar
                             </button>
-                            <button
-                              onClick={saveInlineEdit}
-                              className="h-7 px-2 rounded-md bg-primary/20 text-[11px] text-primary hover:bg-primary/30"
-                            >
-                              Salvar
-                            </button>
+                            {!isLockedByOther && (
+                              <button
+                                onClick={saveInlineEdit}
+                                className="h-7 px-2 rounded-md bg-primary/20 text-[11px] text-primary hover:bg-primary/30"
+                              >
+                                Salvar
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -3267,7 +3536,7 @@ export default function RecordingRoom() {
 
         {/* Novo Sistema de Preview de Áudio (Mobile & Desktop) */}
         <AnimatePresence>
-          {pendingTake && (
+          {(pendingTake || reviewingTake) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -3281,40 +3550,71 @@ export default function RecordingRoom() {
                       <Mic className="w-5 h-5" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">Preview da Gravação</h3>
+                      <h3 className="text-sm font-bold text-white">
+                        {reviewingTake ? "Revisão do Diretor" : "Preview da Gravação"}
+                      </h3>
                       <p className="text-[10px] text-white/40 uppercase tracking-widest font-mono">
-                        {pendingTake.durationSeconds.toFixed(2)}s • {pendingTake.metrics.score}% Qualidade
+                        {(reviewingTake ? reviewingTake.duration : pendingTake?.durationSeconds || 0).toFixed(2)}s • {(reviewingTake || pendingTake)?.metrics?.score}% Qualidade
                       </p>
                     </div>
                   </div>
+                  
+                  {/* Actions Area */}
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={handleRejectTake}
-                      disabled={isSaving}
-                      className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all active:scale-90 disabled:opacity-50"
-                      aria-label="Rejeitar take"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={handleApproveTake}
-                      disabled={isSaving}
-                      className="h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold text-sm flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
-                    >
-                      {isSaving ? (
-                        <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin rounded-full" />
-                      ) : (
-                        <CheckCircle2 className="w-5 h-5" />
-                      )}
-                      {isSaving ? "Enviando..." : "Aprovar e Enviar"}
-                    </button>
+                    {reviewingTake ? (
+                      /* Director Actions */
+                      <>
+                        <button
+                          onClick={handleDirectorReject}
+                          disabled={isSaving}
+                          className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all active:scale-90 disabled:opacity-50"
+                          aria-label="Rejeitar take"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={handleDirectorApprove}
+                          disabled={isSaving}
+                          className="h-10 px-6 rounded-full bg-green-500 text-white font-bold text-sm flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"
+                        >
+                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-5 h-5" />}
+                          {isSaving ? "Processando..." : "Aprovar"}
+                        </button>
+                      </>
+                    ) : isWaitingReview ? (
+                      /* Dubber Waiting State */
+                      <div className="h-10 px-4 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 font-bold text-xs flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Aguardando Diretor...
+                      </div>
+                    ) : (
+                      /* Dubber Pre-Upload / Fallback Actions */
+                      <>
+                        <button
+                          onClick={handleRejectTake}
+                          disabled={isSaving}
+                          className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all active:scale-90 disabled:opacity-50"
+                          aria-label="Descartar"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={handleApproveTake}
+                          disabled={isSaving}
+                          className="h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold text-sm flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+                        >
+                           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                           {isSaving ? "Enviando..." : "Reenviar"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
                 
-                {/* Player de Audio Local */}
+                {/* Player de Audio */}
                 <div className="bg-black/20 rounded-2xl p-3 border border-white/5 flex items-center gap-4">
                   <audio 
-                    src={pendingTake.url} 
+                    src={reviewingTake ? reviewingTake.audioUrl : pendingTake?.url} 
                     controls 
                     className="w-full h-10 accent-primary"
                     controlsList="nodownload noplaybackrate"
@@ -3325,17 +3625,17 @@ export default function RecordingRoom() {
                 <div className="grid grid-cols-3 gap-2">
                   <div className="bg-white/5 rounded-xl p-2 text-center">
                     <p className="text-[9px] text-white/40 uppercase font-bold">Loudness</p>
-                    <p className="text-xs font-mono text-white">{(pendingTake.metrics.loudness * 100).toFixed(0)}%</p>
+                    <p className="text-xs font-mono text-white">{((reviewingTake || pendingTake)?.metrics?.loudness * 100 || 0).toFixed(0)}%</p>
                   </div>
                   <div className="bg-white/5 rounded-xl p-2 text-center">
                     <p className="text-[9px] text-white/40 uppercase font-bold">Clipping</p>
-                    <p className={cn("text-xs font-mono", pendingTake.metrics.clipping ? "text-red-400" : "text-green-400")}>
-                      {pendingTake.metrics.clipping ? "SIM" : "NÃO"}
+                    <p className={cn("text-xs font-mono", (reviewingTake || pendingTake)?.metrics?.clipping ? "text-red-400" : "text-green-400")}>
+                      {(reviewingTake || pendingTake)?.metrics?.clipping ? "SIM" : "NÃO"}
                     </p>
                   </div>
                   <div className="bg-white/5 rounded-xl p-2 text-center">
                     <p className="text-[9px] text-white/40 uppercase font-bold">Noise</p>
-                    <p className="text-xs font-mono text-white">{(pendingTake.metrics.noiseFloor * 100).toFixed(0)}%</p>
+                    <p className="text-xs font-mono text-white">{((reviewingTake || pendingTake)?.metrics?.noiseFloor * 100 || 0).toFixed(0)}%</p>
                   </div>
                 </div>
               </div>
@@ -3379,6 +3679,27 @@ export default function RecordingRoom() {
                 <RotateCcw className="w-5 h-5 flip-horizontal" style={{ transform: "scaleX(-1)" }} />
               </button>
             </div>
+
+            {canApproveTake && directorConsoleOpen && !isMobile && (
+              <DirectorConsole
+                users={onlineRosterForCurrentRole}
+                clientAcks={clientAcks}
+                onClose={() => setDirectorConsoleOpen(false)}
+              />
+            )}
+
+            {canApproveTake && !directorConsoleOpen && !isMobile && (
+              <button
+                onClick={() => setDirectorConsoleOpen(true)}
+                className="absolute top-20 right-4 z-40 w-10 h-10 rounded-full bg-zinc-900/80 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:scale-105 transition-all shadow-lg"
+                title="Abrir Console do Diretor"
+              >
+                <div className="relative">
+                  <Monitor className="w-5 h-5" />
+                  <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                </div>
+              </button>
+            )}
 
             <div className="flex-1 w-full flex flex-col gap-2">
               <div className="flex items-center justify-between text-[11px] font-mono text-white/40 px-1">
