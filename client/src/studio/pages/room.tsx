@@ -1081,85 +1081,6 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     }
   }, [queryClient, sessionId, toast, logFeatureAudit, user?.role]);
 
-  const [videoTime, setVideoTime] = useState(0);
-  const [videoDuration, setVideoDuration] = useState(0);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const desktopVideoTextContainerRef = useRef<HTMLDivElement>(null);
-  const scriptViewportRef = useRef<HTMLDivElement>(null);
-  const lineRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const [scriptAutoFollow, setScriptAutoFollow] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(`vhub_script_follow_${sessionId}`);
-      return saved ? saved === "auto" : true;
-    } catch {
-      return true;
-    }
-  });
-  const scrollAnchorsRef = useRef<ScrollAnchor[]>([]);
-  const scrollSyncRafRef = useRef<number | null>(null);
-  const scrollSyncLastTsRef = useRef<number | null>(null);
-  const scrollSyncCurrentRef = useRef(0);
-  const scrollSyncLastVideoTimeRef = useRef(0);
-
-  const [micReady, setMicReady] = useState(false);
-  const [micState, setMicState] = useState<MicrophoneState | null>(null);
-  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus>("idle");
-  const [countdownValue, setCountdownValue] = useState(0);
-  const [lastRecording, setLastRecording] = useState<RecordingResult | null>(null);
-  const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const previewAudioRef = useRef<HTMLAudioElement>(null);
-  const recordingsPreviewAudioRef = useRef<HTMLAudioElement>(null);
-  const recordingRowAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-  const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
-  const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1);
-  const [recordingsIsLoading, setRecordingsIsLoading] = useState<Set<string>>(new Set());
-  const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem("vhub_desktop_video_text_split");
-      // O roteiro não pode ocupar mais de 50% da altura da viewport.
-      // Se scriptHeight = 100 - split, então 100 - split <= 50, logo split >= 50.
-      const val = saved ? Number(saved) : 68;
-      return Math.max(50, Math.min(80, val));
-    } catch {
-      return 68;
-    }
-  });
-  const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
-
-  const [sideScriptWidth, setSideScriptWidth] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem("vhub_side_script_width");
-      const val = saved ? Number(saved) : 400;
-      // Limites: 15% min, 50% max da largura da tela
-      const min = Math.max(300, window.innerWidth * 0.15);
-      const max = window.innerWidth * 0.5;
-      return Math.max(min, Math.min(max, val));
-    } catch {
-      return 400;
-    }
-  });
-  const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
-
-  const [scriptFontSize, setScriptFontSize] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem("vhub_script_font_size");
-      const val = saved ? Number(saved) : 16;
-      return Math.max(12, Math.min(24, val));
-    } catch {
-      return 16;
-    }
-  });
-
-  const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
-  const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
-  const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
-  const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
-
-  const [textControlPopupOpen, setTextControlPopupOpen] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const controlsTimeoutRef = useRef<any>(null);
-
   useEffect(() => {
     if (!scriptAutoFollow || !scriptViewportRef.current || isPlaying === false) return;
     
@@ -1252,9 +1173,6 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     });
   };
 
-  const [textControllerUserIds, setTextControllerUserIds] = useState<Set<string>>(new Set());
-  const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
-
   const mySessionRole = useMemo(() => {
     const participantRole = session?.participants?.find((p: any) => p.userId === user?.id)?.role;
     if (participantRole) return normalizeRoomRole(participantRole);
@@ -1331,8 +1249,6 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
   const textControlCandidates = useMemo(() => {
     return presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role));
   }, [presenceUsers]);
-
-  const wsRef = useRef<WebSocket | null>(null);
 
   const emitVideoEvent = useCallback((type: string, data: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -2149,8 +2065,6 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     setQualityMetrics(null);
     setRecordingStatus("idle");
   }, []);
-
-  const [directorConsoleOpen, setDirectorConsoleOpen] = useState(true);
 
   // Debounce para live updates de texto
   useEffect(() => {
