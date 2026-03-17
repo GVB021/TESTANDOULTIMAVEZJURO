@@ -32,6 +32,13 @@ Você precisa pegar isso no painel do seu projeto Supabase:
 ### Autenticação do App
 - `SESSION_SECRET`: Crie uma senha longa e aleatória (ex: `batata-frita-com-queijo-123456`)
 
+### Integração de Vídeo (Daily.co) - CRÍTICO 🎥
+Para que a sala de vídeo funcione, você precisa de uma conta no Daily.co.
+1. Crie uma conta em [daily.co](https://daily.co).
+2. Vá em "Developers" e copie sua API Key.
+3. Adicione no Railway:
+   - `DAILY_API_KEY`: `sua_chave_aqui`
+
 ### Configurações Opcionais (Mas recomendadas)
 - `NODE_ENV`: `production` (Já deve vir padrão)
 - `PORT`: O Railway define isso sozinho (geralmente 3000 ou 8080). Não precisa mexer.

@@ -5,23 +5,31 @@ import { isPrivilegedStudioRole, normalizePlatformRole, normalizeStudioRole } fr
 
 interface SyncMessage {
   type:
-    | "video-play"
-    | "video-pause"
-    | "video-seek"
+    | "video:play"
+    | "video:pause"
+    | "video:seek"
+    | "video:sync"
+    | "video:countdown"
+    | "video:countdown-start"
+    | "video:countdown-tick"
+    | "video:loop-preparing"
+    | "video:loop-silence-window"
+    | "video:sync-loop"
     | "grant-permission"
     | "revoke-permission"
-    | "sync-loop"
     | "toggle-global-control"
     | "revoke-all"
     | "permission-sync"
     | "presence-sync"
+    | "presence:update"
     | "text-control:state"
     | "text-control:set-controller"
     | "text-control:clear-controller"
     | "text-control:set-controllers"
     | "text-control:grant-controller"
     | "text-control:revoke-controller"
-    | "text-control:update-line";
+    | "text-control:update-line"
+    | "video:take-status";
   currentTime?: number;
   lineIndex?: number;
   targetUserId?: string;
@@ -43,6 +51,11 @@ interface SyncMessage {
     after?: string;
     by?: string;
   };
+  status?: string;
+  count?: number;
+  initiatorUserId?: string;
+  delayMs?: number;
+  isPlaying?: boolean;
 }
 
 const rooms = new Map<string, Set<WebSocket & { userId?: string; role?: string; name?: string; sessionId?: string }>>();
@@ -299,7 +312,7 @@ export function setupVideoSync(httpServer: Server) {
           if (typeof msg.text !== "string" && typeof msg.character !== "string" && typeof msg.start !== "number") return;
         }
 
-        if (msg.type === "video-seek" && typeof msg.lineIndex === "number") {
+        if (msg.type === "video:seek" && typeof msg.lineIndex === "number") {
           if (!isPrivileged && !isController) return;
         }
 
