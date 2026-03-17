@@ -85,7 +85,16 @@ export function hasMinStudioRole(role: unknown, minRole: StudioRole) {
   return (STUDIO_ROLE_HIERARCHY[current] ?? 0) >= (STUDIO_ROLE_HIERARCHY[minRole] ?? 0);
 }
 
-export function isPrivilegedStudioRole(role: unknown) {
+export function isDirectorRole(role: unknown) {
   const r = normalizeStudioRole(role);
-  return r === "platform_owner" || r === "studio_admin" || hasMinStudioRole(r, "engenheiro_audio");
+  return r === "platform_owner" || r === "studio_admin" || r === "diretor" || r === "engenheiro_audio";
+}
+
+export function isDubberRole(role: unknown) {
+  const r = normalizeStudioRole(role);
+  return r === "dublador" || r === "aluno";
+}
+
+export function isPrivilegedStudioRole(role: unknown) {
+  return isDirectorRole(role);
 }

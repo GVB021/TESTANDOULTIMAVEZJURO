@@ -174,11 +174,8 @@ function keyLabel(code: string) {
 
 function normalizeRoomRole(role: unknown) {
   const value = String(role || "").trim().toLowerCase().replace(/\s+/g, "_");
-  if (value === "director") return "diretor";
-  if (value === "admin") return "studio_admin";
-  if (value === "platformowner") return "platform_owner";
-  if (value === "master") return "master";
-  return value;
+  if (value === "director" || value === "diretor" || value === "studio_admin" || value === "engenheiro_audio" || value === "platform_owner" || value === "master") return "diretor";
+  return "dublador";
 }
 
 type UiRole = "viewer" | "text_controller" | "audio_controller" | "admin";
@@ -187,17 +184,20 @@ type UiPermission = "text_control" | "audio_control" | "presence_view" | "approv
 const UI_ROLE_PERMISSIONS: Record<UiRole, UiPermission[]> = {
   viewer: [],
   text_controller: ["text_control", "presence_view"],
-  audio_controller: ["audio_control", "dashboard_access", "presence_view"],
+  audio_controller: ["audio_control", "presence_view"], // Removed dashboard_access from dubber by default? User said "Dubber's access is restricted to recording and text control only when explicitly permitted"
   admin: ["text_control", "audio_control", "approve_take", "dashboard_access", "presence_view"],
 };
 
 function resolveUiRole(role: unknown, controlledText: boolean): UiRole {
   const normalized = normalizeRoomRole(role);
-  if (normalized === "platform_owner" || normalized === "master" || normalized === "studio_admin" || normalized === "diretor") return "admin";
-  if (normalized === "editor" || normalized === "text_controller") return "text_controller";
+  
+  if (normalized === "diretor") return "admin";
+  
+  // Se tiver controle de texto explícito (concedido pelo diretor)
   if (controlledText) return "text_controller";
-  if (normalized === "dublador" || normalized === "aluno") return "audio_controller";
-  return "viewer";
+  
+  // Dublador padrão
+  return "audio_controller";
 }
 
 function hasUiPermission(role: UiRole, permission: UiPermission) {
@@ -205,8 +205,9 @@ function hasUiPermission(role: UiRole, permission: UiPermission) {
 }
 
 function canReceiveTextControl(role: unknown) {
+  // Qualquer um que não seja diretor pode receber controle (basicamente dubladores)
   const normalized = normalizeRoomRole(role);
-  return normalized === "dublador" || normalized === "aluno";
+  return normalized !== "diretor";
 }
 
 interface RecordingProfile {
@@ -859,8 +860,9 @@ export default function RecordingRoom() {
 
   const handleDiscardTake = useCallback(async (take: any) => {
     const takeId = String(take.id);
-    const normalizedRole = normalizeRoomRole(user?.role);
-    const canDeletePermanently = normalizedRole === "platform_owner" || normalizedRole === "master";
+    // const normalizedRole = normalizeRoomRole(user?.role); // Removed as we check user.role directly
+    const rawRole = String(user?.role || "").trim().toLowerCase();
+    const canDeletePermanently = rawRole === "platform_owner" || rawRole === "master";
     const takesQueryKey = ["/api/sessions", sessionId, "takes"] as const;
     const recordingsQueryKey = ["/api/sessions", sessionId, "recordings"] as const;
     const previousTakes = queryClient.getQueryData(takesQueryKey);
@@ -1081,8 +1083,8 @@ export default function RecordingRoom() {
   }, [session?.participants, user?.id, user?.role]);
   const uiRole = useMemo(() => resolveUiRole(mySessionRole, Boolean(user?.id && textControllerUserIds.has(user.id))), [mySessionRole, user?.id, textControllerUserIds]);
   const isPlatformOwner = useMemo(() => {
-    const normalized = normalizeRoomRole(user?.role);
-    return normalized === "platform_owner" || normalized === "master";
+    const rawRole = String(user?.role || "").trim().toLowerCase();
+    return rawRole === "platform_owner" || rawRole === "master";
   }, [user?.role]);
   const canReleaseText = hasUiPermission(uiRole, "text_control");
   const canTextControl = hasUiPermission(uiRole, "text_control");
@@ -2991,7 +2993,7 @@ export default function RecordingRoom() {
               if (recordingStatus === 'recording' && !window.confirm('Você tem uma gravação em andamento. Deseja realmente sair?')) {
                 return;
               }
-              window.location.href = '/dashboard';
+              window.location.href = `/hub-dub/studio/${studioId}/dashboard`;
             }}
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
           >

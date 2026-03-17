@@ -6,10 +6,10 @@ export type StudioRole = "platform_owner" | "studio_admin" | "diretor" | "engenh
 
 const ROLE_HIERARCHY: Record<string, number> = {
   platform_owner: 100,
-  studio_admin: 80,
-  diretor: 60,
-  engenheiro_audio: 40,
-  dublador: 20,
+  studio_admin: 100,
+  diretor: 100,
+  engenheiro_audio: 100,
+  dublador: 10,
   aluno: 10,
 };
 
@@ -40,17 +40,22 @@ export function useStudioRole(studioId: string) {
     return roles.includes(targetRole);
   };
 
+  const isDirector = hasMinRole("diretor");
+  const isDubber = !isDirector && (hasRole("dublador") || hasRole("aluno"));
+
   return {
     role,
     roles,
     isLoading: isLoading && user?.role !== "platform_owner",
-    canManageMembers: hasMinRole("studio_admin"),
-    canCreateProductions: hasMinRole("studio_admin"),
-    canCreateSessions: hasMinRole("diretor"),
-    canEditScripts: hasMinRole("studio_admin"),
-    canManageStaff: hasMinRole("studio_admin"),
-    canViewStaff: hasMinRole("engenheiro_audio"),
+    canManageMembers: isDirector,
+    canCreateProductions: isDirector,
+    canCreateSessions: isDirector,
+    canEditScripts: isDirector,
+    canManageStaff: isDirector,
+    canViewStaff: isDirector,
     hasMinRole,
     hasRole,
+    isDirector,
+    isDubber,
   };
 }

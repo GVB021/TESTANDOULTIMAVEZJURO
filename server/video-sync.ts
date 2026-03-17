@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { Server } from "http";
 import { pool } from "./db";
-import { isPrivilegedStudioRole, normalizePlatformRole, normalizeStudioRole, hasMinStudioRole } from "@shared/roles";
+import { isPrivilegedStudioRole, normalizePlatformRole, normalizeStudioRole, hasMinStudioRole, isDirectorRole, isDubberRole } from "@shared/roles";
 
 interface SyncMessage {
   type:
@@ -98,8 +98,7 @@ function setTextControllers(sessionId: string, userIds: Iterable<string>) {
 }
 
 function canReceiveTextControl(role: string | undefined) {
-  const normalized = normalizeStudioRole(role);
-  return normalized === "dublador" || normalized === "aluno";
+  return isDubberRole(role);
 }
 
 function getRoster(room: Set<WebSocket & { userId?: string; role?: string; name?: string }>) {
@@ -408,7 +407,7 @@ export function setupVideoSync(httpServer: Server) {
         // Eventos de revisão de take
         if (msg.type === "video:take-decision") {
           // Apenas Diretores ou superior podem tomar decisão sobre take
-          const hasDirectorRole = hasMinStudioRole(ws.role, "diretor");
+          const hasDirectorRole = isDirectorRole(ws.role);
           const isPlatformOwner = ws.role === "platform_owner";
           if (!hasDirectorRole && !isPlatformOwner) {
             console.warn(`[WS] Decisão de take bloqueada para ${ws.name} (${ws.role})`);
@@ -441,7 +440,7 @@ export function setupVideoSync(httpServer: Server) {
           const locks = getLineLocks(sessionId);
           const existing = locks.get(msg.lineIndex);
           
-          const isDirector = hasMinStudioRole(ws.role, "diretor");
+          const isDirector = isDirectorRole(ws.role);
           const isOwner = ws.role === "platform_owner";
           const canForceUnlock = isDirector || isOwner;
 

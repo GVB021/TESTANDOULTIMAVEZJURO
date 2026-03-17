@@ -1525,7 +1525,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         try {
            const parsed = parseSupabaseStorageUrl(takeRecord.audioUrl);
            if (parsed) {
-             await deleteFromSupabaseStorage(parsed.bucket, [parsed.path]);
+             await deleteFromSupabaseStorage({ bucket: parsed.bucket, path: parsed.path });
            } else {
              // Fallback search logic if needed, but usually URL has path
            }

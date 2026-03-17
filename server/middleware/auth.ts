@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../lib/logger";
-import { getHighestStudioRole, normalizePlatformRole, normalizeStudioRole } from "@shared/roles";
+import { getHighestStudioRole, normalizePlatformRole, normalizeStudioRole, isDirectorRole } from "@shared/roles";
 
 export interface AuthUser {
   id: string;
@@ -116,6 +116,17 @@ export function requireStudioRole(...allowedRoles: string[]) {
       }
 
       const normalizedAllowed = allowedRoles.map(normalizeStudioRole);
+      
+      // Simplify logic: If user is Director and the route requires a Director role, allow.
+      const userIsDirector = roles.some(r => isDirectorRole(r));
+      const routeRequiresDirector = normalizedAllowed.some(r => isDirectorRole(r));
+
+      if (userIsDirector && routeRequiresDirector) {
+        req.studioRoles = roles;
+        req.studioRole = getHighestRole(roles);
+        return next();
+      }
+
       const hasPermission = roles.some(r => normalizedAllowed.includes(r as any));
       if (!hasPermission) {
         return res.status(403).json({ message: "Voce nao tem permissao para esta acao" });
