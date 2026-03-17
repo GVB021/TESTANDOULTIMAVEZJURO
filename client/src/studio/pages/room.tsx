@@ -38,6 +38,16 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useStudioRole } from "@studio/hooks/use-studio-role";
 import { useToast } from "@studio/hooks/use-toast";
 import { useAuth } from "@studio/hooks/use-auth";
 import {
@@ -514,232 +524,401 @@ function DirectorConsole({
   );
 }
 
+
+function DirectorEntryModal({
+  isOpen,
+  onConfirm,
+  studioId
+}: {
+  isOpen: boolean;
+  onConfirm: () => void;
+  studioId: string;
+}) {
+  return (
+    <Dialog open={isOpen}>
+      <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800 text-white" hideClose>
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold flex items-center gap-2">
+            <Monitor className="w-5 h-5 text-primary" />
+            Assumir Controle de Direção
+          </DialogTitle>
+          <DialogDescription className="text-zinc-400 mt-2">
+            Você está entrando como Diretor. Isso lhe dará controle total sobre:
+            <ul className="list-disc list-inside mt-2 space-y-1 ml-2 text-sm text-zinc-300">
+              <li>Controle de Playback e Gravação</li>
+              <li>Aprovação e Rejeição de Takes</li>
+              <li>Gerenciamento de Usuários e Permissões</li>
+              <li>Edição de Texto do Script</li>
+            </ul>
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="mt-4">
+          <Button 
+            onClick={onConfirm}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11"
+          >
+            Assumir Controle
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function RecordingRoom() {
   const { studioId, sessionId } = useParams<{ studioId: string; sessionId: string }>();
-  const [isMobile, setIsMobile] = useState(false);
-  const [scriptOpen, setScriptOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const logAudioStep = useCallback((step: string, payload?: Record<string, unknown>) => {
-    console.info(`[AudioPipeline][Room] ${step}`, payload || {});
-  }, []);
+  const { isDirector } = useStudioRole(studioId);
+  const [directorControlConfirmed, setDirectorControlConfirmed] = useState(false);
+  
+  // Se for diretor, só libera quando confirmar. Se não for, libera direto.
+  const isControlBlocked = isDirector && !directorControlConfirmed;
 
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+// Recordings pagination and filtering
+const [recordingsPage, setRecordingsPage] = useState(1);
+const [recordingsSearch, setRecordingsSearch] = useState("");
+const [recordingsScope, setRecordingsScope] = useState<"all" | "mine">("mine");
+const [recordingsDateFrom, setRecordingsDateFrom] = useState("");
+const [recordingsDateTo, setRecordingsDateTo] = useState("");
+const [recordingsSortBy, setRecordingsSortBy] = useState("createdAt");
+const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
 
+// Modal state
+const [discardModalTake, setDiscardModalTake] = useState<any>(null);
+const [discardFinalStep, setDiscardFinalStep] = useState(false);
+
+// Refs
+const videoRef = useRef<HTMLVideoElement>(null);
+const desktopVideoTextContainerRef = useRef<HTMLDivElement>(null);
+const scriptViewportRef = useRef<HTMLDivElement>(null);
+const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
+const scrollAnchorsRef = useRef<Record<number, number>>({});
+const scrollSyncRafRef = useRef<number | null>(null);
+const scrollSyncLastTsRef = useRef<number>(0);
+const scrollSyncCurrentRef = useRef<number>(0);
+const scrollSyncLastVideoTimeRef = useRef<number>(0);
+const loopSilenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const loopSilenceLockRef = useRef<boolean>(false);
+const previewAudioRef = useRef<HTMLAudioElement>(null);
+const recordingsPreviewAudioRef = useRef<HTMLAudioElement>(null);
+const recordingRowAudioRefs = useRef<Record<string, HTMLAudioElement>>({});
+const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
+
+// Additional state
+const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
+const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
+const [recordingsIsLoading, setRecordingsIsLoading] = useState(false);
+const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
+const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
+const [sideScriptWidth, setSideScriptWidth] = useState(320);
+const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
+const [scriptFontSize, setScriptFontSize] = useState(16);
+const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
+const [recordingAvailability, setRecordingAvailability] = useState<Record<string, boolean>>({});
+const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
+const [textControllerUserIds, setTextControllerUserIds] = useState<string[]>([]);
+const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
+const [studioTimecode, setStudioTimecode] = useState<any>(null);
+const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
+
+  // Core hooks
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const studioRole = useStudioRole(studioId, sessionId);
 
-  const [currentLine, setCurrentLine] = useState(0);
+  // WebSocket state
+  const [wsConnected, setWsConnected] = useState(false);
+  const [roomUsers, setRoomUsers] = useState<any[]>([]);
+
+  // Data fetching hooks
+  const { data: session, isLoading: sessionLoading, error: sessionError } = useSessionData(studioId || "", sessionId || "");
+  const { data: production, isLoading: productionLoading } = useProductionScript(studioId || "", session?.productionId);
+  const { data: charactersList = [] } = useCharactersList(session?.productionId);
+
+  // UI state
+  const [isMobile, setIsMobile] = useState(false);
+  const [scriptOpen, setScriptOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [textControlPopupOpen, setTextControlPopupOpen] = useState(false);
+  const [showProfilePanel, setShowProfilePanel] = useState(false);
+  const [deviceSettingsOpen, setDeviceSettingsOpen] = useState(false);
+  const [recordingsOpen, setRecordingsOpen] = useState(false);
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+
+  // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [isLooping, setIsLooping] = useState(false);
-  const [loopSelectionMode, setLoopSelectionMode] = useState<"idle" | "selecting-start" | "selecting-end">("idle");
-  const [customLoop, setCustomLoop] = useState<{ start: number; end: number } | null>(null);
-  const [preRoll, setPreRoll] = useState(1);
-  const [postRoll, setPostRoll] = useState(1);
+  const [videoTime, setVideoTime] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [teleprompterSpeed, setTeleprompterSpeed] = useState(1.0);
+  const [timecodeFormat, setTimecodeFormat] = useState<TimecodeFormat>("seconds");
+  const [scriptAutoFollow, setScriptAutoFollow] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(`vhub_script_follow_${sessionId}`);
+      return saved ? saved === "auto" : true;
+    } catch {
+      return true;
+    }
+  });
 
+  // Script editing state
+  const [lineOverrides, setLineOverrides] = useState<Record<number, ScriptLineOverride>>({});
+  const [lineEditHistory, setLineEditHistory] = useState<Record<number, Array<{ field: string; before: string; after: string; by: string }>>>({});
+  const [editingField, setEditingField] = useState<{ lineIndex: number; field: "character" | "text" } | null>(null);
+  const [editingDraftValue, setEditingDraftValue] = useState("");
+  const [currentLine, setCurrentLine] = useState(0);
+  const [onlySelectedCharacter, setOnlySelectedCharacter] = useState(false);
+
+  // Recording state
+  const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(null);
+  const [micReady, setMicReady] = useState(false);
+  const [micState, setMicState] = useState<"idle" | "requesting" | "granted" | "denied" | "error">("idle");
+  const [recordingStatus, setRecordingStatus] = useState<"idle" | "countdown" | "recording" | "stopped">("idle");
+  const [countdownValue, setCountdownValue] = useState(0);
+  const [lastRecording, setLastRecording] = useState<any>(null);
+  const [qualityMetrics, setQualityMetrics] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pendingTake, setPendingTake] = useState<any>(null);
+  const [reviewingTake, setReviewingTake] = useState<any>(null);
+
+  // Loop state
+  const [isLooping, setIsLooping] = useState(false);
+  const [customLoop, setCustomLoop] = useState<{ start: number; end: number } | null>(null);
+  const [loopSelectionMode, setLoopSelectionMode] = useState<"idle" | "selecting-start" | "selecting-end">("idle");
+  const [loopPreparing, setLoopPreparing] = useState(false);
+  const [loopSilenceActive, setLoopSilenceActive] = useState(false);
+
+  // Device settings
+  const [deviceSettings, setDeviceSettings] = useState<DeviceSettings>({
+    voiceCaptureMode: "high-fidelity",
+    inputDeviceId: "default",
+    inputGain: 1.0,
+    outputDeviceId: "default",
+  });
+
+  // Shortcuts
   const [shortcuts, setShortcuts] = useState<Shortcuts>(() => {
     try {
       const saved = localStorage.getItem("vhub_shortcuts");
-      return saved ? JSON.parse(saved) : DEFAULT_SHORTCUTS;
+      return saved ? { ...DEFAULT_SHORTCUTS, ...JSON.parse(saved) } : DEFAULT_SHORTCUTS;
     } catch {
       return DEFAULT_SHORTCUTS;
     }
   });
   const [pendingShortcuts, setPendingShortcuts] = useState<Shortcuts>(shortcuts);
-  const [isCustomizing, setIsCustomizing] = useState(false);
   const [listeningFor, setListeningFor] = useState<keyof Shortcuts | null>(null);
-  const [deviceSettingsOpen, setDeviceSettingsOpen] = useState(false);
-  const [deviceSettings, setDeviceSettings] = useState<DeviceSettings>(() => {
-    const defaults: DeviceSettings = { inputDeviceId: "", outputDeviceId: "", inputGain: 1, monitorVolume: 0.8, voiceCaptureMode: "original" };
-    try {
-      const saved = localStorage.getItem("vhub_device_settings");
-      return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
-    } catch {
-      return defaults;
-    }
-  });
-  const hasPersistedDeviceSettings = useMemo(() => {
-    try {
-      return Boolean(localStorage.getItem("vhub_device_settings"));
-    } catch {
-      return false;
-    }
+
+  const logAudioStep = useCallback((step: string, payload?: Record<string, unknown>) => {
+    console.info(`[AudioPipeline][Room] ${step}`, payload || {});
   }, []);
 
-  const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(() => {
-    if (!sessionId) return null;
-    try {
-      const saved = localStorage.getItem(`vhub_rec_profile_${sessionId}`);
-      if (!saved) return null;
-      const parsed = JSON.parse(saved);
-      const isValidUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!parsed.characterId || !isValidUuid.test(parsed.characterId)) {
-        localStorage.removeItem(`vhub_rec_profile_${sessionId}`);
-        return null;
-      }
-      return parsed;
-    } catch {
-      return null;
-    }
-  });
-  const [showProfilePanel, setShowProfilePanel] = useState(false);
-
-  const [volumeOverlay, setVolumeOverlay] = useState<number | null>(null);
-  const [charSelectorOpen, setCharSelectorOpen] = useState(false);
-  const [lastUploadedTakeId, setLastUploadedTakeId] = useState<string | null>(null);
-  const [recordingsOpen, setRecordingsOpen] = useState(false);
-  const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
-  const [recordingsScope, setRecordingsScope] = useState<"mine" | "all">("mine");
-  const [recordingsPage, setRecordingsPage] = useState(1);
-  const [recordingsSearch, setRecordingsSearch] = useState("");
-  const [recordingsSortBy, setRecordingsSortBy] = useState<"createdAt" | "durationSeconds" | "lineIndex" | "characterName">("createdAt");
-  const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
-  const [recordingsDateFrom, setRecordingsDateFrom] = useState("");
-  const [recordingsDateTo, setRecordingsDateTo] = useState("");
-  const [discardModalTake, setDiscardModalTake] = useState<any | null>(null);
-  const [discardFinalStep, setDiscardFinalStep] = useState(false);
-  const [onlySelectedCharacter, setOnlySelectedCharacter] = useState(false);
-  const [timecodeFormat, setTimecodeFormat] = useState<TimecodeFormat>("HH:MM:SS");
-  const [teleprompterSpeed, setTeleprompterSpeed] = useState(1);
-  const [loopAnchorIndex, setLoopAnchorIndex] = useState<number | null>(null);
-
-  // Novo sistema de preview de áudio antes do envio
-  const [pendingTake, setPendingTake] = useState<{
-    samples: Float32Array;
-    durationSeconds: number;
-    sampleRate: number;
-    metrics: any;
-    blob: Blob;
-    url: string;
-    lineIndex: number;
-    startTimeSeconds: number;
-  } | null>(null);
-
-  // Estados para o fluxo de revisão do diretor
-  const [reviewingTake, setReviewingTake] = useState<{
-    takeId: string;
-    audioUrl: string;
-    duration: number;
-    metrics: any;
-    lineIndex: number;
-    userId: string;
-    characterName: string;
-    startTimeSeconds: number;
-  } | null>(null);
-  const [isWaitingReview, setIsWaitingReview] = useState(false);
-
-  // Estados para sincronia avançada e locks
-  const [lockedLines, setLockedLines] = useState<Record<number, { userId: string; at: number }>>({});
-  const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
-  const [clientAcks, setClientAcks] = useState<Record<string, { lastAck: number; command: string }>>({});
-
-  const lastTapRef = useRef<number>(0);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const countdownTimerRef = useRef<number | null>(null);
-
-  const handleCharacterChange = (char: { id: string; name: string; voiceActorId: string | null }) => {
-    const baseProfile: RecordingProfile = recordingProfile || {
-      actorName: user?.fullName || user?.displayName || "Dublador",
-      characterId: char.id,
-      characterName: char.name,
-      voiceActorId: user?.id || "",
-      voiceActorName: user?.fullName || user?.displayName || "Dublador",
-    };
-    const newProfile = {
-      ...baseProfile,
-      characterId: char.id,
-      characterName: char.name,
-      voiceActorId: char.voiceActorId || user?.id || "",
-    };
-    setRecordingProfile(newProfile);
-    localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(newProfile));
-    setCharSelectorOpen(false);
-    toast({ title: `Personagem alterado para ${char.name}` });
-  };
-
+  // Mobile detection
   useEffect(() => {
-    if (!isMobile) {
-      setDailyMeetOpen(true);
-    }
-  }, [isMobile]);
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
-  const handleVideoTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  // WebSocket ref
+  const wsRef = useRef<WebSocket | null>(null);
 
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      // Double tap - Cycle playback speed
-      const video = videoRef.current;
-      if (video) {
-        video.playbackRate = 1;
+  // WebSocket connection
+  useEffect(() => {
+    if (!sessionId || !studioId) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.host;
+    const ws = new WebSocket(`${protocol}//${host}/ws/video-sync?studioId=${encodeURIComponent(studioId)}&sessionId=${encodeURIComponent(sessionId)}`);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log("[WS] Recebido:", msg);
+        
+        if (msg.type === "permission-sync") {
+          // Handle permission sync if needed
+        } else if (msg.type === "presence-sync") {
+          setRoomUsers(msg.users || []);
+        } else if (msg.type === "text-control:state") {
+          // Handle text control state if needed
+        } else if (msg.type === "video:sync") {
+          const video = videoRef.current;
+          if (video) {
+            const diff = Math.abs(video.currentTime - msg.currentTime);
+            if (diff > 0.3) video.currentTime = msg.currentTime;
+            if (msg.isPlaying && video.paused) video.play().catch(() => {});
+            else if (!msg.isPlaying && !video.paused) video.pause();
+          }
+        } else if (msg.type === "video:play") {
+          console.log("[WS] Executando comando video:play");
+          const video = videoRef.current;
+          if (video) {
+            if (typeof msg.currentTime === "number" && Number.isFinite(msg.currentTime)) {
+              const drift = Math.abs(video.currentTime - msg.currentTime);
+              if (drift > 0.12) {
+                console.log(`[WS] Ajustando drift de ${drift.toFixed(3)}s`);
+                video.currentTime = msg.currentTime;
+              }
+            }
+            if (video.paused) {
+              console.log("[WS] Vídeo estava pausado, iniciando reprodução...");
+              video.play().catch((e) => console.error("[WS] Erro ao dar play:", e));
+            } else {
+              console.log("[WS] Vídeo já estava reproduzindo.");
+            }
+            // Enviar ACK de confirmação
+            emitVideoEvent("ack", { command: "play", userId: user?.id });
+          } else {
+            console.warn("[WS] Elemento de vídeo não encontrado!");
+          }
+        } else if (msg.type === "video:pause") {
+          const video = videoRef.current;
+          if (video) {
+            if (typeof msg.currentTime === "number" && Number.isFinite(msg.currentTime)) {
+              video.currentTime = msg.currentTime;
+            }
+            if (!video.paused) video.pause();
+            // Enviar ACK de confirmação
+            emitVideoEvent("ack", { command: "pause", userId: user?.id });
+          }
+        } else if (msg.type === "video:ack") {
+          if (msg.userId) {
+            setClientAcks(prev => ({
+              ...prev,
+              [msg.userId!]: { lastAck: Date.now(), command: msg.command || "unknown" }
+            }));
+          }
+        } else if (msg.type === "text:lock-line") {
+          if (typeof msg.lineIndex === "number" && msg.userId) {
+            setLockedLines(prev => ({
+              ...prev,
+              [msg.lineIndex!]: { userId: msg.userId!, at: Date.now() }
+            }));
+          }
+        } else if (msg.type === "text:unlock-line") {
+          if (typeof msg.lineIndex === "number") {
+            setLockedLines(prev => {
+              const next = { ...prev };
+              delete next[msg.lineIndex!];
+              return next;
+            });
+          }
+        } else if (msg.type === "text:live-change") {
+          if (typeof msg.lineIndex === "number" && typeof msg.text === "string") {
+            setLiveDrafts(prev => ({
+              ...prev,
+              [msg.lineIndex!]: msg.text!
+            }));
+          }
+        } else if (msg.type === "video:seek") {
+          if (videoRef.current && typeof msg.currentTime === "number") {
+            videoRef.current.currentTime = msg.currentTime;
+          }
+        } else if (msg.type === "video:countdown" || msg.type === "video:countdown-start" || msg.type === "video:countdown-tick") {
+          setCountdownValue(msg.count);
+          if (msg.count > 0 && micState?.audioContext) {
+            playCountdownBeep(micState.audioContext);
+          }
+        } else if (msg.type === "video:loop-preparing") {
+          setLoopPreparing(true);
+          const delayMs = Number(msg.delayMs || 3000);
+          window.setTimeout(() => setLoopPreparing(false), delayMs);
+        } else if (msg.type === "video:loop-silence-window") {
+          setLoopSilenceActive(true);
+          const delayMs = Number(msg.delayMs || 3000);
+          window.setTimeout(() => setLoopSilenceActive(false), delayMs);
+        } else if (msg.type === "video:sync-loop") {
+          if (msg.loopRange && typeof msg.loopRange.start === "number" && typeof msg.loopRange.end === "number") {
+            setCustomLoop({ start: msg.loopRange.start, end: msg.loopRange.end });
+            setIsLooping(true);
+          } else {
+            setCustomLoop(null);
+            setIsLooping(false);
+          }
+        } else if (msg.type === "text-control:update-line") {
+          const patch: ScriptLineOverride = {};
+          if (typeof msg.text === "string") patch.text = msg.text;
+          if (typeof msg.character === "string") patch.character = msg.character;
+          if (typeof msg.start === "number" && Number.isFinite(msg.start)) patch.start = msg.start;
+          applyScriptLinePatch(msg.lineIndex, patch);
+          if (msg.history && typeof msg.history === "object") {
+            pushEditHistory(
+              msg.lineIndex,
+              msg.history.field,
+              String(msg.history.before ?? ""),
+              String(msg.history.after ?? ""),
+              String(msg.history.by || "Usuário")
+            );
+          }
+        } else if (msg.type === "text-control:set-controllers" || msg.type === "text-control:state") {
+          const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
+          setTextControllerUserIds(new Set(ids || []));
+        } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
+          setPresenceUsers(msg.users);
+        } else if (msg.type === "video:take-ready-for-review") {
+          // Se eu sou aprovador, recebo o take para revisar
+          if (canApproveTake && msg.takeId && msg.audioUrl) {
+            setReviewingTake({
+              takeId: msg.takeId,
+              audioUrl: msg.audioUrl,
+              duration: msg.duration || 0,
+              metrics: msg.metrics || {},
+              lineIndex: msg.lineIndex || 0,
+              userId: msg.userId || "",
+              characterName: msg.character || "Desconhecido",
+              startTimeSeconds: msg.start || 0,
+            });
+            toast({ title: "Novo take para revisão", description: "Um dublador enviou um take." });
+          }
+        } else if (msg.type === "video:take-decision") {
+          // Se a decisão for sobre um take meu
+          if (msg.takeId === lastUploadedTakeId) {
+            setIsWaitingReview(false);
+            if (msg.decision === "approved") {
+              toast({ title: "Take Aprovado!", description: "O diretor aprovou seu take.", variant: "default" });
+              // Limpa estado local se ainda estiver pendente (embora upload já tenha ocorrido)
+              setPendingTake(null);
+              setRecordingStatus("idle");
+            } else {
+              toast({ title: "Take Rejeitado", description: "O diretor solicitou uma nova gravação.", variant: "destructive" });
+              // Mantém o estado para regravação rápida ou limpa? Vamos limpar para forçar nova gravação
+              setPendingTake(null);
+              setRecordingStatus("idle");
+            }
+          }
+          // Se eu sou o diretor que estava revisando, limpo meu estado
+          if (reviewingTake?.takeId === msg.takeId) {
+            setReviewingTake(null);
+          }
+        } else if (msg.type === "video:take-status") {
+          if (String(msg.targetUserId || "") !== String(user?.id || "")) return;
+          if (msg.status === "deleted") {
+            toast({ title: "Um take seu foi excluído pelo diretor", variant: "destructive" });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse WS message", err);
       }
-    }
-    lastTapRef.current = now;
-  };
+    };
 
-  const handleVideoTouchMove = (e: React.TouchEvent) => {
-    if (!touchStartRef.current) return;
-    const touch = e.touches[0];
-    const deltaY = touchStartRef.current.y - touch.clientY;
+    ws.onopen = () => {
+      console.log("[Room] WebSocket connected");
+      setWsConnected(true);
+    };
 
-    if (Math.abs(deltaY) > 20) {
-      const video = videoRef.current;
-      if (video) {
-        const change = deltaY > 0 ? 0.05 : -0.05;
-        const newVol = Math.max(0, Math.min(1, video.volume + change));
-        video.volume = newVol;
-        setIsMuted(newVol === 0);
-        setVolumeOverlay(Math.round(newVol * 100));
-        setTimeout(() => setVolumeOverlay(null), 1000);
-      }
-      touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-    }
-  };
+    ws.onclose = () => {
+      console.log("[Room] WebSocket disconnected");
+      setWsConnected(false);
+    };
 
-  const { data: session, isLoading: sessionLoading, isError: sessionError } = useSessionData(studioId, sessionId);
-  const { data: production, isLoading: productionLoading } = useProductionScript(studioId, session?.productionId);
-  const { data: charactersList } = useCharactersList(session?.productionId);
-  const { data: studioTimecode } = useQuery<{ format: TimecodeFormat }>({
-    queryKey: ["/api/studios", studioId, "timecode-format"],
-    queryFn: () => authFetch(`/api/studios/${studioId}/timecode-format`),
-    enabled: Boolean(studioId),
-  });
-  const logFeatureAudit = useCallback(async (action: string, details?: Record<string, unknown>) => {
-    try {
-      await authFetch(`/api/sessions/${sessionId}/audit-events`, {
-        method: "POST",
-        body: JSON.stringify({ action, details: JSON.stringify(details || {}) }),
-      });
-    } catch {}
-  }, [sessionId]);
-
-  const [lineOverrides, setLineOverrides] = useState<Record<number, ScriptLineOverride>>({});
-  const [lineEditHistory, setLineEditHistory] = useState<Record<number, Array<{
-    id: string;
-    field: "character" | "text" | "timecode";
-    before: string;
-    after: string;
-    at: string;
-    by: string;
-  }>>>({});
-  const [editingField, setEditingField] = useState<{ lineIndex: number; field: "character" | "text" | "timecode" } | null>(null);
-  const [editingDraftValue, setEditingDraftValue] = useState("");
-  const [recordingsPlayerOpenId, setRecordingsPlayerOpenId] = useState<string | null>(null);
-  const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
-  const [loopPreparing, setLoopPreparing] = useState(false);
-  const [loopSilenceActive, setLoopSilenceActive] = useState(false);
-  const loopPreparationTimeoutRef = useRef<number | null>(null);
-  const loopSilenceTimeoutRef = useRef<number | null>(null);
-  const loopSilenceLockRef = useRef(false);
+    return () => {
+      ws.close();
+    };
+  }, [sessionId, studioId, micState, user?.id, toast, applyScriptLinePatch, pushEditHistory, canApproveTake, lastUploadedTakeId, reviewingTake]);
 
   const baseScriptLines: ScriptLine[] = useMemo(() => {
     if (!production?.scriptJson) return [];
@@ -1196,178 +1375,6 @@ export default function RecordingRoom() {
       };
     });
   }, []);
-
-  useEffect(() => {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.host;
-    const ws = new WebSocket(`${protocol}//${host}/ws/video-sync?sessionId=${encodeURIComponent(sessionId)}`);
-    wsRef.current = ws;
-
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      console.log("[WS] Recebido:", msg);
-      
-      if (msg.type === "video:sync") {
-        const video = videoRef.current;
-        if (video) {
-          const diff = Math.abs(video.currentTime - msg.currentTime);
-          if (diff > 0.3) video.currentTime = msg.currentTime;
-          if (msg.isPlaying && video.paused) video.play().catch(() => {});
-          else if (!msg.isPlaying && !video.paused) video.pause();
-        }
-      } else if (msg.type === "video:play") {
-        console.log("[WS] Executando comando video:play");
-        const video = videoRef.current;
-        if (video) {
-          if (typeof msg.currentTime === "number" && Number.isFinite(msg.currentTime)) {
-            const drift = Math.abs(video.currentTime - msg.currentTime);
-            if (drift > 0.12) {
-              console.log(`[WS] Ajustando drift de ${drift.toFixed(3)}s`);
-              video.currentTime = msg.currentTime;
-            }
-          }
-          if (video.paused) {
-            console.log("[WS] Vídeo estava pausado, iniciando reprodução...");
-            video.play().catch((e) => console.error("[WS] Erro ao dar play:", e));
-          } else {
-            console.log("[WS] Vídeo já estava reproduzindo.");
-          }
-          // Enviar ACK de confirmação
-          emitVideoEvent("ack", { command: "play", userId: user?.id });
-        } else {
-          console.warn("[WS] Elemento de vídeo não encontrado!");
-        }
-      } else if (msg.type === "video:pause") {
-        const video = videoRef.current;
-        if (video) {
-          if (typeof msg.currentTime === "number" && Number.isFinite(msg.currentTime)) {
-            video.currentTime = msg.currentTime;
-          }
-          if (!video.paused) video.pause();
-          // Enviar ACK de confirmação
-          emitVideoEvent("ack", { command: "pause", userId: user?.id });
-        }
-      } else if (msg.type === "video:ack") {
-        if (msg.userId) {
-          setClientAcks(prev => ({
-            ...prev,
-            [msg.userId!]: { lastAck: Date.now(), command: msg.command || "unknown" }
-          }));
-        }
-      } else if (msg.type === "text:lock-line") {
-        if (typeof msg.lineIndex === "number" && msg.userId) {
-          setLockedLines(prev => ({
-            ...prev,
-            [msg.lineIndex!]: { userId: msg.userId!, at: Date.now() }
-          }));
-        }
-      } else if (msg.type === "text:unlock-line") {
-        if (typeof msg.lineIndex === "number") {
-          setLockedLines(prev => {
-            const next = { ...prev };
-            delete next[msg.lineIndex!];
-            return next;
-          });
-        }
-      } else if (msg.type === "text:live-change") {
-        if (typeof msg.lineIndex === "number" && typeof msg.text === "string") {
-          setLiveDrafts(prev => ({
-            ...prev,
-            [msg.lineIndex!]: msg.text!
-          }));
-        }
-      } else if (msg.type === "video:seek") {
-        if (videoRef.current && typeof msg.currentTime === "number") {
-          videoRef.current.currentTime = msg.currentTime;
-        }
-      } else if (msg.type === "video:countdown" || msg.type === "video:countdown-start" || msg.type === "video:countdown-tick") {
-        setCountdownValue(msg.count);
-        if (msg.count > 0 && micState?.audioContext) {
-          playCountdownBeep(micState.audioContext);
-        }
-      } else if (msg.type === "video:loop-preparing") {
-        setLoopPreparing(true);
-        const delayMs = Number(msg.delayMs || 3000);
-        window.setTimeout(() => setLoopPreparing(false), delayMs);
-      } else if (msg.type === "video:loop-silence-window") {
-        setLoopSilenceActive(true);
-        const delayMs = Number(msg.delayMs || 3000);
-        window.setTimeout(() => setLoopSilenceActive(false), delayMs);
-      } else if (msg.type === "video:sync-loop") {
-        if (msg.loopRange && typeof msg.loopRange.start === "number" && typeof msg.loopRange.end === "number") {
-          setCustomLoop({ start: msg.loopRange.start, end: msg.loopRange.end });
-          setIsLooping(true);
-        } else {
-          setCustomLoop(null);
-          setIsLooping(false);
-        }
-      } else if (msg.type === "text-control:update-line") {
-        const patch: ScriptLineOverride = {};
-        if (typeof msg.text === "string") patch.text = msg.text;
-        if (typeof msg.character === "string") patch.character = msg.character;
-        if (typeof msg.start === "number" && Number.isFinite(msg.start)) patch.start = msg.start;
-        applyScriptLinePatch(msg.lineIndex, patch);
-        if (msg.history && typeof msg.history === "object") {
-          pushEditHistory(
-            msg.lineIndex,
-            msg.history.field,
-            String(msg.history.before ?? ""),
-            String(msg.history.after ?? ""),
-            String(msg.history.by || "Usuário")
-          );
-        }
-      } else if (msg.type === "text-control:set-controllers" || msg.type === "text-control:state") {
-        const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
-        setTextControllerUserIds(new Set(ids || []));
-      } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
-        setPresenceUsers(msg.users);
-      } else if (msg.type === "video:take-ready-for-review") {
-        // Se eu sou aprovador, recebo o take para revisar
-        if (canApproveTake && msg.takeId && msg.audioUrl) {
-          setReviewingTake({
-            takeId: msg.takeId,
-            audioUrl: msg.audioUrl,
-            duration: msg.duration || 0,
-            metrics: msg.metrics || {},
-            lineIndex: msg.lineIndex || 0,
-            userId: msg.userId || "",
-            characterName: msg.character || "Desconhecido",
-            startTimeSeconds: msg.start || 0,
-          });
-          toast({ title: "Novo take para revisão", description: "Um dublador enviou um take." });
-        }
-      } else if (msg.type === "video:take-decision") {
-        // Se a decisão for sobre um take meu
-        if (msg.takeId === lastUploadedTakeId) {
-          setIsWaitingReview(false);
-          if (msg.decision === "approved") {
-            toast({ title: "Take Aprovado!", description: "O diretor aprovou seu take.", variant: "default" });
-            // Limpa estado local se ainda estiver pendente (embora upload já tenha ocorrido)
-            setPendingTake(null);
-            setRecordingStatus("idle");
-          } else {
-            toast({ title: "Take Rejeitado", description: "O diretor solicitou uma nova gravação.", variant: "destructive" });
-            // Mantém o estado para regravação rápida ou limpa? Vamos limpar para forçar nova gravação
-            setPendingTake(null);
-            setRecordingStatus("idle");
-          }
-        }
-        // Se eu sou o diretor que estava revisando, limpo meu estado
-        if (reviewingTake?.takeId === msg.takeId) {
-          setReviewingTake(null);
-        }
-      } else if (msg.type === "video:take-status") {
-        if (String(msg.targetUserId || "") !== String(user?.id || "")) return;
-        if (msg.status === "deleted") {
-          toast({ title: "Um take seu foi excluído pelo diretor", variant: "destructive" });
-        }
-      }
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [sessionId, micState, user?.id, toast, applyScriptLinePatch, pushEditHistory]);
 
   const rebuildScrollAnchors = useCallback(() => {
     const viewport = scriptViewportRef.current;
@@ -3117,10 +3124,10 @@ export default function RecordingRoom() {
           {canViewOnlineUsers && !isMobile && (
             <div
               className="h-7 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 flex items-center gap-1.5"
-              title={onlineRosterForCurrentRole.map((presence: any) => presence.name || presence.userId).join(", ")}
+              title={roomUsers.map((u: any) => u.displayName || u.fullName || u.name || u.userId).join(", ")}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>{onlineRosterForCurrentRole.length} online</span>
+              <span>{roomUsers.length} online</span>
             </div>
           )}
           
@@ -3959,6 +3966,24 @@ export default function RecordingRoom() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Director Entry Modal and Blocking Overlay */}
+      {isDirector && !directorControlConfirmed && (
+        <DirectorEntryModal
+          studioId={studioId}
+          sessionId={sessionId}
+          onConfirm={() => setDirectorControlConfirmed(true)}
+        />
+      )}
+      
+      {isControlBlocked && (
+        <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-center text-white">
+            <h2 className="text-2xl font-bold mb-2">Aguardando Confirmação</h2>
+            <p>O diretor precisa confirmar o controle antes de prosseguir.</p>
+          </div>
+        </div>
+      )}
 
     </div>
   );
