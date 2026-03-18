@@ -88,6 +88,11 @@ import {
   computeAdaptiveMaxSpeedPxPerSec,
   smoothScrollStep,
 } from "@studio/lib/script-scroll-sync";
+import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
+import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
+import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
+import { RoomHeader } from "@studio/components/room/header/RoomHeader";
+import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
 
 export interface ScriptLine {
   character: string;
@@ -145,12 +150,6 @@ export interface ScrollAnchor {
 }
 
 type RecordingAvailabilityState = "available" | "loading" | "error";
-
-import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
-import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
-import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
-import { RoomHeader } from "@studio/components/room/header/RoomHeader";
-import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
 
 const DEFAULT_SHORTCUTS: Shortcuts = {
   playPause: "Space",
