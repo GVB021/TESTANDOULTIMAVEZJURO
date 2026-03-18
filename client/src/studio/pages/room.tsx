@@ -1885,6 +1885,14 @@ export default function RecordingRoom() {
   const toggleUserTextControl = useCallback((targetUserId: string) => {
     if (!canTextControl) return;
     const hasPermission = textControllerUserIds.has(targetUserId);
+    // Optimistic UI update: toggle immediately
+    const next = new Set(textControllerUserIds);
+    if (hasPermission) {
+      next.delete(targetUserId);
+    } else {
+      next.add(targetUserId);
+    }
+    setTextControllerUserIds(next);
     emitTextControlEvent(hasPermission ? "text-control:revoke-controller" : "text-control:grant-controller", { targetUserId });
   }, [canTextControl, textControllerUserIds, emitTextControlEvent]);
 
