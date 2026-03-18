@@ -2,7 +2,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { authFetch } from "@studio/lib/auth-fetch";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Mic,
   Play,
