@@ -90,6 +90,7 @@ import { MobileMenu, MobileScriptDrawer, MobileFooterControls } from "@studio/co
 import { DesktopScriptColumn } from "@studio/components/room/script";
 import { DesktopControlsBar } from "@studio/components/room/controls";
 import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
+import { RecordingsPanel } from "@studio/components/room/recordings";
 import { RecordingProfilePanel } from "@studio/components/room/profile";
 import {
   DEFAULT_SHORTCUTS,
@@ -161,7 +162,7 @@ export interface ScrollAnchor {
   scrollTop: number;
 }
 
-type RecordingAvailabilityState = "available" | "loading" | "error";
+export type RecordingAvailabilityState = "available" | "loading" | "error";
 
 export interface RecordingProfile {
   actorName: string;
@@ -2399,271 +2400,90 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       )}
 
       {recordingsOpen && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-md" style={{ zIndex: UI_LAYER_BASE.modalOverlay }}>
-          <div className="rounded-2xl w-[calc(100vw-32px)] max-w-[720px] overflow-hidden border border-border/70 bg-card/95 shadow-2xl">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/70">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-foreground">Gravações</span>
-                {isPrivileged && (
-                  <button
-                    onClick={() => setRecordingsScope((v) => (v === "all" ? "mine" : "all"))}
-                    className="text-[10px] px-2 py-1 rounded-full border bg-muted/60 text-muted-foreground"
-                  >
-                    {recordingsScope === "all" ? "Todas" : "Minhas"}
-                  </button>
-                )}
-              </div>
-              <button onClick={() => setRecordingsOpen(false)} className="transition-colors text-muted-foreground hover:text-foreground">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {canViewOnlineUsers && (
-              <div className="px-6 pt-3">
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <span className="text-emerald-500 font-medium">Online agora:</span>
-                  {onlineRosterForCurrentRole.map((presence: any) => (
-                    <span key={presence.userId} className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      {presence.name || presence.userId}
-                    </span>
-                  ))}
-                  {onlineRosterForCurrentRole.length === 0 && <span>Nenhum usuário online</span>}
-                </div>
-              </div>
-            )}
-            <div className="px-6 pt-3 pb-2 border-b border-border/40">
-              <div className="grid gap-2 md:grid-cols-5">
-                <input
-                  value={recordingsSearch}
-                  onChange={(event) => setRecordingsSearch(event.target.value)}
-                  placeholder="Buscar por personagem, usuário ou ID"
-                  className="h-8 md:col-span-2 rounded-md border border-border bg-background px-2 text-xs"
-                />
-                <select
-                  value={recordingsSortBy}
-                  onChange={(event) => setRecordingsSortBy(event.target.value as any)}
-                  className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                >
-                  <option value="createdAt">Data</option>
-                  <option value="durationSeconds">Duração</option>
-                  <option value="lineIndex">Linha</option>
-                  <option value="characterName">Personagem</option>
-                </select>
-                <select
-                  value={recordingsSortDir}
-                  onChange={(event) => setRecordingsSortDir(event.target.value as any)}
-                  className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                >
-                  <option value="desc">Desc</option>
-                  <option value="asc">Asc</option>
-                </select>
-                <select
-                  value={String(recordingsPlaybackRate)}
-                  onChange={(event) => setRecordingsPlaybackRate(Number(event.target.value))}
-                  className="h-8 rounded-md border border-border bg-background px-2 text-xs"
-                >
-                  <option value="0.75">0.75x</option>
-                  <option value="1">1x</option>
-                  <option value="1.25">1.25x</option>
-                  <option value="1.5">1.5x</option>
-                  <option value="2">2x</option>
-                </select>
-              </div>
-              <div className="grid gap-2 md:grid-cols-4 mt-2">
-                <input type="date" value={recordingsDateFrom} onChange={(event) => setRecordingsDateFrom(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2 text-xs" />
-                <input type="date" value={recordingsDateTo} onChange={(event) => setRecordingsDateTo(event.target.value)} className="h-8 rounded-md border border-border bg-background px-2 text-xs" />
-                <div className="md:col-span-2 text-[11px] text-muted-foreground flex items-center justify-end">
-                  {recordingsResponse?.total || 0} gravações · página {recordingsResponse?.page || 1}/{recordingsResponse?.pageCount || 1}
-                </div>
-              </div>
-            </div>
-            <div className="px-6 py-4 max-h-[420px] overflow-y-auto custom-scrollbar">
-              <div className="grid grid-cols-12 text-[10px] uppercase text-muted-foreground tracking-wider pb-2 border-b border-border/60">
-                <span className="col-span-2">Linha</span>
-                <span className="col-span-3">Personagem</span>
-                <span className="col-span-2">Dublador</span>
-                <span className="col-span-2">Status</span>
-                <span className="col-span-1 text-right">Duração</span>
-                <span className="col-span-2 text-right">Ações</span>
-              </div>
-              <div className="space-y-1 mt-2">
-                {scopedRecordings.map((take: any) => (
-                  <div
-                    key={take.id}
-                    className={cn(
-                      "rounded-md hover:bg-muted/40 px-2 py-2 transition-all duration-300",
-                      optimisticRemovingTakeIds.has(String(take.id)) && "opacity-0 -translate-y-2 scale-[0.98] pointer-events-none"
-                    )}
-                  >
-                    <div className="grid grid-cols-12 items-center text-xs">
-                      <span className="col-span-2 font-mono text-muted-foreground">#{take.lineIndex}</span>
-                      <span className="col-span-3 truncate">{take.characterName || "-"}</span>
-                      <span className="col-span-2 font-mono">{take.voiceActorName || "N/A"}</span>
-                      <span className={cn("col-span-2 flex items-center gap-1.5", "text-emerald-500")}>
-                        <span>Salvo</span>
-                        <span className={cn(
-                          "inline-flex h-1.5 w-1.5 rounded-full",
-                          recordingAvailability[String(take.id || "")] === "error"
-                            ? "bg-red-500"
-                            : recordingAvailability[String(take.id || "")] === "loading"
-                              ? "bg-amber-500"
-                              : "bg-emerald-500"
-                        )} />
-                        <span className={cn(
-                          "text-[10px] inline-flex items-center gap-1",
-                          recordingAvailability[String(take.id || "")] === "error"
-                            ? "text-red-500"
-                            : recordingAvailability[String(take.id || "")] === "loading"
-                              ? "text-amber-500"
-                              : "text-emerald-500"
-                        )}>
-                          {recordingAvailability[String(take.id || "")] === "loading" && <Loader2 className="w-3 h-3 animate-spin" />}
-                          {recordingAvailability[String(take.id || "")] === "error"
-                            ? "Mídia indisponível"
-                            : recordingAvailability[String(take.id || "")] === "loading"
-                              ? "Carregando mídia"
-                              : "Mídia disponível"}
-                        </span>
-                      </span>
-                      <span className="col-span-1 text-right font-mono text-muted-foreground">
-                        {take.durationSeconds ? `${Number(take.durationSeconds).toFixed(1)}s` : "-"}
-                      </span>
-                      <div className="col-span-2 flex items-center justify-end gap-1.5">
-                        <button
-                          disabled={recordingsIsLoading.has(String(take.id))}
-                          onClick={async () => {
-                            const audio = recordingsPreviewAudioRef.current;
-                            if (!audio) return;
-                            const takeId = String(take?.id || "");
-                            if (!takeId) return;
-                            if (recordingsPreviewId === take.id && !recordingsPlayerOpenId) {
-                              audio.pause();
-                              setRecordingsPreviewId(null);
-                              setRecordingsPlayerOpenId(null);
-                              return;
-                            }
-                            try {
-                              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
-                              const streamUrl = await getTakeStreamUrl(take.id);
-                              if (streamUrl) {
-                                audio.src = streamUrl;
-                                await audio.play();
-                                setRecordingsPreviewId(take.id);
-                                setRecordingsPlayerOpenId(take.id);
-                                setRecordingPlayableUrls((prev) => ({ ...prev, [takeId]: streamUrl }));
-                                setRecordingAvailability((prev) => ({ ...prev, [takeId]: "available" }));
-                              }
-                            } catch (error) {
-                              console.error("Failed to play audio:", error);
-                              setRecordingAvailability((prev) => ({ ...prev, [takeId]: "error" }));
-                            } finally {
-                              setRecordingsIsLoading((prev) => {
-                                const next = new Set(prev);
-                                next.delete(takeId);
-                                return next;
-                              });
-                            }
-                          }}
-                          className={cn(
-                            "w-7 h-7 rounded-md flex items-center justify-center transition-all",
-                            recordingsPreviewId === take.id && !recordingsPlayerOpenId
-                              ? "bg-primary/20 text-primary hover:bg-primary/30"
-                              : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white",
-                            recordingsIsLoading.has(String(take.id)) && "opacity-50 cursor-not-allowed"
-                          )}
-                          title={recordingsPreviewId === take.id ? "Pausar" : "Tocar"}
-                        >
-                          {recordingsIsLoading.has(String(take.id)) ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : recordingsPreviewId === take.id && recordingsPlayerOpenId ? (
-                            <Pause className="w-3 h-3" />
-                          ) : (
-                            <Play className="w-3 h-3" />
-                          )}
-                        </button>
-                        <button
-                          disabled={recordingsIsLoading.has(String(take.id))}
-                          onClick={async () => {
-                            const takeId = String(take?.id || "");
-                            if (!takeId) return;
-                            try {
-                              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
-                              await handleDownloadTake(take);
-                            } catch (error) {
-                              console.error("Failed to download take:", error);
-                              toast({ title: "Erro ao baixar", description: "Não foi possível baixar a gravação.", variant: "destructive" });
-                            } finally {
-                              setRecordingsIsLoading((prev) => {
-                                const next = new Set(prev);
-                                next.delete(takeId);
-                                return next;
-                              });
-                              setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
-                            }
-                          }}
-                          className="w-7 h-7 rounded-md bg-muted/70 text-foreground hover:bg-muted flex items-center justify-center"
-                          title="Baixar take"
-                          data-testid={`button-download-recording-${take.id}`}
-                        >
-                          <Download className="w-3.5 h-3.5" />
-                        </button>
-                        {canDiscardTake && (
-                          <button
-                            onClick={() => { setDiscardModalTake(take); setDiscardFinalStep(false); }}
-                            className="h-7 px-2 rounded-md bg-destructive/20 text-destructive hover:bg-destructive/30 text-[10px]"
-                            title="Excluir take"
-                            data-testid={`button-discard-recording-${take.id}`}
-                            disabled={optimisticRemovingTakeIds.has(String(take.id))}
-                          >
-                            Excluir
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    {recordingsPlayerOpenId === take.id && (
-                      <div className="mt-2 pl-[16.8%]">
-                        <audio
-                          ref={(node: HTMLAudioElement | null) => { recordingRowAudioRefs.current[String(take.id)] = node; }}
-                          controls
-                          className="w-full h-8"
-                          src={recordingPlayableUrls[String(take.id)] || getTakeStreamUrl(take)}
-                          preload="none"
-                          onLoadedMetadata={(event) => {
-                            event.currentTarget.playbackRate = recordingsPlaybackRate;
-                            setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "available" }));
-                          }}
-                          onError={() => {
-                            setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-                {scopedRecordings.length === 0 && (
-                  <div className="text-sm text-center py-10 text-muted-foreground">
-                    Nenhuma gravação encontrada para este filtro
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="px-6 pb-4 flex items-center justify-between gap-2">
-              <button
-                onClick={() => setRecordingsPage((prev) => Math.max(1, prev - 1))}
-                disabled={(recordingsResponse?.page || 1) <= 1}
-                className="h-8 px-3 rounded-md border border-border bg-background text-xs disabled:opacity-40"
-              >
-                Página anterior
-              </button>
-              <button
-                onClick={() => setRecordingsPage((prev) => Math.min(recordingsResponse?.pageCount || 1, prev + 1))}
-                disabled={(recordingsResponse?.page || 1) >= (recordingsResponse?.pageCount || 1)}
-                className="h-8 px-3 rounded-md border border-border bg-background text-xs disabled:opacity-40"
-              >
-                Próxima página
-              </button>
-            </div>
-          </div>
-        </div>
+        <RecordingsPanel
+          zIndex={UI_LAYER_BASE.modalOverlay}
+          isPrivileged={isPrivileged}
+          canViewOnlineUsers={canViewOnlineUsers}
+          canDiscardTake={canDiscardTake}
+          recordingsScope={recordingsScope}
+          recordingsSearch={recordingsSearch}
+          recordingsSortBy={recordingsSortBy}
+          recordingsSortDir={recordingsSortDir}
+          recordingsPlaybackRate={recordingsPlaybackRate}
+          recordingsDateFrom={recordingsDateFrom}
+          recordingsDateTo={recordingsDateTo}
+          recordingsResponse={recordingsResponse}
+          scopedRecordings={scopedRecordings}
+          recordingAvailability={recordingAvailability}
+          recordingsIsLoading={recordingsIsLoading}
+          recordingsPreviewId={recordingsPreviewId}
+          recordingsPlayerOpenId={recordingsPlayerOpenId}
+          recordingPlayableUrls={recordingPlayableUrls}
+          optimisticRemovingTakeIds={optimisticRemovingTakeIds}
+          onlineRosterForCurrentRole={onlineRosterForCurrentRole}
+          audioRef={recordingsPreviewAudioRef}
+          rowAudioRefs={recordingRowAudioRefs}
+          getTakeStreamUrl={getTakeStreamUrl}
+          onClose={() => setRecordingsOpen(false)}
+          onScopeToggle={() => setRecordingsScope((v) => (v === "all" ? "mine" : "all"))}
+          onSearchChange={setRecordingsSearch}
+          onSortByChange={(v) => setRecordingsSortBy(v as any)}
+          onSortDirChange={(v) => setRecordingsSortDir(v as any)}
+          onPlaybackRateChange={setRecordingsPlaybackRate}
+          onDateFromChange={setRecordingsDateFrom}
+          onDateToChange={setRecordingsDateTo}
+          onPagePrev={() => setRecordingsPage((p) => Math.max(1, p - 1))}
+          onPageNext={() => setRecordingsPage((p) => Math.min(recordingsResponse?.pageCount || 1, p + 1))}
+          onPlayTake={async (take) => {
+            const audio = recordingsPreviewAudioRef.current;
+            if (!audio) return;
+            const takeId = String(take?.id || "");
+            if (!takeId) return;
+            if (recordingsPreviewId === take.id && !recordingsPlayerOpenId) {
+              audio.pause();
+              setRecordingsPreviewId(null);
+              setRecordingsPlayerOpenId(null);
+              return;
+            }
+            try {
+              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
+              const streamUrl = await getTakeStreamUrl(take.id);
+              if (streamUrl) {
+                audio.src = streamUrl;
+                await audio.play();
+                setRecordingsPreviewId(String(take.id));
+                setRecordingsPlayerOpenId(String(take.id));
+                setRecordingPlayableUrls((prev) => ({ ...prev, [takeId]: streamUrl }));
+                setRecordingAvailability((prev) => ({ ...prev, [takeId]: "available" }));
+              }
+            } catch (error) {
+              console.error("Failed to play audio:", error);
+              setRecordingAvailability((prev) => ({ ...prev, [takeId]: "error" }));
+            } finally {
+              setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
+            }
+          }}
+          onDownloadTake={async (take) => {
+            const takeId = String(take?.id || "");
+            if (!takeId) return;
+            try {
+              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
+              await handleDownloadTake(take);
+            } catch (error) {
+              console.error("Failed to download take:", error);
+              toast({ title: "Erro ao baixar", description: "Não foi possível baixar a gravação.", variant: "destructive" });
+            } finally {
+              setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
+              setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
+            }
+          }}
+          onDiscardTake={(take) => { setDiscardModalTake(take); setDiscardFinalStep(false); }}
+          onLoadedMetadata={(tid, rate, el) => {
+            el.playbackRate = rate;
+            setRecordingAvailability((prev) => ({ ...prev, [tid]: "available" }));
+          }}
+          onAudioError={(tid) => setRecordingAvailability((prev) => ({ ...prev, [tid]: "error" }))}
+        />
       )}
 
       <DiscardTakeModal
