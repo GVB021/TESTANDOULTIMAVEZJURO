@@ -315,7 +315,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   const hasPersistedDeviceSettings = false;
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
   const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
-  const [preRoll, setPreRoll] = useState(1);
 
   // Shortcuts
   const [shortcuts, setShortcuts] = useState<Shortcuts>(() => {
@@ -1652,7 +1651,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         console.log("🎬 Gravação iniciada exatamente no timing previsto");
       }
     }, 1000);
-  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, isLooping, customLoop, preRoll, recordingProfile, currentLine, scriptLines, mySessionRole]);
+  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, isLooping, customLoop, recordingProfile, currentLine, scriptLines, mySessionRole]);
 
   const handleDirectorApprove = useCallback(async () => {
     if (!reviewingTake) return;
@@ -1935,7 +1934,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       setLoopRangeMeta({ startIndex: normalizedStartIndex, endIndex: normalizedEndIndex });
       setLoopSelectionMode("idle");
       setIsLooping(true);
-      setPreRoll(3);
       toast({ title: "Loop definido", description: "Preroll de 3s e posroll adaptativo aplicados." });
       emitVideoEvent("sync-loop", { loopRange: { start, end } });
       logFeatureAudit("room.loop", "defined", { start, end, startLineIndex: normalizedStartIndex, endLineIndex: normalizedEndIndex });
@@ -1956,7 +1954,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       setCustomLoop(null);
       setLoopRangeMeta(null);
       setLoopAnchorIndex(null);
-      setPreRoll(1);
       await logFeatureAudit("room.loop", "cleared");
       return;
     }
