@@ -1443,7 +1443,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
   const startCountdown = useCallback(() => {
     if (recordingStatus !== "idle") {
-      console.warn("Gravação não iniciada: status não é idle", recordingStatus);
       toast({ 
         title: "Gravação em andamento", 
         description: "Pare a gravação atual antes de iniciar outra.", 
@@ -1453,8 +1452,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     }
     
     if (!micState) {
-      console.warn("MicState ausente, tentando inicializar...");
-      // Não bloquear, tentar iniciar mesmo sem micState
       toast({ 
         title: "Microfone não inicializado", 
         description: "Tentando iniciar microfone automaticamente...", 
@@ -1473,7 +1470,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     
     const video = videoRef.current;
     if (!video) {
-      console.error("❌ Elemento de vídeo não encontrado");
+      console.error("Elemento de vídeo não encontrado");
       toast({ 
         title: "Erro de reprodução", 
         description: "Elemento de vídeo não encontrado.", 
@@ -1497,11 +1494,11 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     if (micState) {
       startCapture(micState);
     } else {
-      console.warn("⚠️ Iniciando gravação sem micState - pode não funcionar");
+      console.warn("Iniciando gravação sem micState - pode não funcionar");
     }
     
     video.play().catch((error) => {
-      console.error("❌ Erro ao reproduzir vídeo", error);
+      console.error("Erro ao reproduzir vídeo", error);
       toast({ title: "Erro na reprodução", description: "Não foi possível reproduzir o vídeo.", variant: "destructive" });
     });
     
