@@ -5,8 +5,6 @@ import { authFetch } from "@studio/lib/auth-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Mic,
-  Play,
-  Pause,
   Square,
   CheckCircle2,
   AlertCircle,
@@ -18,7 +16,6 @@ import {
   User,
   Users,
   Edit3,
-  Download,
   Loader2,
   Menu,
   ListMusic,
