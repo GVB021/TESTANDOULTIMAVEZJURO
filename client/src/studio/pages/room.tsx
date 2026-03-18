@@ -1481,11 +1481,7 @@ export default function RecordingRoom() {
       // Opcional: Marcar como preferred no backend se necessário
       await authFetch(`/api/takes/${reviewingTake.takeId}/preferred`, { method: "PUT" });
       
-      emitVideoEvent("take-decision", {
-        takeId: reviewingTake.takeId,
-        decision: "approved",
-        userId: user?.id
-      });
+      emitVideoEvent("take-decision", { takeId: reviewingTake.takeId, decision: "approved", userId: user?.id });
       
       toast({ title: "Take Aprovado", description: "O dublador foi notificado." });
       setReviewingTake(null);
@@ -1502,11 +1498,7 @@ export default function RecordingRoom() {
       setIsSaving(true);
       await authFetch(`/api/takes/${reviewingTake.takeId}`, { method: "DELETE" });
       
-      emitVideoEvent("take-decision", {
-        takeId: reviewingTake.takeId,
-        decision: "rejected",
-        userId: user?.id
-      });
+      emitVideoEvent("take-decision", { takeId: reviewingTake.takeId, decision: "rejected", userId: user?.id });
       
       toast({ title: "Take Rejeitado", description: "O take foi excluído." });
       setReviewingTake(null);
@@ -1583,16 +1575,7 @@ export default function RecordingRoom() {
         startTimeSeconds: Number(videoRef.current?.currentTime || 0),
       });
 
-      emitVideoEvent("take-ready-for-review", {
-        takeId: uploadedTake.id,
-        audioUrl: uploadedTake.audioUrl,
-        duration: result.durationSeconds,
-        metrics: metrics,
-        lineIndex: currentLine,
-        userId: user?.id,
-        character: recordingProfile?.characterName || "Personagem",
-        start: Number(videoRef.current?.currentTime || 0)
-      });
+      emitVideoEvent("take-ready-for-review", { takeId: uploadedTake.id, audioUrl: uploadedTake.audioUrl, duration: result.durationSeconds, metrics, lineIndex: currentLine, userId: user?.id, character: recordingProfile?.characterName || "Personagem", start: Number(videoRef.current?.currentTime || 0) });
       
       toast({ title: "Enviado para revisão", description: "Aguardando aprovação do diretor..." });
     } catch (error: any) {
