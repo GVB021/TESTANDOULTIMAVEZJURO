@@ -250,7 +250,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [teleprompterSpeed, setTeleprompterSpeed] = useState(1.0);
   const [timecodeFormat, setTimecodeFormat] = useState<TimecodeFormat>("HH:MM:SS");
   const [scriptAutoFollow, setScriptAutoFollow] = useState(() => {
     try {
@@ -318,7 +317,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   });
   const [hasPersistedDeviceSettings, setHasPersistedDeviceSettings] = useState(false);
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
-  const [volumeOverlay, setVolumeOverlay] = useState<number | null>(null);
   const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
   const [preRoll, setPreRoll] = useState(1);
   const [postRoll, setPostRoll] = useState(1);
@@ -887,14 +885,14 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     if (maxScroll <= 0 || videoDuration <= 0) return;
 
     // Teleprompter: Rolagem suave contínua baseada no tempo do vídeo e velocidade ajustável
-    const scrollPos = (videoTime / videoDuration) * maxScroll * teleprompterSpeed;
-    console.log(`[Teleprompter] Scrolling to ${scrollPos} with speed ${teleprompterSpeed}`);
+    const scrollPos = (videoTime / videoDuration) * maxScroll;
+    console.log(`[Teleprompter] Scrolling to ${scrollPos}`);
     
     viewport.scrollTo({
       top: scrollPos,
       behavior: "smooth"
     });
-  }, [videoTime, videoDuration, scriptAutoFollow, teleprompterSpeed, isPlaying]);
+  }, [videoTime, videoDuration, scriptAutoFollow, isPlaying]);
 
   useEffect(() => {
     const handleActivity = () => {
@@ -2662,7 +2660,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               onTouchStart={handleVideoTouchStart}
               onTouchMove={handleVideoTouchMove}
               countdownValue={countdownValue}
-              volumeOverlay={volumeOverlay}
+              volumeOverlay={null}
               loopInfo={loopInfo}
               className="min-h-[220px]"
               height={isMobile ? undefined : `${desktopVideoTextSplit}%`}
