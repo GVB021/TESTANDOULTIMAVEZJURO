@@ -401,14 +401,12 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
   // 🔥 SOLICITAR ACESSO AO MICROFONE AO ENTRAR NO ROOM
   useEffect(() => {
     const initializeHardware = async () => {
-      console.log("🎤 Inicializando hardware do room...");
       
       // Aguardar um pouco para garantir que o componente está montado
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       try {
         await requestMicrophoneAccess();
-        console.log("✅ Hardware inicializado com sucesso");
         
         // Mostrar dialog de configuração na primeira vez
         const hasConfigured = localStorage.getItem(`hardware_configured_${sessionId}`);
@@ -500,7 +498,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
-        console.log("[WS] Recebido:", msg);
         
         if (msg.type === "permission-sync") {
           // Handle permission sync if needed
@@ -517,21 +514,17 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
             else if (!msg.isPlaying && !video.paused) video.pause();
           }
         } else if (msg.type === "video:play") {
-          console.log("[WS] Executando comando video:play");
           const video = videoRef.current;
           if (video) {
             if (typeof msg.currentTime === "number" && Number.isFinite(msg.currentTime)) {
               const drift = Math.abs(video.currentTime - msg.currentTime);
               if (drift > 0.12) {
-                console.log(`[WS] Ajustando drift de ${drift.toFixed(3)}s`);
                 video.currentTime = msg.currentTime;
               }
             }
             if (video.paused) {
-              console.log("[WS] Vídeo estava pausado, iniciando reprodução...");
               video.play().catch((e) => console.error("[WS] Erro ao dar play:", e));
             } else {
-              console.log("[WS] Vídeo já estava reproduzindo.");
             }
             // Enviar ACK de confirmação
             emitVideoEvent("ack", { command: "play", userId: user?.id });
@@ -626,7 +619,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
         } else if (msg.type === "video:take-ready-for-review") {
           // Se eu sou aprovador, recebo o take para revisar
           if (canApproveTake && msg.takeId && msg.audioUrl) {
-            console.log("👨‍💼 Diretor recebendo take para revisão", msg.takeId);
             setReviewingTake({
               takeId: msg.takeId,
               audioUrl: msg.audioUrl,
@@ -872,7 +864,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
     // Teleprompter: Rolagem suave contínua baseada no tempo do vídeo e velocidade ajustável
     const scrollPos = (videoTime / videoDuration) * maxScroll;
-    console.log(`[Teleprompter] Scrolling to ${scrollPos}`);
     
     viewport.scrollTo({
       top: scrollPos,
@@ -1033,7 +1024,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       ? presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role))
       : [{ userId: user?.id, name: user?.displayName || user?.fullName || 'Você', role: 'actor' }];
     
-    console.log("Text control candidates:", candidates);
     return candidates;
   }, [presenceUsers, user]);
 
@@ -1561,12 +1551,10 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     
     // 🔥 REMOVER BLOQUEIOS POR MICREADY
     if (micInitializing) {
-      console.log("⏳ Microfone inicializando, prosseguindo mesmo assim...");
     }
     
     // Permitir gravação mesmo sem personagem selecionado
     if (!recordingProfile) {
-      console.log("⚠️ Gravando sem personagem selecionado");
       toast({
         title: "Nenhum personagem selecionado",
         description: "Gravando como 'Sem Personagem'.",
@@ -1585,7 +1573,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       return;
     }
     
-    console.log("✅ Iniciando gravação com sucesso - FORÇADO");
     
     // 🔥 IMPLEMENTAÇÃO DO PREROLL SIMPLIFICADA
     const currentLineTime = scriptLines[currentLine]?.start || 0;
@@ -1638,7 +1625,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       if (count <= 0 && countdownTimerRef.current) {
         window.clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
-        console.log("🎬 Gravação iniciada exatamente no timing previsto");
       }
     }, 1000);
   }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, recordingProfile, currentLine, scriptLines, mySessionRole]);
