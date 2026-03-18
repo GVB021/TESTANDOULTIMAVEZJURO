@@ -500,17 +500,14 @@ export default function RecordingRoom() {
     const ws = new WebSocket(`${protocol}//${host}/ws/video-sync?studioId=${encodeURIComponent(studioId)}&sessionId=${encodeURIComponent(sessionId)}`);
     wsRef.current = ws;
 
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data);
-        
-        if (msg.type === "permission-sync") {
-          // Handle permission sync if needed
-        } else if (msg.type === "presence-sync") {
-          setRoomUsers(msg.users || []);
-        } else if (msg.type === "text-control:state") {
-          // Handle text control state if needed
-        } else if (msg.type === "video:sync") {
+    ws.onmessage = (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          console.log("[Room] WS message received:", msg.type, msg);
+          if (msg.type === "text-control:state" || msg.type === "text-control:set-controllers") {
+            console.log("[Room] Text control update before state change:", { currentControllers: Array.from(textControllerUserIds), myId: user?.id });
+          }
+          if (msg.type === "video:sync") {
           const video = videoRef.current;
           if (video) {
             const diff = Math.abs(video.currentTime - msg.currentTime);
@@ -619,6 +616,16 @@ export default function RecordingRoom() {
           const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
           console.log("[Room] text-control state received:", { type: msg.type, ids, myId: user?.id });
           setTextControllerUserIds(new Set(Array.from(new Set(ids || []))));
+          // Log immediately after state change
+          setTimeout(() => {
+            console.log("[Room] After text-control update:", { 
+              controllers: Array.from(textControllerUserIds), 
+              myId: user?.id,
+              hasPermission: textControllerUserIds.has(String(user?.id ?? "")),
+              studioRole,
+              canTextControl
+            });
+          }, 100);
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
         } else if (msg.type === "video:take-ready-for-review") {
