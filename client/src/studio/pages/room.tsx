@@ -287,8 +287,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   const [micState, setMicState] = useState<any>(null);
   const [recordingStatus, setRecordingStatus] = useState<"idle" | "countdown" | "recording" | "stopped" | "recorded">("idle");
   const [countdownValue, setCountdownValue] = useState(0);
-  const [lastRecording, setLastRecording] = useState<any>(null);
-  const [qualityMetrics, setQualityMetrics] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingTake, setPendingTake] = useState<any>(null);
   const [reviewingTake, setReviewingTake] = useState<any>(null);
@@ -318,7 +316,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
   const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
   const [preRoll, setPreRoll] = useState(1);
-  const [postRoll, setPostRoll] = useState(1);
 
   // Shortcuts
   const [shortcuts, setShortcuts] = useState<Shortcuts>(() => {
@@ -1712,8 +1709,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     if (!result.samples.length) {
       toast({ title: "Sem áudio capturado", description: "Nenhum sample foi registrado. Verifique microfone e ganho.", variant: "destructive" });
       setRecordingStatus("idle");
-      setLastRecording(null);
-      setQualityMetrics(null);
       logAudioStep("stop-empty-buffer");
       return;
     }
@@ -1724,7 +1719,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     }
 
     const metrics = analyzeTakeQuality(result.samples);
-    setQualityMetrics(metrics);
     logAudioStep("quality-analyzed", {
       score: metrics.score,
       clipping: metrics.clipping,
@@ -1742,8 +1736,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           variant: "destructive",
         });
         setRecordingStatus("idle");
-        setLastRecording(null);
-        setQualityMetrics(null);
         return;
       }
     }
@@ -1766,7 +1758,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
     setPendingTake(localTakeData);
     setRecordingStatus("recorded");
-    setLastRecording(result);
 
     // Upload Automático para o Diretor
     setIsSaving(true);
@@ -1828,8 +1819,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       URL.revokeObjectURL(pendingTake.url);
       setPendingTake(null);
       setRecordingStatus("idle");
-      setLastRecording(null);
-      setQualityMetrics(null);
     } catch (err: any) {
       logAudioStep("upload-error", { message: String(err?.message || err) });
       try {
@@ -1848,8 +1837,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         URL.revokeObjectURL(pendingTake.url);
         setPendingTake(null);
         setRecordingStatus("idle");
-        setLastRecording(null);
-        setQualityMetrics(null);
       } catch {}
       toast({ title: "Erro ao enviar take", description: String(err?.message || err), variant: "destructive" });
     } finally {
@@ -1862,8 +1849,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     URL.revokeObjectURL(pendingTake.url);
     setPendingTake(null);
     setRecordingStatus("idle");
-    setLastRecording(null);
-    setQualityMetrics(null);
     toast({ title: "Take descartado" });
   }, [pendingTake, toast]);
 
@@ -1951,7 +1936,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       setLoopSelectionMode("idle");
       setIsLooping(true);
       setPreRoll(3);
-      setPostRoll(calculatedPostRoll);
       toast({ title: "Loop definido", description: "Preroll de 3s e posroll adaptativo aplicados." });
       emitVideoEvent("sync-loop", { loopRange: { start, end } });
       logFeatureAudit("room.loop", "defined", { start, end, startLineIndex: normalizedStartIndex, endLineIndex: normalizedEndIndex });
@@ -1973,7 +1957,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       setLoopRangeMeta(null);
       setLoopAnchorIndex(null);
       setPreRoll(1);
-      setPostRoll(1);
       await logFeatureAudit("room.loop", "cleared");
       return;
     }
@@ -1986,8 +1969,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, [loopSelectionMode, customLoop, logFeatureAudit, toast]);
 
   const handleDiscard = useCallback(() => {
-    setLastRecording(null);
-    setQualityMetrics(null);
     setRecordingStatus("idle");
   }, []);
 
