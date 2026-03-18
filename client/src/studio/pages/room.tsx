@@ -2035,6 +2035,30 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
   }, [onlySelectedCharacter, recordingProfile, logFeatureAudit]);
 
+  const handleShortcutsApply = useCallback((pending: typeof shortcuts) => {
+    setShortcuts(pending);
+    setIsCustomizing(false);
+    toast({ title: "Atalhos atualizados (apenas nesta sessão)" });
+  }, [toast]);
+
+  const handleShortcutsSaveDefault = useCallback((pending: typeof shortcuts) => {
+    setShortcuts(pending);
+    localStorage.setItem("vhub_shortcuts", JSON.stringify(pending));
+    setIsCustomizing(false);
+    toast({ title: "Atalhos salvos como padrão" });
+  }, [toast]);
+
+  const handleShortcutsClose = useCallback(() => {
+    setIsCustomizing(false);
+    setPendingShortcuts(shortcuts);
+    setListeningFor(null);
+  }, [shortcuts]);
+
+  const handleRecordOrStop = useCallback(() => {
+    if (recordingStatus === "recording") handleStopRecording();
+    else startCountdown();
+  }, [recordingStatus, handleStopRecording, startCountdown]);
+
   // Debounce para live updates de texto
   useEffect(() => {
     if (!editingField) return;
@@ -2425,9 +2449,9 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           keyLabel={keyLabel}
           onSetPending={setPendingShortcuts}
           onSetListeningFor={setListeningFor}
-          onApply={(pending) => { setShortcuts(pending); setIsCustomizing(false); toast({ title: "Atalhos atualizados (apenas nesta sessão)" }); }}
-          onSaveDefault={(pending) => { setShortcuts(pending); localStorage.setItem("vhub_shortcuts", JSON.stringify(pending)); setIsCustomizing(false); toast({ title: "Atalhos salvos como padrão" }); }}
-          onClose={() => { setIsCustomizing(false); setPendingShortcuts(shortcuts); setListeningFor(null); }}
+          onApply={handleShortcutsApply}
+          onSaveDefault={handleShortcutsSaveDefault}
+          onClose={handleShortcutsClose}
         />
       )}
 
@@ -2596,7 +2620,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             canAccessDashboard={canAccessDashboard}
             roomUsers={roomUsers}
             studioId={studioId}
-            onRecordOrStop={() => recordingStatus === "recording" ? handleStopRecording() : startCountdown()}
+            onRecordOrStop={handleRecordOrStop}
             onOpenMenu={() => setMobileMenuOpen(true)}
             onOpenRecordings={() => setRecordingsOpen(true)}
             onOpenTextControl={() => setTextControlPopupOpen(true)}
@@ -2780,7 +2804,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             formatTimecode={formatLiveTimecode}
             onVisibilityChange={setControlsVisible}
             onSeekBack={() => seek(-2)}
-            onRecordOrStop={() => recordingStatus === "recording" ? handleStopRecording() : startCountdown()}
+            onRecordOrStop={handleRecordOrStop}
             onPlayPause={handlePlayPause}
             onScrub={scrub}
             onLoop={handleLoopButton}
