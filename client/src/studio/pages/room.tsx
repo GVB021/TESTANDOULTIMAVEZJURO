@@ -39,15 +39,11 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Button } from "@studio/components/ui/button";
+import { Badge } from "@studio/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { HardwareSetupDialog } from "@studio/components/hardware/HardwareSetupDialog";
+import { useHardwareControl } from "@studio/hooks/use-hardware-control";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -622,16 +618,20 @@ const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
 const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
 const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
 const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
-const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
-const [studioTimecode, setStudioTimecode] = useState<any>(null);
-const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
-
-  // Core hooks
-  const { toast } = useToast();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const studioRole = useStudioRole(studioId);
-  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const { studioId, sessionId } = useParams();
+  const [, navigate] = useLocation();
+  
+  // 🔥 HARDWARE CONTROL
+  const {
+    requestMicrophoneAccess,
+    hasPermission,
+    devices,
+    audioLevel,
+  } = useHardwareControl(sessionId || "");
+  
+  const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
 
   // WebSocket state
   const [wsConnected, setWsConnected] = useState(false);
@@ -829,7 +829,38 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     return () => clearInterval(interval);
   }, [sessionId, checkSessionAccess, sessionAccessStatus?.canAccess]);
 
-  // WebSocket event emitters
+  // 🔥 SOLICITAR ACESSO AO MICROFONE AO ENTRAR NO ROOM
+  useEffect(() => {
+    const initializeHardware = async () => {
+      console.log("🎤 Inicializando hardware do room...");
+      
+      // Aguardar um pouco para garantir que o componente está montado
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      try {
+        await requestMicrophoneAccess();
+        console.log("✅ Hardware inicializado com sucesso");
+        
+        // Mostrar dialog de configuração na primeira vez
+        const hasConfigured = localStorage.getItem(`hardware_configured_${sessionId}`);
+        if (!hasConfigured && hasPermission) {
+          setHardwareDialogOpen(true);
+          localStorage.setItem(`hardware_configured_${sessionId}`, "true");
+        }
+      } catch (error) {
+        console.error("❌ Falha ao inicializar hardware:", error);
+        toast({
+          title: "Configuração de Hardware",
+          description: "Configure seu microfone para melhor experiência.",
+          variant: "default",
+        });
+      }
+    };
+
+    if (sessionId && user) {
+      initializeHardware();
+    }
+  }, [sessionId, user, requestMicrophoneAccess, hasPermission, toast]);
   const emitVideoEvent = useCallback((type: string, data: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: `video:${type}`, ...data }));
@@ -4346,6 +4377,13 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           </div>
         </div>
       )}
+
+      {/* 🎙️ Hardware Setup Dialog */}
+      <HardwareSetupDialog
+        open={hardwareDialogOpen}
+        onOpenChange={setHardwareDialogOpen}
+        sessionId={sessionId || ""}
+      />
 
     </div>
   );
