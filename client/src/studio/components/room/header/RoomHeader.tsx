@@ -42,14 +42,11 @@ export function RoomHeader({
   return (
     <header
       className={cn(
-        "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header",
+        "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75",
+        "bg-background/70 backdrop-blur-xl border-b border-border/60 shadow-sm",
         !isMobile ? "grid" : "justify-between"
       )}
       style={{
-        background: "hsl(var(--background) / 0.90)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        borderBottom: "1px solid hsl(var(--border) / 0.9)",
         gridTemplateColumns: !isMobile ? `1fr ${sideScriptWidth}px` : undefined,
       }}
     >
@@ -57,7 +54,7 @@ export function RoomHeader({
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onBack}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+          className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
           aria-label="Voltar ao painel"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -72,7 +69,7 @@ export function RoomHeader({
         <div className="relative ml-2">
           <button
             onClick={() => setCharSelectorOpen(!charSelectorOpen)}
-            className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1.5"
+            className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1.5"
             data-testid="button-character-selector"
           >
             <User className="w-3.5 h-3.5" />
@@ -121,7 +118,7 @@ export function RoomHeader({
 
         {/* Script toggles */}
         {(onToggleAutoFollow || onToggleCharacterFilter) && (
-          <div className="flex items-center gap-1 ml-2 border-l border-white/10 pl-2">
+          <div className="flex items-center gap-1 ml-2 border-l border-border/60 pl-2">
             {onToggleAutoFollow && (
               <button
                 type="button"
@@ -131,7 +128,7 @@ export function RoomHeader({
                   "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
                   scriptAutoFollow
                     ? "bg-primary/20 border-primary/30 text-primary"
-                    : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10"
+                    : "bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )}
               >
                 <ArrowUpDown className="w-4 h-4" />
@@ -147,7 +144,7 @@ export function RoomHeader({
                   "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
                   onlySelectedCharacter
                     ? "bg-primary/20 border-primary/30 text-primary"
-                    : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10",
+                    : "bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60",
                   !recordingProfile && "opacity-50 cursor-not-allowed"
                 )}
               >
@@ -162,7 +159,7 @@ export function RoomHeader({
       {rightSlot && (
         <div className={cn(
           "flex items-center gap-2",
-          !isMobile && "justify-end px-4 border-l border-white/5"
+          !isMobile && "justify-end px-4 border-l border-border/60"
         )}>
           {rightSlot}
         </div>

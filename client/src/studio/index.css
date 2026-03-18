@@ -78,12 +78,6 @@
 @layer components {
   /* 🎨 COMPONENTES HARMONIZADOS */
   
-  /* Debug class para verificar se CSS está carregando */
-  .room-debug {
-    background: red !important;
-    border: 2px solid blue !important;
-  }
-  
   /* Header com gradient suave */
   .room-header {
     background: linear-gradient(135deg, 

@@ -2199,10 +2199,11 @@ export default function RecordingRoom() {
         window.setTimeout(() => button.classList.remove("rr-click-blink"), 300);
       }}
     >
-      {/* Cinematic Background */}
+      {/* Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-background to-background opacity-50"></div>
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] bg-repeat opacity-[0.05]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/12 via-background to-background"></div>
+        <div className="absolute -top-28 right-[-12rem] w-[34rem] h-[34rem] rounded-full bg-primary/10 blur-3xl opacity-70" />
+        <div className="absolute -bottom-24 left-[-8rem] w-[26rem] h-[26rem] rounded-full bg-primary/8 blur-3xl opacity-70" />
       </div>
 
       {isCustomizing && (

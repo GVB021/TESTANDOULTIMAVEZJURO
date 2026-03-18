@@ -73,7 +73,7 @@ export function RoomHeaderActions({
           </button>
           <button
             onClick={onOpenMenu}
-            className="w-11 h-11 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Menu principal"
           >
             <Menu className="w-5 h-5" />
@@ -83,7 +83,7 @@ export function RoomHeaderActions({
         <>
           <button
             onClick={onOpenRecordings}
-            className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
+            className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1"
             data-testid="button-room-recordings"
           >
             <ListMusic className="w-3.5 h-3.5" />
@@ -93,7 +93,7 @@ export function RoomHeaderActions({
           {canTextControl && (
             <button
               onClick={onOpenTextControl}
-              className="h-7 px-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 hover:bg-indigo-500/20 flex items-center gap-1"
+              className="h-7 px-2 rounded-md bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 flex items-center gap-1"
               data-testid="button-room-release-text"
             >
               <Edit3 className="w-3.5 h-3.5" />
@@ -103,7 +103,7 @@ export function RoomHeaderActions({
 
           <button
             onClick={onOpenDeviceSettings}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Configurações de dispositivos"
             data-testid="button-open-device-settings"
           >
@@ -114,7 +114,7 @@ export function RoomHeaderActions({
             <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
               <button
                 onClick={onPanelClick}
-                className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
+                className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1"
                 data-testid="button-room-panel"
               >
                 <Monitor className="w-3.5 h-3.5" />
@@ -125,7 +125,7 @@ export function RoomHeaderActions({
 
           <button
             onClick={onOpenShortcuts}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Atalhos de teclado"
             data-testid="button-open-shortcuts"
           >

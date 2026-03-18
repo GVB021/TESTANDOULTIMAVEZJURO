@@ -43,11 +43,11 @@ export function DesktopControlsBar({
   const canRecord = recordingStatus === "idle" || recordingStatus === "recorded";
 
   return (
-    <div className="shrink-0 h-20 room-controls flex items-center px-8 gap-6 z-40">
+    <div className="shrink-0 h-20 flex items-center px-8 gap-6 z-40 bg-background/80 backdrop-blur-md border-t border-border/60">
       <div className="flex items-center gap-2">
         <button
           onClick={onSeekBack}
-          className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition"
+          className="w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-all"
           title="Recuar 2s"
         >
           <RotateCcw className="w-4 h-4" />
@@ -55,8 +55,10 @@ export function DesktopControlsBar({
         <button
           onClick={onPlayPause}
           className={cn(
-            "w-11 h-11 room-rounded flex items-center justify-center room-transition",
-            isPlaying ? "room-button-primary" : "room-button-secondary"
+            "w-11 h-11 rounded-xl flex items-center justify-center transition-all",
+            isPlaying
+              ? "bg-primary text-primary-foreground hover:brightness-110"
+              : "bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground"
           )}
           title={isPlaying ? "Pausar" : "Reproduzir"}
         >
@@ -64,7 +66,7 @@ export function DesktopControlsBar({
         </button>
         <button
           onClick={onSeekForward}
-          className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition"
+          className="w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-all"
           title="Avançar 2s"
         >
           <RotateCcw className="w-4 h-4" />
@@ -72,12 +74,12 @@ export function DesktopControlsBar({
       </div>
 
       <div className="flex-1 flex flex-col gap-1.5">
-        <div className="flex justify-between text-[10px] font-mono text-white/30 uppercase tracking-tighter">
-          <span>{formatTimecode(videoTime)}</span>
-          <span>{formatTimecode(videoDuration)}</span>
+        <div className="flex justify-between text-[10px] font-mono uppercase tracking-tighter">
+          <span className="text-muted-foreground/50">{formatTimecode(videoTime)}</span>
+          <span className="text-muted-foreground/50">{formatTimecode(videoDuration)}</span>
         </div>
         <div
-          className="relative h-1.5 rounded-full bg-white/10 cursor-pointer overflow-hidden"
+          className="relative h-1.5 rounded-full bg-muted/40 cursor-pointer overflow-hidden"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             onScrub((e.clientX - rect.left) / rect.width);
@@ -96,8 +98,8 @@ export function DesktopControlsBar({
           className={cn(
             "w-9 h-9 rounded-xl flex items-center justify-center border transition-all",
             isLooping
-              ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300"
-              : "bg-white/5 border-white/10 text-white/60 hover:text-white"
+              ? "bg-primary/10 border-primary/20 text-primary"
+              : "bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground"
           )}
           title="Configurar Loop"
         >
@@ -114,7 +116,7 @@ export function DesktopControlsBar({
                 ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-300 animate-pulse"
                 : !micReady
                 ? "bg-red-500/20 border-red-500/40 text-red-300"
-                : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                : "bg-muted/50 border-border/60 text-foreground hover:bg-muted/80"
             )}
             title={
               micInitializing
