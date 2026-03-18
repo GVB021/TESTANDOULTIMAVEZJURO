@@ -2063,12 +2063,7 @@ export default function RecordingRoom() {
         cachedRecordingBlobUrlsRef.current[takeId] = objectUrl;
         setRecordingPlayableUrls((prev) => ({ ...prev, [takeId]: objectUrl }));
         setRecordingAvailability((prev) => ({ ...prev, [takeId]: "available" }));
-        console.info("[Room][Audio] take carregado", {
-          takeId,
-          bytes: blob.size,
-          contentType: blob.type || null,
-          elapsedMs: Math.round(performance.now() - startedAt),
-        });
+        console.info("[Room][Audio] take carregado", { takeId, bytes: blob.size, contentType: blob.type || null, elapsedMs: Math.round(performance.now() - startedAt) });
         return objectUrl;
       } catch (error: any) {
         setRecordingAvailability((prev) => ({ ...prev, [takeId]: "error" }));
