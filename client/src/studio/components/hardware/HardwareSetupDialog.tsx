@@ -60,7 +60,7 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
 
         <div className="space-y-6">
           {/* Status do Microfone */}
-          <div className="p-4 rounded-lg border bg-card">
+          <div className="p-4 room-rounded-xl room-card">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 {hasPermission ? (
@@ -92,12 +92,12 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
                 {/* Nível de Áudio */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium">Nível de Áudio</span>
-                    <span className="text-sm text-muted-foreground">{Math.round(audioLevel)}%</span>
+                    <span className="text-sm font-medium room-text-primary">Nível de Áudio</span>
+                    <span className="text-sm room-text-muted">{Math.round(audioLevel)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full room-bg-subtle rounded-full h-2">
                     <div
-                      className={`h-2 rounded-full transition-all ${getAudioLevelColor(audioLevel)}`}
+                      className={`h-2 rounded-full room-transition ${getAudioLevelColor(audioLevel)}`}
                       style={{ width: `${audioLevel}%` }}
                     />
                   </div>
@@ -246,12 +246,12 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
           </div>
 
           {/* Informações Importantes */}
-          <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+          <div className="p-4 room-rounded-xl room-bg-surface border border-primary/20">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+              <AlertCircle className="w-5 h-5 text-primary mt-0.5" />
               <div className="space-y-1">
-                <p className="text-sm font-medium text-blue-900">Importante</p>
-                <p className="text-xs text-blue-700">
+                <p className="text-sm font-medium room-text-primary">Importante</p>
+                <p className="text-xs room-text-muted">
                   As configurações de hardware serão salvas e aplicadas automaticamente 
                   na próxima vez que você entrar no estúdio.
                 </p>

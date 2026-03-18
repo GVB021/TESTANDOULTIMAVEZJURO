@@ -41,7 +41,7 @@ import {
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@studio/components/ui/button";
 import { Badge } from "@studio/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { HardwareSetupDialog } from "@studio/components/hardware/HardwareSetupDialog";
 import { useHardwareControl } from "@studio/hooks/use-hardware-control";
 import {
@@ -150,6 +150,8 @@ export interface ScrollAnchor {
 type RecordingAvailabilityState = "available" | "loading" | "error";
 
 import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
+import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
+import { DirectorReview } from "@studio/components/room/modals/DirectorReview";
 
 const DEFAULT_SHORTCUTS: Shortcuts = {
   playPause: "Space",
@@ -571,8 +573,19 @@ function DirectorEntryModal({
 
 export default function RecordingRoom() {
   const { studioId, sessionId } = useParams<{ studioId: string; sessionId: string }>();
-  const { isDirector } = useStudioRole(studioId);
+  const { role: studioRole, isDirector } = useStudioRole(studioId || "");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [directorControlConfirmed, setDirectorControlConfirmed] = useState(false);
+  const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
+  
+  // 🔥 HARDWARE CONTROL
+  const {
+    requestMicrophoneAccess,
+    hasPermission,
+    audioLevel,
+  } = useHardwareControl(sessionId || "");
   
   // Se for diretor, só libera quando confirmar. Se não for, libera direto.
   const isControlBlocked = isDirector && !directorControlConfirmed;
@@ -622,9 +635,12 @@ const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string
   // WebSocket state
   const [wsConnected, setWsConnected] = useState(false);
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
+  const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
   const [clientAcks, setClientAcks] = useState<Record<string, any>>({});
   const [lockedLines, setLockedLines] = useState<Record<number, any>>({});
   const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
+  const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
+  const queryClient = useQueryClient();
 const [lastUploadedTakeId, setLastUploadedTakeId] = useState<string | null>(null);
 const [isWaitingReview, setIsWaitingReview] = useState(false);
 
@@ -752,7 +768,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, []);
 
   // Permission calculations - moved here to be used in useEffect
-  const uiRole = resolveUiRole(studioRole?.role, false);
+  const uiRole = resolveUiRole(studioRole, false);
   const canTextControl = hasUiPermission(uiRole, "text_control");
   const canManageAudio = hasUiPermission(uiRole, "audio_control");
   const canApproveTake = hasUiPermission(uiRole, "approve_take");
@@ -1215,10 +1231,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       });
   }, [scriptLines, onlySelectedCharacter, recordingProfile?.characterName]);
 
-  useEffect(() => {
-    if (!studioTimecode?.format) return;
-    setTimecodeFormat(studioTimecode.format);
-  }, [studioTimecode?.format]);
 
   const { data: takesList = [] } = useTakesList(sessionId);
   const {
@@ -3450,72 +3462,37 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         >
           {/* Coluna Principal: Video + Texto Sincronizado */}
           <div ref={desktopVideoTextContainerRef} className="flex flex-col min-h-0 relative bg-black/40">
-            <div
-              className="relative overflow-hidden bg-black flex items-center justify-center min-h-[220px]"
-              style={isMobile ? { flex: 1 } : { height: `${desktopVideoTextSplit}%` }}
-            >
-              {production?.videoUrl ? (
-                <video
-                  ref={videoRef}
-                  src={production.videoUrl}
-                  className="w-full h-full object-contain touch-none"
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  onTouchStart={handleVideoTouchStart}
-                  onTouchMove={handleVideoTouchMove}
-                  muted={isMuted}
-                  playsInline
-                  disablePictureInPicture
-                  controls={false}
-                  controlsList="nodownload noplaybackrate noremoteplayback nofullscreen"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/30">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center bg-white/5">
-                    <Play className="w-7 h-7" />
-                  </div>
-                  <p className="text-xs">Nenhum vídeo anexado a esta produção</p>
-                </div>
-              )}
-
-              {countdownValue > 0 && (
-                <CountdownOverlay count={countdownValue} />
-              )}
-
-              <AnimatePresence>
-                {volumeOverlay !== null && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 bg-black/60 backdrop-blur px-4 py-3 rounded-2xl border border-white/10 z-20 pointer-events-none"
-                  >
-                    <Volume2 className="w-6 h-6 text-primary" />
-                    <span className="text-xs font-bold font-mono tracking-widest">{volumeOverlay}%</span>
-                  </motion.div>
-                )}
-
-              </AnimatePresence>
-
-              <button
-                onClick={() => setIsMuted((m) => !m)}
-                className="absolute top-4 right-4 p-3 rounded-xl bg-black/60 backdrop-blur text-white/80 hover:text-white transition-all hover:bg-black/80 border border-white/20 hover:scale-110 hover:border-white/30"
-                style={{ zIndex: UI_LAYER_BASE.floatingButtons }}
-                aria-label={isMuted ? "Ativar som" : "Desativar som"}
-              >
-                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </button>
-
-              {(customLoop || loopSelectionMode !== "idle" || loopPreparing || loopSilenceActive) && (
-                <div className="absolute top-4 left-4 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 px-4 flex items-center text-[11px] text-indigo-100 z-30 backdrop-blur-md">
-                  {loopPreparing && "Preparando loop... (3s)"}
-                  {!loopPreparing && loopSilenceActive && "Silêncio entre loops... (3s)"}
-                  {loopSelectionMode === "selecting-start" && "Loop: selecione a primeira fala"}
-                  {loopSelectionMode === "selecting-end" && "Loop: selecione a última fala"}
-                  {!loopPreparing && !loopSilenceActive && loopSelectionMode === "idle" && customLoop && `Loop ativo ${formatLiveTimecode(customLoop.start)} - ${formatLiveTimecode(customLoop.end)}${loopRangeMeta ? ` · Linhas ${loopRangeMeta.startIndex + 1}-${loopRangeMeta.endIndex + 1}` : ""}`}
-                </div>
-              )}
-            </div>
+            <VideoPlayer
+              ref={videoRef}
+              src={production?.videoUrl}
+              isMuted={isMuted}
+              onMuteToggle={() => setIsMuted((m) => !m)}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onTimeUpdate={setVideoTime}
+              onDurationChange={setVideoDuration}
+              onTouchStart={handleVideoTouchStart}
+              onTouchMove={handleVideoTouchMove}
+              countdownValue={countdownValue}
+              volumeOverlay={volumeOverlay}
+              loopInfo={
+                (customLoop || loopSelectionMode !== "idle" || loopPreparing || loopSilenceActive)
+                  ? loopPreparing
+                    ? "Preparando loop... (3s)"
+                    : !loopPreparing && loopSilenceActive
+                    ? "Silêncio entre loops... (3s)"
+                    : loopSelectionMode === "selecting-start"
+                    ? "Loop: selecione a primeira fala"
+                    : loopSelectionMode === "selecting-end"
+                    ? "Loop: selecione a última fala"
+                    : customLoop
+                    ? `Loop ativo ${formatLiveTimecode(customLoop.start)} - ${formatLiveTimecode(customLoop.end)}${loopRangeMeta ? ` · Linhas ${loopRangeMeta.startIndex + 1}-${loopRangeMeta.endIndex + 1}` : ""}`
+                    : null
+                  : null
+              }
+              className="min-h-[220px]"
+              height={isMobile ? undefined : `${desktopVideoTextSplit}%`}
+            />
 
             {!isMobile && (
               <div className="shrink-0 h-20 room-controls flex items-center px-8 gap-6 z-40">
@@ -3819,132 +3796,18 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           )}
         </div>
 
-        {/* 🎙️ Popup de Revisão do Diretor - Melhorado */}
+        {/* 🎙️ Popup de Revisão do Diretor */}
         <AnimatePresence>
           {(pendingTake || reviewingTake) && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className="fixed bottom-24 left-4 right-4 md:left-auto md:right-4 md:w-[420px] z-50"
-              data-testid="director-review-popup"
-            >
-              <div className="room-popup rounded-2xl p-4 backdrop-blur-xl">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "w-12 h-12 room-rounded-full flex items-center justify-center",
-                      reviewingTake 
-                        ? "room-bg-surface border border-primary/30" 
-                        : "room-bg-surface border border-emerald-500/30"
-                    )}>
-                      {reviewingTake ? (
-                        <Monitor className="w-6 h-6 text-primary" />
-                      ) : (
-                        <Mic className="w-6 h-6 text-emerald-400" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-bold room-text-primary">
-                        {reviewingTake ? "👨‍💼 Revisão do Diretor" : "🎙️ Preview da Gravação"}
-                      </h3>
-                      <p className="text-[10px] room-text-muted uppercase tracking-widest font-mono">
-                        {(reviewingTake ? reviewingTake.duration : pendingTake?.durationSeconds || 0).toFixed(2)}s • {(reviewingTake || pendingTake)?.metrics?.score}% Qualidade
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Status Indicator */}
-                  <div className={cn(
-                    "w-3 h-3 rounded-full animate-pulse",
-                    reviewingTake ? "room-status-online" : "room-status-recording"
-                  )} />
-                </div>
-                
-                {/* Actions Area */}
-                <div className="flex items-center gap-2 mb-4">
-                  {reviewingTake ? (
-                    /* Director Actions */
-                    <>
-                      <button
-                        onClick={handleDirectorApprove}
-                        disabled={isSaving}
-                        className="flex-1 h-10 room-button-primary room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition"
-                      >
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                        Aprovar
-                      </button>
-                      <button
-                        onClick={handleDirectorReject}
-                        disabled={isSaving}
-                        className="flex-1 h-10 room-bg-surface room-text-primary border border-destructive room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition hover:bg-destructive/10"
-                      >
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                        Rejeitar
-                      </button>
-                    </>
-                  ) : (
-                    /* Dubler Actions */
-                    <>
-                      <button
-                        onClick={handleApproveTake}
-                        disabled={isSaving || isWaitingReview}
-                        className="flex-1 h-10 room-button-primary room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition"
-                      >
-                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                        {isWaitingReview ? "Enviado..." : "Enviar"}
-                      </button>
-                      <button
-                        onClick={() => handleDiscardTake(pendingTake)}
-                        className="h-10 px-4 room-button-secondary room-rounded-lg font-medium flex items-center justify-center gap-2 room-transition"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-                
-                {/* Player de Audio */}
-                <div className="room-bg-surface room-rounded-2xl p-3 flex items-center gap-4 mb-4">
-                  <audio 
-                    src={reviewingTake ? reviewingTake.audioUrl : pendingTake?.url} 
-                    controls 
-                    className="w-full h-10 accent-primary"
-                    controlsList="nodownload noplaybackrate"
-                    preload="metadata"
-                  />
-                </div>
-                
-                {/* Metrics */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="room-bg-surface room-rounded-xl p-2 text-center">
-                    <p className="text-[9px] room-text-subtle uppercase font-bold">Loudness</p>
-                    <p className="text-xs font-mono room-text-primary">{((reviewingTake || pendingTake)?.metrics?.loudness * 100 || 0).toFixed(0)}%</p>
-                  </div>
-                  <div className="room-bg-surface room-rounded-xl p-2 text-center">
-                    <p className="text-[9px] room-text-subtle uppercase font-bold">Clipping</p>
-                    <p className={cn("text-xs font-mono", (reviewingTake || pendingTake)?.metrics?.clipping ? "text-destructive" : "text-emerald-400")}>
-                      {(reviewingTake || pendingTake)?.metrics?.clipping ? "SIM" : "NÃO"}
-                    </p>
-                  </div>
-                  <div className="room-bg-surface room-rounded-xl p-2 text-center">
-                    <p className="text-[9px] room-text-subtle uppercase font-bold">Noise</p>
-                    <p className="text-xs font-mono room-text-primary">{((reviewingTake || pendingTake)?.metrics?.noiseFloor * 100 || 0).toFixed(0)}%</p>
-                  </div>
-                </div>
-                
-                {/* Additional Info */}
-                {reviewingTake && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="room-text-muted">Linha #{reviewingTake.lineIndex + 1}</span>
-                      <span className="room-text-muted">{reviewingTake.characterName}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
+            <DirectorReview
+              mode={reviewingTake ? "director" : "dubber"}
+              take={reviewingTake ?? pendingTake}
+              isSaving={isSaving}
+              isWaitingReview={isWaitingReview}
+              onApprove={reviewingTake ? handleDirectorApprove : handleApproveTake}
+              onReject={handleDirectorReject}
+              onDiscard={pendingTake ? () => handleDiscardTake(pendingTake) : undefined}
+            />
           )}
         </AnimatePresence>
 
