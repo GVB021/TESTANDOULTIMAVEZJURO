@@ -330,7 +330,7 @@ export default function RecordingRoom() {
   }, []);
 
   // Permission calculations - moved here to be used in useEffect
-  const uiRole = resolveUiRole(studioRole, false);
+  const uiRole = resolveUiRole(studioRole, textControllerUserIds.has(String(user?.id ?? "")));
   const canTextControl = hasUiPermission(uiRole, "text_control");
   const canManageAudio = hasUiPermission(uiRole, "audio_control");
   const canApproveTake = hasUiPermission(uiRole, "approve_take");
@@ -1014,11 +1014,6 @@ export default function RecordingRoom() {
     // If no presence users, fall back to room users
     if (candidates.length === 0 && roomUsers.length > 0) {
       candidates = roomUsers.filter((user: any) => canReceiveTextControl(user?.role));
-    }
-    
-    // If still no candidates, add current user as fallback
-    if (candidates.length === 0) {
-      candidates = [{ userId: user?.id, name: user?.displayName || user?.fullName || 'Você', role: 'actor' }];
     }
     
     return candidates;
