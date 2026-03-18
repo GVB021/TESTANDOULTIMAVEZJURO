@@ -86,7 +86,6 @@ import {
   canReceiveTextControl,
   type UiRole,
   type UiPermission,
-  UI_ROLE_PERMISSIONS,
 } from "@studio/lib/room-utils";
 
 export interface ScriptLine {
