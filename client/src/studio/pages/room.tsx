@@ -1380,11 +1380,7 @@ export default function RecordingRoom() {
     if (!recordingProfile) {
       throw new Error("Perfil de gravação não configurado.");
     }
-    logAudioStep("upload-started", {
-      lineIndex: input.lineIndex,
-      durationSeconds: input.durationSeconds,
-      autoApprove: input.autoApprove,
-    });
+    logAudioStep("upload-started", { lineIndex: input.lineIndex, durationSeconds: input.durationSeconds, autoApprove: input.autoApprove });
     const formData = new FormData();
     formData.append("audio", input.wavBlob, `take_${sessionId}_${Date.now()}.wav`);
     formData.append("characterId", recordingProfile.characterId);
@@ -1584,13 +1580,7 @@ export default function RecordingRoom() {
     }
 
     const metrics = analyzeTakeQuality(result.samples);
-    logAudioStep("quality-analyzed", {
-      score: metrics.score,
-      clipping: metrics.clipping,
-      loudness: metrics.loudness,
-      noiseFloor: metrics.noiseFloor,
-      sampleRate: result.sampleRate,
-    });
+    logAudioStep("quality-analyzed", { score: metrics.score, clipping: metrics.clipping, loudness: metrics.loudness, noiseFloor: metrics.noiseFloor, sampleRate: result.sampleRate });
     
     if (isLooping && customLoop) {
       const expectedDuration = customLoop.end - Math.max(0, customLoop.start - 3);
