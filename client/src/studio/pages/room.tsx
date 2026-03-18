@@ -88,7 +88,7 @@ import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
 import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
-import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
+import { MobileMenu, MobileScriptDrawer, MobileFooterControls } from "@studio/components/room/mobile";
 import { DesktopScriptColumn } from "@studio/components/room/script";
 import { DesktopControlsBar } from "@studio/components/room/controls";
 import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
@@ -3027,149 +3027,29 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           )}
         </AnimatePresence>
 
-        {/* Rodapé de Controles (Apenas Mobile ou Fallback) */}
+        {/* Rodapé de Controles (Apenas Mobile) */}
         {isMobile && (
-          <footer
-            className={cn(
-              "h-24 room-controls flex flex-col sm:flex-row items-center px-6 gap-4 sm:gap-8 transition-all duration-300 ease-in-out z-50",
-              !controlsVisible && "translate-y-full opacity-0 pointer-events-none"
-            )}
-            onMouseEnter={() => {
-              if (!isLooping) setControlsVisible(true);
-            }}
-            onMouseLeave={() => {
-              if (!isLooping) setControlsVisible(false);
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <button onClick={() => seek(-2)} className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition" title="Recuar 2s">
-                <RotateCcw className="w-4 h-4" />
-              </button>
-              <button 
-                onClick={() => (recordingStatus === 'recording' ? handleStopRecording() : startCountdown())} 
-                className={cn(
-                  'w-14 h-14 room-rounded-full flex items-center justify-center transition-all',
-                  recordingStatus === 'recording'
-                    ? 'room-status-recording animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.6)] hover:scale-110 active:scale-95'
-                    : 'room-button-primary hover:scale-105 active:scale-95'
-                )}
-              >
-                {recordingStatus === 'recording' ? <Square className="w-7 h-7 text-white fill-white" /> : <Mic className="w-7 h-7" />}
-              </button>
-              <button onClick={handlePlayPause} className={cn(
-                "w-9 h-9 room-rounded flex items-center justify-center room-transition",
-                isPlaying ? "room-button-primary" : "room-button-secondary"
-              )} title={isPlaying ? "Pausar" : "Reproduzir"}>
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              </button>
-            </div>
-
-            {canApproveTake && directorConsoleOpen && !isMobile && (
-              <DirectorConsole
-                users={onlineRosterForCurrentRole}
-                clientAcks={clientAcks}
-                normalizeRole={normalizeRoomRole}
-                onClose={() => setDirectorConsoleOpen(false)}
-              />
-            )}
-
-            {canApproveTake && !directorConsoleOpen && !isMobile && (
-              <button
-                onClick={() => setDirectorConsoleOpen(true)}
-                className="absolute top-20 right-4 z-40 w-10 h-10 rounded-full room-bg-elevated backdrop-blur border border-border flex items-center justify-center room-text-muted hover:text-foreground hover:scale-105 transition-all shadow-lg"
-                title="Abrir Console do Diretor"
-              >
-                <div className="relative">
-                  <Monitor className="w-5 h-5" />
-                  <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
-                </div>
-              </button>
-            )}
-
-            <div className="flex-1 w-full flex flex-col gap-2">
-              <div className="flex items-center justify-between text-[11px] font-mono text-white/40 px-1">
-                <span>{formatLiveTimecode(videoTime)}</span>
-                <span>{formatLiveTimecode(videoDuration)}</span>
-              </div>
-              <div
-                className="relative h-2 rounded-full cursor-pointer group bg-white/10 overflow-hidden"
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  scrub((e.clientX - rect.left) / rect.width);
-                }}
-              >
-                <div
-                  className="absolute top-0 bottom-0 rounded-full bg-primary transition-all duration-100"
-                  style={{ width: `${videoDuration > 0 ? (videoTime / videoDuration) * 100 : 0}%` }}
-                />
-                {customLoop && videoDuration > 0 && (
-                  <>
-                    <div
-                      className="absolute top-0 bottom-0 w-[2px] bg-indigo-400 z-10"
-                      style={{ left: `${Math.max(0, Math.min(100, (customLoop.start / videoDuration) * 100))}%` }}
-                    />
-                    <div
-                      className="absolute top-0 bottom-0 w-[2px] bg-indigo-400 z-10"
-                      style={{ left: `${Math.max(0, Math.min(100, (customLoop.end / videoDuration) * 100))}%` }}
-                    />
-                    <div
-                      className="absolute top-0 bottom-0 bg-indigo-500/20"
-                      style={{
-                        left: `${Math.max(0, Math.min(100, (customLoop.start / videoDuration) * 100))}%`,
-                        width: `${Math.max(0, Math.min(100, ((customLoop.end - customLoop.start) / videoDuration) * 100))}%`
-                      }}
-                    />
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleLoopButton}
-                className={cn(
-                  "w-14 h-14 rounded-2xl flex items-center justify-center transition-all border shadow-lg",
-                  loopSelectionMode !== "idle" || isLooping
-                    ? "bg-indigo-500/30 border-indigo-400/60 text-indigo-200 shadow-indigo-500/20"
-                    : "bg-white/10 border-white/20 text-white/80 hover:text-white hover:bg-white/20 hover:scale-105"
-                )}
-                aria-label="Configurar loop"
-              >
-                <Repeat className="w-6 h-6" />
-              </button>
-
-              {recordingStatus === "idle" || recordingStatus === "recorded" ? (
-                <button
-                  onClick={startCountdown}
-                  disabled={!micReady || isSaving}
-                  className={cn(
-                    "w-16 h-16 rounded-full flex items-center justify-center transition-all border shadow-2xl",
-                    isSaving
-                      ? "opacity-50 cursor-not-allowed bg-white/5 border-white/10 text-white/20"
-                      : "bg-gradient-to-br from-red-500 to-red-600 border-red-400/30 text-white hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 shadow-red-500/25"
-                  )}
-                >
-                  {isSaving ? <Loader2 className="w-7 h-7 animate-spin" /> : <Mic className="w-7 h-7" />}
-                </button>
-              ) : (
-                <button
-                  onClick={handleStopRecording}
-                  className="w-16 h-16 rounded-full flex items-center justify-center transition-all bg-gradient-to-br from-red-600 to-red-700 shadow-[0_0_30px_rgba(239,68,68,0.6)] animate-pulse hover:scale-110 active:scale-95"
-                >
-                  <Square className="w-7 h-7 text-white fill-white" />
-                </button>
-              )}
-            </div>
-
-            {/* Toast de Aprovação Integrado no Rodapé se necessário, ou overlay acima dele */}
-            {recordingStatus === "recorded" && (
-              <div className="absolute bottom-full left-0 right-0 mb-4 px-6 pointer-events-none">
-                <div className="max-w-md mx-auto h-12 rounded-2xl room-bg-elevated border border-border shadow-2xl flex items-center justify-between px-4 text-xs room-text-primary pointer-events-auto backdrop-blur-xl">
-                  <span>Take salvo automaticamente.</span>
-                </div>
-              </div>
-            )}
-          </footer>
+          <MobileFooterControls
+            controlsVisible={controlsVisible}
+            isLooping={isLooping}
+            isPlaying={isPlaying}
+            recordingStatus={recordingStatus}
+            micReady={micReady}
+            isSaving={isSaving}
+            loopSelectionMode={loopSelectionMode}
+            customLoop={customLoop}
+            videoTime={videoTime}
+            videoDuration={videoDuration}
+            formatTimecode={formatLiveTimecode}
+            onVisibilityChange={setControlsVisible}
+            onSeekBack={() => seek(-2)}
+            onRecordOrStop={() => recordingStatus === "recording" ? handleStopRecording() : startCountdown()}
+            onPlayPause={handlePlayPause}
+            onScrub={scrub}
+            onLoop={handleLoopButton}
+            onRecord={startCountdown}
+            onStopRecord={handleStopRecording}
+          />
         )}
         </div>
 
