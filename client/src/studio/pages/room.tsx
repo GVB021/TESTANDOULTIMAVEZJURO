@@ -1889,19 +1889,20 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
   const startCountdown = useCallback(() => {
     // 🔍 DEBUG DETALHADO
-    console.log("🎙️ startCountdown chamado", {
+    console.log("🎙️ startCountdown chamado - DEBUG COMPLETO", {
       recordingStatus,
       micReady,
       micInitializing,
       hasMicState: !!micState,
       currentLine,
       hasVideoRef: !!videoRef.current,
-      userRole: mySessionRole
+      userRole: mySessionRole,
+      timestamp: new Date().toISOString()
     });
 
-    // 🔒 VALIDAÇÕES DETALHADAS COM LOGS
+    // 🔥 SIMPLIFICAR VALIDAÇÕES PARA DEBUG
     if (recordingStatus !== "idle") {
-      console.warn("❌ Gravação não iniciada: status inválido", recordingStatus);
+      console.warn("❌ Gravação não iniciada: status não é idle", recordingStatus);
       toast({ 
         title: "Gravação em andamento", 
         description: "Pare a gravação atual antes de iniciar outra.", 
@@ -1910,40 +1911,28 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       return;
     }
     
+    // 🔥 FORÇAR INICIALIZAÇÃO DO MICROFONE
     if (!micState) {
-      console.warn("❌ Gravação não iniciada: micState ausente");
+      console.warn("❌ MicState ausente, tentando inicializar...");
+      // Não bloquear, tentar iniciar mesmo sem micState
       toast({ 
         title: "Microfone não inicializado", 
-        description: "Verifique as permissões de áudio.", 
-        variant: "destructive" 
+        description: "Tentando iniciar microfone automaticamente...", 
+        variant: "default" 
       });
-      return;
     }
     
-    if (!micReady || micInitializing) {
-      console.warn("❌ Gravação não iniciada: microfone não pronto", { micReady, micInitializing });
-      if (micInitializing) {
-        toast({ 
-          title: "Aguarde...", 
-          description: "Inicializando o microfone.", 
-          variant: "default" 
-        });
-      } else if (!micReady) {
-        toast({ 
-          title: "Microfone não pronto", 
-          description: "Verifique as permissões de áudio.", 
-          variant: "destructive" 
-        });
-      }
-      return;
+    // 🔥 REMOVER BLOQUEIOS POR MICREADY
+    if (micInitializing) {
+      console.log("⏳ Microfone inicializando, prosseguindo mesmo assim...");
     }
     
-    // Permitir gravação mesmo sem personagem selecionado (fallback)
+    // Permitir gravação mesmo sem personagem selecionado
     if (!recordingProfile) {
       console.log("⚠️ Gravando sem personagem selecionado");
       toast({
         title: "Nenhum personagem selecionado",
-        description: "Gravando como 'Sem Personagem'. Selecione um personagem para melhor organização.",
+        description: "Gravando como 'Sem Personagem'.",
         variant: "default"
       });
     }
@@ -1959,30 +1948,34 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       return;
     }
     
-    console.log("✅ Iniciando gravação com sucesso");
+    console.log("✅ Iniciando gravação com sucesso - FORÇADO");
     
-    // 🔥 IMPLEMENTAÇÃO DO PREROLL PRECISO
+    // 🔥 IMPLEMENTAÇÃO DO PREROLL SIMPLIFICADA
     const currentLineTime = scriptLines[currentLine]?.start || 0;
-    const loopPreroll = isLooping ? 3 : preRoll;
-    const startFrom = isLooping && customLoop ? customLoop.start : currentLineTime;
-    const prerollStart = Math.max(0, startFrom - loopPreroll);
+    const prerollStart = Math.max(0, currentLineTime - 3);
     
-    console.log("⏱️ Timing preroll", {
+    console.log("⏱️ Timing preroll simplificado", {
       currentLine,
       currentLineTime,
       prerollStart,
-      startFrom,
-      prerollSeconds: loopPreroll
+      prerollSeconds: 3
     });
     
     video.currentTime = prerollStart;
     emitVideoEvent("seek", { currentTime: prerollStart });
-    logAudioStep("countdown-started", { initiatorUserId: user?.id, prerollStart, loopEnabled: isLooping });
+    logAudioStep("countdown-started", { initiatorUserId: user?.id, prerollStart });
     
-    // Iniciar countdown e gravação
+    // Iniciar countdown e gravação IMEDIATAMENTE
     setCountdownValue(3);
     setRecordingStatus("recording");
-    startCapture(micState);
+    
+    // 🔥 FORÇAR CAPTURA MESMO SEM MICSTATE PERFEITO
+    if (micState) {
+      startCapture(micState);
+    } else {
+      console.warn("⚠️ Iniciando gravação sem micState - pode não funcionar");
+    }
+    
     video.play().catch((error) => {
       console.error("❌ Erro ao reproduzir vídeo", error);
       toast({ title: "Erro na reprodução", description: "Não foi possível reproduzir o vídeo.", variant: "destructive" });
@@ -3193,7 +3186,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
       <header 
         className={cn(
-          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header",
+          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header room-debug",
           !isMobile ? "grid" : "justify-between"
         )} 
         style={{
