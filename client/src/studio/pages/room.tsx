@@ -1649,7 +1649,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         console.log("🎬 Gravação iniciada exatamente no timing previsto");
       }
     }, 1000);
-  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, isLooping, customLoop, recordingProfile, currentLine, scriptLines, mySessionRole]);
+  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, recordingProfile, currentLine, scriptLines, mySessionRole]);
 
   const handleDirectorApprove = useCallback(async () => {
     if (!reviewingTake) return;
