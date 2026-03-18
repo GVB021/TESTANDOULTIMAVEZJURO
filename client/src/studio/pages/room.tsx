@@ -615,17 +615,16 @@ export default function RecordingRoom() {
         } else if (msg.type === "text-control:set-controllers" || msg.type === "text-control:state") {
           const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
           console.log("[Room] text-control state received:", { type: msg.type, ids, myId: user?.id });
-          setTextControllerUserIds(new Set(Array.from(new Set(ids || []))));
-          // Log immediately after state change
-          setTimeout(() => {
-            console.log("[Room] After text-control update:", { 
-              controllers: Array.from(textControllerUserIds), 
-              myId: user?.id,
-              hasPermission: textControllerUserIds.has(String(user?.id ?? "")),
-              studioRole,
-              canTextControl
-            });
-          }, 100);
+          const nextSet = new Set(Array.from(new Set(ids || [])));
+          setTextControllerUserIds(nextSet);
+          // Log immediately with the new state
+          console.log("[Room] After text-control update:", { 
+            controllers: Array.from(nextSet), 
+            myId: user?.id,
+            hasPermission: nextSet.has(String(user?.id ?? "")),
+            studioRole,
+            willHaveTextControl: hasUiPermission(resolveUiRole(studioRole, nextSet.has(String(user?.id ?? ""))), "text_control")
+          });
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
         } else if (msg.type === "video:take-ready-for-review") {
