@@ -88,6 +88,19 @@ import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
 import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
 import { RecordingProfilePanel } from "@studio/components/room/profile";
+import {
+  DEFAULT_SHORTCUTS,
+  SHORTCUT_LABELS,
+  UI_LAYER_BASE,
+  keyLabel,
+  normalizeRoomRole,
+  resolveUiRole,
+  hasUiPermission,
+  canReceiveTextControl,
+  type UiRole,
+  type UiPermission,
+  UI_ROLE_PERMISSIONS,
+} from "@studio/lib/room-utils";
 
 export interface ScriptLine {
   character: string;
@@ -145,79 +158,6 @@ export interface ScrollAnchor {
 }
 
 type RecordingAvailabilityState = "available" | "loading" | "error";
-
-const DEFAULT_SHORTCUTS: Shortcuts = {
-  playPause: "Space",
-  record: "KeyR",
-  stop: "KeyS",
-  back: "ArrowLeft",
-  forward: "ArrowRight",
-  loop: "KeyL",
-};
-
-const SHORTCUT_LABELS: Record<keyof Shortcuts, string> = {
-  playPause: "Play / Pause",
-  record: "Gravar",
-  stop: "Parar",
-  back: "Voltar 2s",
-  forward: "Avancar 2s",
-  loop: "Alternar Loop",
-};
-
-const UI_LAYER_BASE = {
-  playerControls: 160,
-  floatingButtons: 180,
-  chatPanel: 1150,
-  modalOverlay: 1400,
-  confirmationModal: 1500,
-  mobileDrawerOverlay: 1450,
-  mobileDrawerContent: 1500,
-} as const;
-
-function keyLabel(code: string) {
-  if (code === "Space") return "Espaco";
-  if (code.startsWith("Key")) return code.slice(3);
-  if (code.startsWith("Arrow")) return code.slice(5);
-  return code;
-}
-
-function normalizeRoomRole(role: unknown) {
-  const value = String(role || "").trim().toLowerCase().replace(/\s+/g, "_");
-  if (value === "director" || value === "diretor" || value === "studio_admin" || value === "engenheiro_audio" || value === "platform_owner" || value === "master") return "diretor";
-  return "dublador";
-}
-
-type UiRole = "viewer" | "text_controller" | "audio_controller" | "admin";
-type UiPermission = "text_control" | "audio_control" | "presence_view" | "approve_take" | "dashboard_access";
-
-const UI_ROLE_PERMISSIONS: Record<UiRole, UiPermission[]> = {
-  viewer: [],
-  text_controller: ["text_control", "presence_view"],
-  audio_controller: ["audio_control", "presence_view"], // Removed dashboard_access from dubber by default? User said "Dubber's access is restricted to recording and text control only when explicitly permitted"
-  admin: ["text_control", "audio_control", "approve_take", "dashboard_access", "presence_view"],
-};
-
-function resolveUiRole(role: unknown, controlledText: boolean): UiRole {
-  const normalized = normalizeRoomRole(role);
-  
-  if (normalized === "diretor") return "admin";
-  
-  // Se tiver controle de texto explícito (concedido pelo diretor)
-  if (controlledText) return "text_controller";
-  
-  // Dublador padrão
-  return "audio_controller";
-}
-
-function hasUiPermission(role: UiRole, permission: UiPermission) {
-  return UI_ROLE_PERMISSIONS[role].includes(permission);
-}
-
-function canReceiveTextControl(role: unknown) {
-  // Qualquer um que não seja diretor pode receber controle (basicamente dubladores)
-  const normalized = normalizeRoomRole(role);
-  return normalized !== "diretor";
-}
 
 export interface RecordingProfile {
   actorName: string;
