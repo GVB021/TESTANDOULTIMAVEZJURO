@@ -1841,14 +1841,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     }
   }, [pendingTake, uploadTakeForDirector, toast, logFeatureAudit, enqueuePendingUpload, blobToBase64, recordingProfile, user?.id, hasApproverPresent, isPrivileged, logAudioStep]);
 
-  const handleRejectTake = useCallback(() => {
-    if (!pendingTake) return;
-    URL.revokeObjectURL(pendingTake.url);
-    setPendingTake(null);
-    setRecordingStatus("idle");
-    toast({ title: "Take descartado" });
-  }, [pendingTake, toast]);
-
   const handlePlayPause = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -1962,10 +1954,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     await logFeatureAudit("room.loop", "selection_started");
     toast({ title: "Selecione a primeira fala do loop" });
   }, [loopSelectionMode, customLoop, logFeatureAudit, toast]);
-
-  const handleDiscard = useCallback(() => {
-    setRecordingStatus("idle");
-  }, []);
 
   const handleBack = useCallback(() => {
     if (recordingStatus === "recording" && !window.confirm("Você tem uma gravação em andamento. Deseja realmente sair?")) return;
