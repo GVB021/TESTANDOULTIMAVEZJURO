@@ -1083,6 +1083,63 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     return candidates;
   }, [presenceUsers, user]);
 
+  const mobileMenuItems = useMemo(() => [
+    {
+      icon: <Monitor className="w-5 h-5" />,
+      iconBg: "bg-blue-500/10 text-blue-500",
+      title: "Dispositivos",
+      subtitle: "Configurar Áudio",
+      onClick: () => { setDeviceSettingsOpen(true); setMobileMenuOpen(false); },
+    },
+    {
+      icon: <User className="w-5 h-5" />,
+      iconBg: "bg-purple-500/10 text-purple-500",
+      title: "Perfil de Gravação",
+      subtitle: "Ator & Personagem",
+      onClick: () => { setShowProfilePanel(true); setMobileMenuOpen(false); },
+    },
+    {
+      icon: <ListMusic className="w-5 h-5" />,
+      iconBg: "bg-emerald-500/10 text-emerald-400",
+      title: "Gravações",
+      subtitle: "Takes da Sessão",
+      onClick: () => { setRecordingsOpen(true); setMobileMenuOpen(false); },
+    },
+    {
+      icon: <Edit3 className="w-5 h-5" />,
+      iconBg: "bg-indigo-500/10 text-indigo-300",
+      title: "Liberar Texto",
+      subtitle: "Permissões em tempo real",
+      onClick: () => { setTextControlPopupOpen(true); setMobileMenuOpen(false); },
+      visible: canReleaseText,
+    },
+    {
+      icon: <Settings className="w-5 h-5" />,
+      iconBg: "bg-amber-500/10 text-amber-300",
+      title: "Atalhos do Teclado",
+      subtitle: "Configurações rápidas",
+      onClick: () => { setIsCustomizing(true); setMobileMenuOpen(false); },
+      testId: "button-mobile-open-shortcuts",
+    },
+    {
+      icon: <Monitor className="w-5 h-5" />,
+      iconBg: "bg-sky-500/10 text-sky-300",
+      title: "Painel",
+      subtitle: "Voltar ao dashboard",
+      onClick: () => { logFeatureAudit("room.panel", "redirect", { studioId }); setMobileMenuOpen(false); },
+      href: `/hub-dub/studio/${studioId}/dashboard`,
+      testId: "button-mobile-room-panel",
+      visible: canAccessDashboard,
+    },
+    {
+      icon: <Video className="w-5 h-5" />,
+      iconBg: "bg-green-500/10 text-green-400",
+      title: "Vídeo & Voz",
+      subtitle: "Chat da equipe",
+      onClick: () => { setDailyMeetOpen(true); setMobileMenuOpen(false); },
+    },
+  ], [canReleaseText, canAccessDashboard, studioId]);
+
   // Note: applyScriptLinePatch and pushEditHistory moved above to avoid hoisting issues
 
   const rebuildScrollAnchors = useCallback(() => {
@@ -2743,62 +2800,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               onOpenChange={setMobileMenuOpen}
               overlayZIndex={UI_LAYER_BASE.mobileDrawerOverlay}
               contentZIndex={UI_LAYER_BASE.mobileDrawerContent}
-              items={[
-                {
-                  icon: <Monitor className="w-5 h-5" />,
-                  iconBg: "bg-blue-500/10 text-blue-500",
-                  title: "Dispositivos",
-                  subtitle: "Configurar Áudio",
-                  onClick: () => { setDeviceSettingsOpen(true); setMobileMenuOpen(false); },
-                },
-                {
-                  icon: <User className="w-5 h-5" />,
-                  iconBg: "bg-purple-500/10 text-purple-500",
-                  title: "Perfil de Gravação",
-                  subtitle: "Ator & Personagem",
-                  onClick: () => { setShowProfilePanel(true); setMobileMenuOpen(false); },
-                },
-                {
-                  icon: <ListMusic className="w-5 h-5" />,
-                  iconBg: "bg-emerald-500/10 text-emerald-400",
-                  title: "Gravações",
-                  subtitle: "Takes da Sessão",
-                  onClick: () => { setRecordingsOpen(true); setMobileMenuOpen(false); },
-                },
-                {
-                  icon: <Edit3 className="w-5 h-5" />,
-                  iconBg: "bg-indigo-500/10 text-indigo-300",
-                  title: "Liberar Texto",
-                  subtitle: "Permissões em tempo real",
-                  onClick: () => { setTextControlPopupOpen(true); setMobileMenuOpen(false); },
-                  visible: canReleaseText,
-                },
-                {
-                  icon: <Settings className="w-5 h-5" />,
-                  iconBg: "bg-amber-500/10 text-amber-300",
-                  title: "Atalhos do Teclado",
-                  subtitle: "Configurações rápidas",
-                  onClick: () => { setIsCustomizing(true); setMobileMenuOpen(false); },
-                  testId: "button-mobile-open-shortcuts",
-                },
-                {
-                  icon: <Monitor className="w-5 h-5" />,
-                  iconBg: "bg-sky-500/10 text-sky-300",
-                  title: "Painel",
-                  subtitle: "Voltar ao dashboard",
-                  onClick: () => { logFeatureAudit("room.panel", "redirect", { studioId }); setMobileMenuOpen(false); },
-                  href: `/hub-dub/studio/${studioId}/dashboard`,
-                  testId: "button-mobile-room-panel",
-                  visible: canAccessDashboard,
-                },
-                {
-                  icon: <Video className="w-5 h-5" />,
-                  iconBg: "bg-green-500/10 text-green-400",
-                  title: "Vídeo & Voz",
-                  subtitle: "Chat da equipe",
-                  onClick: () => { setDailyMeetOpen(true); setMobileMenuOpen(false); },
-                },
-              ]}
+              items={mobileMenuItems}
             />
 
             <button
