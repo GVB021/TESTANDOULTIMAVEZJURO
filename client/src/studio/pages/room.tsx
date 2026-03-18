@@ -157,7 +157,6 @@ export default function RecordingRoom() {
   const [directorControlConfirmed, setDirectorControlConfirmed] = useState(false);
   const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
   
-  // 🔥 HARDWARE CONTROL
   const {
     requestMicrophoneAccess,
     hasPermission,
@@ -398,7 +397,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     return () => clearInterval(interval);
   }, [sessionId, checkSessionAccess, sessionAccessStatus?.canAccess]);
 
-  // 🔥 SOLICITAR ACESSO AO MICROFONE AO ENTRAR NO ROOM
   useEffect(() => {
     const initializeHardware = async () => {
       
@@ -629,9 +627,8 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
               startTimeSeconds: msg.start || 0,
             });
             
-            // 🔥 TOAST INTERATIVO GARANTIDO
             toast({
-              title: "🎙️ Novo Take para Revisão",
+              title: "Novo Take para Revisão",
               description: `${msg.character || "Desconhecido"} enviou uma gravação.`,
               action: (
                 <button 
@@ -1289,75 +1286,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
   }, [deviceSettings.outputDeviceId, logAudioStep, toast]);
 
   useEffect(() => {
-    if (deviceSettingsOpen || micInitializing) return;
-    
-    setMicInitializing(true);
-    logAudioStep("microphone-request", {
-      captureMode: deviceSettings.voiceCaptureMode,
-      inputDeviceId: deviceSettings.inputDeviceId || "default",
-      gain: deviceSettings.inputGain,
-    });
-    
-    requestMicrophone(deviceSettings.voiceCaptureMode, deviceSettings.inputDeviceId)
-      .then((state) => {
-        setMicState(state);
-        setMicReady(true);
-        setGain(state, deviceSettings.inputGain);
-        const latencyMs = getEstimatedInputLatencyMs(state);
-        if (latencyMs > 10) {
-          toast({
-            title: "Latência de entrada acima da meta",
-            description: `Latência detectada: ${Math.round(latencyMs)}ms. Pode afetar sincronia.`,
-            variant: "default",
-          });
-        }
-        logAudioStep("microphone-ready", {
-          sampleRate: state.audioContext?.sampleRate || 48000,
-          captureMode: state.captureMode,
-          latencyMs,
-        });
-      })
-      .catch((err) => {
-        const message = String(err?.message || err);
-        console.error("Mic initialization error:", err);
-        if (deviceSettings.voiceCaptureMode === "high-fidelity") {
-          requestMicrophone("original", deviceSettings.inputDeviceId)
-            .then((fallbackState) => {
-              setMicState(fallbackState);
-              setMicReady(true);
-              setGain(fallbackState, deviceSettings.inputGain);
-              setDeviceSettings((prev) => ({ ...prev, voiceCaptureMode: "original" }));
-              logAudioStep("microphone-fallback-original", { message });
-              toast({
-                title: "Lossless indisponível neste dispositivo",
-                description: "Aplicado fallback automático para modo padrão.",
-                variant: "destructive",
-              });
-            })
-            .catch((fallbackError) => {
-              console.error("Mic fallback error:", fallbackError);
-              setMicReady(false);
-              logAudioStep("microphone-error", { message: String((fallbackError as any)?.message || fallbackError) });
-              toast({ title: "Erro no microfone", description: "Nao foi possivel acessar o audio.", variant: "destructive" });
-            });
-        } else {
-          console.error("Mic error:", err);
-          setMicReady(false);
-          logAudioStep("microphone-error", { message });
-          toast({ title: "Erro no microfone", description: "Nao foi possivel acessar o audio.", variant: "destructive" });
-        }
-      })
-      .finally(() => {
-        setMicInitializing(false);
-      });
-
-    return () => {
-      releaseMicrophone();
-      setMicReady(false);
-    };
-  }, [deviceSettings.inputDeviceId, deviceSettings.voiceCaptureMode, deviceSettings.inputGain, deviceSettingsOpen, toast, logAudioStep]);
-
-  useEffect(() => {
     return () => {
       if (countdownTimerRef.current) {
         window.clearInterval(countdownTimerRef.current);
@@ -1515,7 +1443,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
   const startCountdown = useCallback(() => {
     if (recordingStatus !== "idle") {
-      console.warn("❌ Gravação não iniciada: status não é idle", recordingStatus);
+      console.warn("Gravação não iniciada: status não é idle", recordingStatus);
       toast({ 
         title: "Gravação em andamento", 
         description: "Pare a gravação atual antes de iniciar outra.", 
@@ -1525,7 +1453,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     }
     
     if (!micState) {
-      console.warn("❌ MicState ausente, tentando inicializar...");
+      console.warn("MicState ausente, tentando inicializar...");
       // Não bloquear, tentar iniciar mesmo sem micState
       toast({ 
         title: "Microfone não inicializado", 
@@ -1534,7 +1462,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       });
     }
     
-    // 🔥 REMOVER BLOQUEIOS POR MICREADY
     if (micInitializing) {
     }
     
