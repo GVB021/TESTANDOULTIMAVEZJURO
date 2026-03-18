@@ -241,15 +241,15 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                 : { width: panelSize.width, height: panelSize.height }
             }
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className={`bg-zinc-900 border border-zinc-800 ${mode === "embedded" ? "rounded-none h-full" : "rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"} flex flex-col overflow-hidden backdrop-blur-xl`}
+            className={`room-bg-elevated border border-border ${mode === "embedded" ? "rounded-none h-full" : "rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"} flex flex-col overflow-hidden backdrop-blur-xl`}
             data-testid="daily-meet-popup"
           >
             {/* Custom Join Screen */}
             {showJoinScreen && (
-              <div className="flex-1 flex flex-col items-center justify-center p-6 bg-zinc-950/95">
+              <div className="flex-1 flex flex-col items-center justify-center p-6 room-bg-subtle">
                 <div className="w-full max-w-sm space-y-6">
                   {/* User Profile */}
-                  <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800">
+                  <div className="flex items-center gap-4 p-4 rounded-xl room-bg-surface border border-border">
                     <Avatar className="w-16 h-16">
                       <AvatarImage src={user?.profileImageUrl || undefined} />
                       <AvatarFallback className="text-lg font-bold bg-primary/20 text-primary">
@@ -260,7 +260,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                       <div className="font-semibold text-white text-lg">
                         {user?.displayName || user?.fullName || 'Usuário'}
                       </div>
-                      <div className="text-sm text-zinc-400">
+                      <div className="text-sm room-text-muted">
                         Pronto para entrar na chamada
                       </div>
                     </div>
@@ -305,7 +305,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                   </Button>
 
                   {/* Status */}
-                  <div className="text-center text-xs text-zinc-500">
+                  <div className="text-center text-xs room-text-subtle">
                     Sala de vídeo e voz para dublagem colaborativa
                   </div>
                 </div>
@@ -315,18 +315,18 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
             {/* Original Daily.co Content (when not showing join screen) */}
             {!showJoinScreen && (
               <div>
-            <div className="h-14 px-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/40 shrink-0">
+            <div className="h-14 px-4 border-b border-border flex items-center justify-between room-bg-surface shrink-0">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full animate-pulse ${
                     status === "conectado" ? "bg-emerald-500" : status === "conectando" ? "bg-amber-500" : "bg-red-500"
                   }`} />
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                  <span className="text-[10px] font-bold room-text-muted uppercase tracking-widest">
                     {isMinimized ? "Chat Ativo" : "Voice & Video Chat"}
                   </span>
                 </div>
                 {isMinimized && (
-                  <div className="flex items-center gap-2 border-l border-zinc-800 pl-3">
+                  <div className="flex items-center gap-2 border-l border-border pl-3">
                     <button
                       onClick={() => {
                         const call = callRef.current;
@@ -335,7 +335,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                         setIsMuted((prev) => !prev);
                       }}
                       className={`w-7 h-7 rounded-md flex items-center justify-center transition-all ${
-                        isMuted ? "text-red-400 bg-red-500/10" : "text-zinc-400 hover:text-white hover:bg-white/5"
+                        isMuted ? "text-red-400 bg-red-500/10" : "room-text-muted hover:text-foreground hover:bg-white/5"
                       }`}
                     >
                       {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
@@ -348,7 +348,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                         setIsVideoOff((prev) => !prev);
                       }}
                       className={`w-7 h-7 rounded-md flex items-center justify-center transition-all ${
-                        isVideoOff ? "text-red-400 bg-red-500/10" : "text-zinc-400 hover:text-white hover:bg-white/5"
+                        isVideoOff ? "text-red-400 bg-red-500/10" : "room-text-muted hover:text-foreground hover:bg-white/5"
                       }`}
                     >
                       {isVideoOff ? <VideoOff className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
@@ -364,7 +364,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                       const call = callRef.current;
                       if (call && roomUrl) call.join({ url: roomUrl }).catch(() => {});
                     }}
-                    className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-md hover:bg-white/5"
+                    className="room-text-muted hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-white/5"
                     title="Recarregar conexão"
                   >
                     <RefreshCw className="w-4 h-4" />
@@ -372,7 +372,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                 )}
                 <button
                   onClick={() => setIsMinimized((v) => !v)}
-                  className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-md hover:bg-white/5"
+                  className="room-text-muted hover:text-foreground transition-colors p-1.5 rounded-md hover:bg-white/5"
                   title={isMinimized ? "Maximizar" : "Minimizar"}
                 >
                   {isMinimized ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -398,7 +398,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                 >
                   <div ref={containerRef} className="absolute inset-0" />
                   {errorMsg && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/80 backdrop-blur-sm p-6 text-center z-50">
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm p-6 text-center z-50">
                       <div className="max-w-xs">
                         <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center text-red-500 mx-auto mb-4">
                           <PhoneOff className="w-6 h-6" />
@@ -421,19 +421,19 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                 {!isMobile && (
                   <button
                     onPointerDown={() => setIsResizingSplit(true)}
-                    className="w-1.5 cursor-col-resize bg-zinc-800/80 hover:bg-primary/50 transition-colors z-10"
+                    className="w-1.5 cursor-col-resize room-bg-surface hover:bg-primary/50 transition-colors z-10"
                     aria-label="Redimensionar vídeo e texto"
                   />
                 )}
 
                 <div
-                  className="bg-zinc-950 p-6 border-zinc-800 min-h-0 overflow-y-auto"
+                  className="room-bg-subtle p-6 border-border min-h-0 overflow-y-auto"
                   style={isMobile ? { borderTopWidth: 1, flex: 1 } : { width: `${100 - splitPercent}%`, borderLeftWidth: 1 }}
                 >
-                  <div className="text-zinc-100 text-lg sm:text-xl font-bold leading-snug mb-3">
+                  <div className="room-text-primary text-lg sm:text-xl font-bold leading-snug mb-3">
                     Colaboração em Tempo Real
                   </div>
-                  <div className="text-sm text-zinc-400 leading-relaxed space-y-3">
+                  <div className="text-sm room-text-muted leading-relaxed space-y-3">
                     <p>Use este painel para coordenar entradas, revisar sincronia e orientar ajustes com sua equipe.</p>
                     <div className="pt-4 space-y-2">
                       <div className="flex items-start gap-2">
@@ -452,7 +452,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
 
             {/* Bottom Controls (Only when Expanded) */}
             {!isMinimized && (
-              <div className="h-16 px-4 border-t border-zinc-800 flex items-center justify-center gap-3 bg-zinc-900/40 shrink-0">
+              <div className="h-16 px-4 border-t border-border flex items-center justify-center gap-3 room-bg-surface shrink-0">
                 <button
                   onClick={() => {
                     const call = callRef.current;
@@ -461,7 +461,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                     setIsMuted((prev) => !prev);
                   }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium text-sm ${
-                    isMuted ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "bg-zinc-800 text-zinc-100 hover:bg-zinc-700"
+                    isMuted ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "room-button-secondary room-text-primary"
                   }`}
                 >
                   {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -475,7 +475,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                     setIsVideoOff((prev) => !prev);
                   }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-medium text-sm ${
-                    isVideoOff ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "bg-zinc-800 text-zinc-100 hover:bg-zinc-700"
+                    isVideoOff ? "bg-red-500 text-white shadow-lg shadow-red-500/20" : "room-button-secondary room-text-primary"
                   }`}
                 >
                   {isVideoOff ? <VideoOff className="w-4 h-4" /> : <Video className="w-4 h-4" />}

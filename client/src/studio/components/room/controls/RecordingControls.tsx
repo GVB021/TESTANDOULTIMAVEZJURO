@@ -26,10 +26,10 @@ export function RecordingControls({
           disabled={disabled || status === "stopped"}
           className={cn(
             "relative w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl",
-            disabled ? "opacity-50 cursor-not-allowed bg-zinc-800 border border-zinc-700" :
+            disabled ? "opacity-50 cursor-not-allowed room-bg-surface border border-border" :
             status === "countdown" ? "bg-amber-500 text-white scale-110 shadow-amber-500/50" :
             status === "recording" ? "bg-red-500 text-white scale-110 shadow-red-500/50 animate-pulse-slow" :
-            status === "stopped" ? "bg-zinc-800 text-zinc-400 border border-zinc-700" :
+            status === "stopped" ? "room-bg-surface room-text-muted border border-border" :
             "bg-red-500 text-white hover:bg-red-600 hover:scale-105 shadow-red-500/30"
           )}
         >
