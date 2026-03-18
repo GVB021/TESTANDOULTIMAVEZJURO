@@ -984,19 +984,19 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     { label: "Máximo", value: 36 }
   ];
 
-  const changeScriptFontSize = (delta: number) => {
+  const changeScriptFontSize = useCallback((delta: number) => {
     setScriptFontSize(prev => {
       const next = prev + delta;
       const constrained = Math.max(10, Math.min(36, next));
       localStorage.setItem("vhub_script_font_size", String(constrained));
       return constrained;
     });
-  };
+  }, []);
 
-  const setScriptFontSizeExact = (size: number) => {
+  const setScriptFontSizeExact = useCallback((size: number) => {
     setScriptFontSize(size);
     localStorage.setItem("vhub_script_font_size", String(size));
-  };
+  }, []);
 
   const mySessionRole = useMemo(() => {
     const participantRole = session?.participants?.find((p: any) => p.userId === user?.id)?.role;
