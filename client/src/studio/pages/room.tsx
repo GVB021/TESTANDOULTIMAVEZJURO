@@ -4,18 +4,13 @@ import { AnimatePresence } from "framer-motion";
 import { authFetch } from "@studio/lib/auth-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Mic,
-  Square,
   AlertCircle,
-  Circle,
   Settings,
   X,
   Check,
   Monitor,
   User,
-  Users,
   Edit3,
-  Menu,
   ListMusic,
   Video,
 } from "lucide-react";
