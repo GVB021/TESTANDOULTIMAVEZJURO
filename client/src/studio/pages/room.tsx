@@ -1,4 +1,4 @@
-import { useParams, Link } from "wouter";
+import { useParams, Link, useLocation } from "wouter";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Drawer } from "vaul";
@@ -625,6 +625,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const studioRole = useStudioRole(studioId);
+  const [, setLocation] = useLocation();
 
   // WebSocket state
   const [wsConnected, setWsConnected] = useState(false);
@@ -688,7 +689,8 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   // Recording state
   const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(null);
   const [micReady, setMicReady] = useState(false);
-  const [micState, setMicState] = useState<any>("idle");
+  const [micInitializing, setMicInitializing] = useState(false);
+  const [micState, setMicState] = useState<any>(null);
   const [recordingStatus, setRecordingStatus] = useState<"idle" | "countdown" | "recording" | "stopped" | "recorded">("idle");
   const [countdownValue, setCountdownValue] = useState(0);
   const [lastRecording, setLastRecording] = useState<any>(null);
@@ -959,9 +961,15 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         } else if (msg.type === "video:countdown" || msg.type === "video:countdown-start" || msg.type === "video:countdown-tick") {
           setCountdownValue(msg.count);
           if (msg.count > 0) {
-            // Create audio context for beep
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-            playCountdownBeep(audioContext);
+            // 🔒 CRITICAL FIX: Safe AudioContext creation for beep
+            try {
+              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+              if (audioContext.state !== "closed") {
+                playCountdownBeep(audioContext);
+              }
+            } catch (error) {
+              console.warn("[Room] Failed to create AudioContext for countdown beep:", error);
+            }
           }
         } else if (msg.type === "video:loop-preparing") {
           setLoopPreparing(true);
@@ -1579,12 +1587,15 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, [deviceSettings.outputDeviceId, logAudioStep, toast]);
 
   useEffect(() => {
-    if (deviceSettingsOpen) return;
+    if (deviceSettingsOpen || micInitializing) return;
+    
+    setMicInitializing(true);
     logAudioStep("microphone-request", {
       captureMode: deviceSettings.voiceCaptureMode,
       inputDeviceId: deviceSettings.inputDeviceId || "default",
       gain: deviceSettings.inputGain,
     });
+    
     requestMicrophone(deviceSettings.voiceCaptureMode, deviceSettings.inputDeviceId)
       .then((state) => {
         setMicState(state);
@@ -1594,18 +1605,19 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         if (latencyMs > 10) {
           toast({
             title: "Latência de entrada acima da meta",
-            description: `Latência atual ${latencyMs.toFixed(2)}ms. Use modo high-fidelity e feche apps de áudio.`,
-            variant: "destructive",
+            description: `Latência detectada: ${Math.round(latencyMs)}ms. Pode afetar sincronia.`,
+            variant: "default",
           });
         }
         logAudioStep("microphone-ready", {
-          sampleRate: state.audioContext.sampleRate,
+          sampleRate: state.audioContext?.sampleRate || 48000,
           captureMode: state.captureMode,
           latencyMs,
         });
       })
       .catch((err) => {
         const message = String(err?.message || err);
+        console.error("Mic initialization error:", err);
         if (deviceSettings.voiceCaptureMode === "high-fidelity") {
           requestMicrophone("original", deviceSettings.inputDeviceId)
             .then((fallbackState) => {
@@ -1626,12 +1638,15 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               logAudioStep("microphone-error", { message: String((fallbackError as any)?.message || fallbackError) });
               toast({ title: "Erro no microfone", description: "Nao foi possivel acessar o audio.", variant: "destructive" });
             });
-          return;
+        } else {
+          console.error("Mic error:", err);
+          setMicReady(false);
+          logAudioStep("microphone-error", { message });
+          toast({ title: "Erro no microfone", description: "Nao foi possivel acessar o audio.", variant: "destructive" });
         }
-        console.error("Mic error:", err);
-        setMicReady(false);
-        logAudioStep("microphone-error", { message });
-        toast({ title: "Erro no microfone", description: "Nao foi possivel acessar o audio.", variant: "destructive" });
+      })
+      .finally(() => {
+        setMicInitializing(false);
       });
 
     return () => {
@@ -1797,7 +1812,23 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, [recordingProfile, sessionId, user?.id, user?.displayName, user?.fullName, queryClient, logAudioStep]);
 
   const startCountdown = useCallback(() => {
-    if (recordingStatus !== "idle" || !micState) return;
+    // 🔒 CRITICAL FIX: Prevent recording without proper audio initialization
+    if (recordingStatus !== "idle" || !micState || !micReady || micInitializing) {
+      if (micInitializing) {
+        toast({ 
+          title: "Aguarde...", 
+          description: "Inicializando o microfone.", 
+          variant: "default" 
+        });
+      } else if (!micReady) {
+        toast({ 
+          title: "Microfone não pronto", 
+          description: "Verifique as permissões de áudio.", 
+          variant: "destructive" 
+        });
+      }
+      return;
+    }
     const video = videoRef.current;
     if (!video) return;
     const loopPreroll = isLooping ? 3 : preRoll;
@@ -1812,14 +1843,14 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     video.play().catch(() => {});
     emitVideoEvent("play", { currentTime: video.currentTime });
     emitVideoEvent("countdown-start", { initiatorUserId: user?.id, count: 3 });
-    if (micState.audioContext) playCountdownBeep(micState.audioContext);
+    if (micState?.audioContext) playCountdownBeep(micState.audioContext);
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     let count = 3;
     countdownTimerRef.current = window.setInterval(() => {
       count -= 1;
       setCountdownValue(Math.max(0, count));
       emitVideoEvent("countdown-tick", { count: Math.max(0, count), initiatorUserId: user?.id });
-      if (count > 0 && micState.audioContext) playCountdownBeep(micState.audioContext);
+      if (count > 0 && micState?.audioContext) playCountdownBeep(micState.audioContext);
       if (count <= 0 && countdownTimerRef.current) {
         window.clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
@@ -2512,7 +2543,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           <AlertCircle className="w-12 h-12 text-destructive" />
           <p className="text-sm font-medium text-foreground">Erro ao carregar sessao</p>
           <p className="text-xs text-muted-foreground">Verifique se voce tem acesso a este estudio e sessao.</p>
-          <Link href={`/hub-dub/studio/${studioId}/sessions`}>
+          <Link to={`/hub-dub/studio/${studioId}/sessions`}>
             <button className="mt-2 vhub-btn-sm vhub-btn-primary" data-testid="button-go-sessions">
               Ir para Sessoes
             </button>
@@ -3009,7 +3040,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               if (recordingStatus === 'recording' && !window.confirm('Você tem uma gravação em andamento. Deseja realmente sair?')) {
                 return;
               }
-              window.location.href = `/hub-dub/studio/${studioId}/dashboard`;
+              setLocation(`/hub-dub/studio/${studioId}/dashboard`);
             }}
             className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -3195,7 +3226,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                 <Monitor className="w-4 h-4" />
               </button>
               {canAccessDashboard && (
-                <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
+                <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
                   <button
                     onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); }}
                     className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
@@ -3288,11 +3319,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
               <button
                 onClick={() => setIsMuted((m) => !m)}
-                className="absolute top-4 right-4 p-2.5 rounded-xl bg-black/50 text-white/60 hover:text-white transition-all hover:bg-black/70 border border-white/10"
+                className="absolute top-4 right-4 p-3 rounded-xl bg-black/60 backdrop-blur text-white/80 hover:text-white transition-all hover:bg-black/80 border border-white/20 hover:scale-110 hover:border-white/30"
                 style={{ zIndex: UI_LAYER_BASE.floatingButtons }}
                 aria-label={isMuted ? "Ativar som" : "Desativar som"}
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
               </button>
 
               {(customLoop || loopSelectionMode !== "idle" || loopPreparing || loopSilenceActive) && (
@@ -3335,8 +3366,20 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                     <Repeat className="w-4 h-4" />
                   </button>
                   {recordingStatus === "idle" || recordingStatus === "recorded" ? (
-                    <button onClick={startCountdown} disabled={!micReady || isSaving} className="w-11 h-11 rounded-full flex items-center justify-center bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all" title="Gravar">
-                      {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
+                    <button 
+                      onClick={startCountdown} 
+                      disabled={!micReady || isSaving || micInitializing} 
+                      className={cn(
+                        "w-11 h-11 rounded-full flex items-center justify-center transition-all",
+                        micInitializing 
+                          ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-300 animate-pulse" 
+                          : !micReady 
+                            ? "bg-red-500/20 border-red-500/40 text-red-300" 
+                            : "bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      )} 
+                      title={micInitializing ? "Inicializando microfone..." : !micReady ? "Microfone não disponível" : "Gravar"}
+                    >
+                      {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : micInitializing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
                     </button>
                   ) : (
                     <button onClick={handleStopRecording} className="w-11 h-11 rounded-full flex items-center justify-center bg-red-500 animate-pulse" title="Parar Gravação">
@@ -3412,11 +3455,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                   Roteiro Completo
                 </span>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 12} className="w-7 h-7 rounded-md flex items-center justify-center bg-white/5 text-white/60 hover:bg-white/10 disabled:opacity-50 transition-all">
+                  <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 12} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="text-xs font-mono w-6 text-center text-white/50">{scriptFontSize}</span>
-                  <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 24} className="w-7 h-7 rounded-md flex items-center justify-center bg-white/5 text-white/60 hover:bg-white/10 disabled:opacity-50 transition-all">
+                  <span className="text-xs font-mono w-8 text-center text-white/70 font-bold">{scriptFontSize}</span>
+                  <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 24} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
@@ -3478,7 +3521,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                               event.stopPropagation();
                               startInlineEdit(i, "character");
                             }}
-                            className="h-7 px-2 rounded-md bg-muted/70 text-[11px] text-muted-foreground hover:text-foreground"
+                            className="h-8 px-3 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105"
                           >
                             Personagem
                           </button>
@@ -3487,7 +3530,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                               event.stopPropagation();
                               startInlineEdit(i, "text");
                             }}
-                            className="h-7 px-2 rounded-md bg-muted/70 text-[11px] text-muted-foreground hover:text-foreground"
+                            className="h-8 px-3 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105"
                           >
                             Fala
                           </button>
@@ -3496,7 +3539,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                               event.stopPropagation();
                               startInlineEdit(i, "timecode");
                             }}
-                            className="h-7 px-2 rounded-md bg-muted/70 text-[11px] text-muted-foreground hover:text-foreground"
+                            className="h-8 px-3 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105"
                           >
                             Timecode
                           </button>
@@ -3761,14 +3804,14 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               <button
                 onClick={handleLoopButton}
                 className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center transition-all border",
+                  "w-14 h-14 rounded-2xl flex items-center justify-center transition-all border shadow-lg",
                   loopSelectionMode !== "idle" || isLooping
-                    ? "bg-indigo-500/20 border-indigo-400/50 text-indigo-300"
-                    : "bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10"
+                    ? "bg-indigo-500/30 border-indigo-400/60 text-indigo-200 shadow-indigo-500/20"
+                    : "bg-white/10 border-white/20 text-white/80 hover:text-white hover:bg-white/20 hover:scale-105"
                 )}
                 aria-label="Configurar loop"
               >
-                <Repeat className="w-5 h-5" />
+                <Repeat className="w-6 h-6" />
               </button>
 
               {recordingStatus === "idle" || recordingStatus === "recorded" ? (
@@ -3776,20 +3819,20 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                   onClick={startCountdown}
                   disabled={!micReady || isSaving}
                   className={cn(
-                    "w-14 h-14 rounded-full flex items-center justify-center transition-all border shadow-xl",
+                    "w-16 h-16 rounded-full flex items-center justify-center transition-all border shadow-2xl",
                     isSaving
                       ? "opacity-50 cursor-not-allowed bg-white/5 border-white/10 text-white/20"
-                      : "bg-white/10 border-white/20 text-white hover:bg-white/20 hover:scale-105 active:scale-95"
+                      : "bg-gradient-to-br from-red-500 to-red-600 border-red-400/30 text-white hover:from-red-600 hover:to-red-700 hover:scale-110 active:scale-95 shadow-red-500/25"
                   )}
                 >
-                  {isSaving ? <Loader2 className="w-6 h-6 animate-spin" /> : <Mic className="w-6 h-6" />}
+                  {isSaving ? <Loader2 className="w-7 h-7 animate-spin" /> : <Mic className="w-7 h-7" />}
                 </button>
               ) : (
                 <button
                   onClick={handleStopRecording}
-                  className="w-14 h-14 rounded-full flex items-center justify-center transition-all bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.5)] animate-pulse hover:scale-105 active:scale-95"
+                  className="w-16 h-16 rounded-full flex items-center justify-center transition-all bg-gradient-to-br from-red-600 to-red-700 shadow-[0_0_30px_rgba(239,68,68,0.6)] animate-pulse hover:scale-110 active:scale-95"
                 >
-                  <Square className="w-6 h-6 text-white fill-white" />
+                  <Square className="w-7 h-7 text-white fill-white" />
                 </button>
               )}
             </div>
@@ -3896,7 +3939,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                         <ChevronRight className="w-5 h-5 text-white/20" />
                       </button>
                       {canAccessDashboard && (
-                        <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
+                        <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
                           <button
                             onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); setMobileMenuOpen(false); }}
                             className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"

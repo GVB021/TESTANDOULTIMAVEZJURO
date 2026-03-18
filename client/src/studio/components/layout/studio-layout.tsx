@@ -31,7 +31,7 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
 
       <div className="flex flex-col flex-1 w-full overflow-hidden min-w-0 relative z-10">
         <header className="flex h-16 shrink-0 items-center gap-4 md:gap-8 px-4 md:px-8 sticky top-0 z-50 border-b border-border/60 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/50 shadow-sm">
-          <Link href="/">
+          <Link to="/">
             <div className="flex items-center gap-3 cursor-pointer group shrink-0">
               <div className="h-8 w-8 rounded-lg border border-border/70 bg-card/70 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                 <img src="/logo.svg" alt="V.HUB" className="h-5 w-5" />
@@ -45,7 +45,7 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
               {navItems.map((item) => {
                 const isActive = location === item.url || location.startsWith(item.url + "?");
                 return (
-                  <Link key={item.url} href={item.url}>
+                  <Link key={item.url} to={item.url}>
                     <button 
                       className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-all ${
                         isActive 
@@ -67,13 +67,13 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
           <div className="flex items-center gap-2 md:gap-4">
             {!isMobile && (
               <div className="flex items-center gap-1 border-r border-border/60 pr-4">
-                <Link href="/hub-dub/profile">
+                <Link to="/hub-dub/profile">
                   <button className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-md hover:bg-muted/40" data-testid="button-header-profile">
                     <UserCircle className="h-3.5 w-3.5" />
                     Perfil
                   </button>
                 </Link>
-                <Link href="/hub-dub/studios">
+                <Link to="/hub-dub/studios">
                   <button className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-md hover:bg-muted/40" data-testid="button-header-switch-studio">
                     <Building2 className="h-3.5 w-3.5" />
                     Trocar Estúdio
@@ -91,7 +91,7 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
             )}
             
             {user?.role === "platform_owner" && !isMobile && (
-              <Link href="/hub-dub/admin">
+              <Link to="/hub-dub/admin">
                 <button className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-full border border-border/60 bg-card/60 hover:bg-card" data-testid="button-header-admin">
                   <ShieldAlert className="h-3.5 w-3.5" />
                   Admin
@@ -116,7 +116,7 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
               {navItems.map((item) => {
                 const isActive = location === item.url || location.startsWith(item.url + "?");
                 return (
-                  <Link key={item.url} href={item.url} onClick={() => setIsMenuOpen(false)}>
+                  <Link key={item.url} to={item.url} onClick={() => setIsMenuOpen(false)}>
                     <button 
                       className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all w-full ${
                         isActive 
@@ -133,20 +133,20 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
             </nav>
             <div className="h-px bg-border/60" />
             <div className="flex flex-col gap-2">
-              <Link href="/hub-dub/profile" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/hub-dub/profile" onClick={() => setIsMenuOpen(false)}>
                 <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground w-full transition-colors">
                   <UserCircle className="h-4 w-4" />
                   Perfil
                 </button>
               </Link>
-              <Link href="/hub-dub/studios" onClick={() => setIsMenuOpen(false)}>
+              <Link to="/hub-dub/studios" onClick={() => setIsMenuOpen(false)}>
                 <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground w-full transition-colors">
                   <Building2 className="h-4 w-4" />
                   Trocar Estúdio
                 </button>
               </Link>
               {user?.role === "platform_owner" && (
-                <Link href="/hub-dub/admin" onClick={() => setIsMenuOpen(false)}>
+                <Link to="/hub-dub/admin" onClick={() => setIsMenuOpen(false)}>
                   <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground w-full transition-colors">
                     <ShieldAlert className="h-4 w-4" />
                     Admin

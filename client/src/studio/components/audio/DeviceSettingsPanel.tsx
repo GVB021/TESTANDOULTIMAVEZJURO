@@ -129,7 +129,7 @@ export function DeviceSettingsPanel({
   const mobileDetected = useMemo(() => /iphone|ipad|ipod|android/i.test(navigator.userAgent), []);
   const losslessActive = settings.voiceCaptureMode === "high-fidelity";
   const estimatedLatencyMs = useMemo(() => {
-    if (!micState) return null;
+    if (!micState?.audioContext) return null;
     const baseLatency = Number(micState.audioContext.baseLatency || 0);
     const outputLatency = Number((micState.audioContext as any).outputLatency || 0);
     return (baseLatency + outputLatency) * 1000;

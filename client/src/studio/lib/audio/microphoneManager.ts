@@ -167,6 +167,11 @@ export function getAnalyserData(state: MicrophoneState): Uint8Array {
 }
 
 export function setGain(state: MicrophoneState, value: number): void {
+  // 🔒 CRITICAL FIX: Prevent crash when audioContext is undefined
+  if (!state?.audioContext) {
+    console.warn("[Mic] AudioContext not available, cannot set gain");
+    return;
+  }
   const clamped = Math.max(0, Math.min(2, value));
   state.gainNode.gain.setTargetAtTime(clamped, state.audioContext.currentTime, 0.01);
 }
@@ -194,6 +199,11 @@ export function getMicState(): MicrophoneState | null {
 }
 
 export function getEstimatedInputLatencyMs(state: MicrophoneState): number {
+  // 🔒 CRITICAL FIX: Prevent crash when audioContext is undefined
+  if (!state?.audioContext) {
+    console.warn("[Mic] AudioContext not available, returning default latency");
+    return 10; // Safe default latency in ms
+  }
   const baseLatency = Number(state.audioContext.baseLatency || 0);
   const outputLatency = Number((state.audioContext as any).outputLatency || 0);
   return (baseLatency + outputLatency) * 1000;

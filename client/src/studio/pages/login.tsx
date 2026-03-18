@@ -242,7 +242,7 @@ export default function Login() {
       {/* Header */}
       <header className="relative z-50 w-full px-6 py-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/">
+          <Link to="/">
             <motion.div 
               whileHover={{ scale: 1.02 }}
               className="flex items-center gap-3 cursor-pointer group"

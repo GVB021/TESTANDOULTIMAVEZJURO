@@ -57,7 +57,7 @@ export default function TutorialAudio({ studioId }: { studioId: string }) {
             Checklist rápido para gravações limpas, inteligíveis e consistentes no fluxo do estúdio.
           </p>
         </div>
-        <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
+        <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
           <Button variant="outline" className="border-border/70 hover:bg-muted/40">
             Ir para painel
           </Button>

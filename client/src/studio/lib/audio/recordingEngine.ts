@@ -139,14 +139,24 @@ export function playCountdownBeep(
   frequency: number = 880,
   duration: number = 0.12
 ): void {
-  const osc = audioContext.createOscillator();
-  const env = audioContext.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
-  env.gain.setValueAtTime(0.3, audioContext.currentTime);
-  env.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
-  osc.connect(env);
-  env.connect(audioContext.destination);
-  osc.start();
-  osc.stop(audioContext.currentTime + duration);
+  // 🔒 CRITICAL FIX: Prevent crash when audioContext is invalid
+  if (!audioContext || audioContext.state === "closed") {
+    console.warn("[AudioEngine] Invalid AudioContext, skipping beep");
+    return;
+  }
+  
+  try {
+    const osc = audioContext.createOscillator();
+    const env = audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    env.gain.setValueAtTime(0.3, audioContext.currentTime);
+    env.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
+    osc.connect(env);
+    env.connect(audioContext.destination);
+    osc.start();
+    osc.stop(audioContext.currentTime + duration);
+  } catch (error) {
+    console.warn("[AudioEngine] Failed to play beep:", error);
+  }
 }
