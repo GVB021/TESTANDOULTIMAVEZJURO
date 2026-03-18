@@ -1,7 +1,6 @@
 import { useParams, Link, useLocation } from "wouter";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Drawer } from "vaul";
 import { authFetch } from "@studio/lib/auth-fetch";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
@@ -32,7 +31,6 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { Button } from "@studio/components/ui/button";
-import { Badge } from "@studio/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { HardwareSetupDialog } from "@studio/components/hardware/HardwareSetupDialog";
 import { useHardwareControl } from "@studio/hooks/use-hardware-control";
