@@ -410,11 +410,7 @@ export default function RecordingRoom() {
         }
       } catch (error) {
         console.error("Falha ao inicializar hardware:", error);
-        toast({
-          title: "Configuração de Hardware",
-          description: "Configure seu microfone para melhor experiência.",
-          variant: "default",
-        });
+        toast({ title: "Configuração de Hardware", description: "Configure seu microfone para melhor experiência.", variant: "default" });
       }
     };
 
@@ -792,11 +788,7 @@ export default function RecordingRoom() {
   }, [takesList]);
   useEffect(() => {
     if (!hasRecordingsError) return;
-    toast({
-      title: "Falha de conexão com o banco de áudio",
-      description: String((recordingsError as any)?.message || "Não foi possível carregar os takes"),
-      variant: "destructive",
-    });
+    toast({ title: "Falha de conexão com o banco de áudio", description: String((recordingsError as any)?.message || "Não foi possível carregar os takes"), variant: "destructive" });
   }, [hasRecordingsError, recordingsError, toast]);
 
   const handleDiscardTake = useCallback(async (take: any) => {
@@ -1245,10 +1237,7 @@ export default function RecordingRoom() {
     if (!mobileDetected) return;
     if (deviceSettings.voiceCaptureMode !== "original") return;
     setDeviceSettings((prev) => ({ ...prev, voiceCaptureMode: "high-fidelity" }));
-    toast({
-      title: "Modo lossless ativado",
-      description: "Captura em alta fidelidade habilitada por padrão no dispositivo móvel.",
-    });
+    toast({ title: "Modo lossless ativado", description: "Captura em alta fidelidade habilitada por padrão no dispositivo móvel." });
   }, [deviceSettings.voiceCaptureMode, toast]);
 
   useEffect(() => {
