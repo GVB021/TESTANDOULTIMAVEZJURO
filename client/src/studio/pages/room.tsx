@@ -570,7 +570,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
         } else if (msg.type === "video:countdown" || msg.type === "video:countdown-start" || msg.type === "video:countdown-tick") {
           setCountdownValue(msg.count);
           if (msg.count > 0) {
-            // 🔒 CRITICAL FIX: Safe AudioContext creation for beep
             try {
               const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
               if (audioContext.state !== "closed") {
@@ -1525,7 +1524,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       return;
     }
     
-    // 🔥 FORÇAR INICIALIZAÇÃO DO MICROFONE
     if (!micState) {
       console.warn("❌ MicState ausente, tentando inicializar...");
       // Não bloquear, tentar iniciar mesmo sem micState
@@ -1561,7 +1559,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     }
     
     
-    // 🔥 IMPLEMENTAÇÃO DO PREROLL SIMPLIFICADA
     const currentLineTime = scriptLines[currentLine]?.start || 0;
     const prerollStart = Math.max(0, currentLineTime - 3);
     
@@ -1573,7 +1570,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     setCountdownValue(3);
     setRecordingStatus("recording");
     
-    // 🔥 FORÇAR CAPTURA MESMO SEM MICSTATE PERFEITO
     if (micState) {
       startCapture(micState);
     } else {
