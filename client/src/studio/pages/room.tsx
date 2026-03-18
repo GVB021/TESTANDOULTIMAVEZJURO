@@ -90,6 +90,7 @@ import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } f
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
 import { DesktopScriptColumn } from "@studio/components/room/script";
+import { DesktopControlsBar } from "@studio/components/room/controls";
 import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
 import { RecordingProfilePanel } from "@studio/components/room/profile";
 import {
@@ -123,6 +124,7 @@ export type RecordingStatus =
   | "idle"
   | "countdown"
   | "recording"
+  | "stopped"
   | "recorded"
   | "previewing";
 
@@ -2860,61 +2862,24 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             />
 
             {!isMobile && (
-              <div className="shrink-0 h-20 room-controls flex items-center px-8 gap-6 z-40">
-                <div className="flex items-center gap-2">
-                  <button onClick={() => seek(-2)} className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition" title="Recuar 2s">
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                  <button onClick={handlePlayPause} className={cn(
-                    "w-11 h-11 room-rounded flex items-center justify-center room-transition",
-                    isPlaying 
-                      ? "room-button-primary" 
-                      : "room-button-secondary"
-                  )} title={isPlaying ? "Pausar" : "Reproduzir"}>
-                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-                  </button>
-                  <button onClick={() => seek(2)} className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition" title="Avançar 2s">
-                    <RotateCcw className="w-4 h-4" />
-                  </button>
-                </div>
-                
-                <div className="flex-1 flex flex-col gap-1.5">
-                  <div className="flex justify-between text-[10px] font-mono text-white/30 uppercase tracking-tighter">
-                    <span>{formatLiveTimecode(videoTime)}</span>
-                    <span>{formatLiveTimecode(videoDuration)}</span>
-                  </div>
-                  <div className="relative h-1.5 rounded-full bg-white/10 cursor-pointer overflow-hidden" onClick={(e) => { const rect = e.currentTarget.getBoundingClientRect(); scrub((e.clientX - rect.left) / rect.width); }}>
-                    <div className="absolute top-0 bottom-0 bg-primary transition-all duration-100" style={{ width: `${videoDuration > 0 ? (videoTime / videoDuration) * 100 : 0}%` }} />
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <button onClick={handleLoopButton} className={cn("w-9 h-9 rounded-xl flex items-center justify-center border transition-all", isLooping ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-300" : "bg-white/5 border-white/10 text-white/60 hover:text-white")} title="Configurar Loop">
-                    <Repeat className="w-4 h-4" />
-                  </button>
-                  {recordingStatus === "idle" || recordingStatus === "recorded" ? (
-                    <button 
-                      onClick={startCountdown} 
-                      disabled={!micReady || isSaving || micInitializing} 
-                      className={cn(
-                        "w-11 h-11 rounded-full flex items-center justify-center transition-all",
-                        micInitializing 
-                          ? "bg-yellow-500/20 border-yellow-500/40 text-yellow-300 animate-pulse" 
-                          : !micReady 
-                            ? "bg-red-500/20 border-red-500/40 text-red-300" 
-                            : "bg-white/10 border-white/20 text-white hover:bg-white/20"
-                      )} 
-                      title={micInitializing ? "Inicializando microfone..." : !micReady ? "Microfone não disponível" : "Gravar"}
-                    >
-                      {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : micInitializing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="w-5 h-5" />}
-                    </button>
-                  ) : (
-                    <button onClick={handleStopRecording} className="w-11 h-11 rounded-full flex items-center justify-center bg-red-500 animate-pulse" title="Parar Gravação">
-                      <Square className="w-5 h-5 text-white fill-white" />
-                    </button>
-                  )}
-                </div>
-              </div>
+              <DesktopControlsBar
+                isPlaying={isPlaying}
+                isLooping={isLooping}
+                recordingStatus={recordingStatus}
+                micReady={micReady}
+                isSaving={isSaving}
+                micInitializing={micInitializing}
+                videoTime={videoTime}
+                videoDuration={videoDuration}
+                formatTimecode={formatLiveTimecode}
+                onSeekBack={() => seek(-2)}
+                onPlayPause={handlePlayPause}
+                onSeekForward={() => seek(2)}
+                onScrub={scrub}
+                onLoop={handleLoopButton}
+                onRecord={startCountdown}
+                onStopRecord={handleStopRecording}
+              />
             )}
 
             {!isMobile && (
