@@ -163,7 +163,7 @@ export default function RecordingRoom() {
   // Se for diretor, só libera quando confirmar. Se não for, libera direto.
   const isControlBlocked = isDirector && !directorControlConfirmed;
 
-// Recordings pagination and filtering
+  // Recordings pagination and filtering
   const [recordingsPage, setRecordingsPage] = useState(1);
   const [recordingsSearch, setRecordingsSearch] = useState("");
   const [recordingsScope, setRecordingsScope] = useState<"all" | "mine">("mine");
@@ -172,29 +172,29 @@ export default function RecordingRoom() {
   const [recordingsSortBy, setRecordingsSortBy] = useState<"createdAt" | "durationSeconds" | "lineIndex" | "characterName">("createdAt");
   const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
 
-// Modal state
+  // Modal state
   const [discardModalTake, setDiscardModalTake] = useState<any>(null);
   const [discardFinalStep, setDiscardFinalStep] = useState(false);
 
-// Refs
-const videoRef = useRef<HTMLVideoElement>(null);
-const desktopVideoTextContainerRef = useRef<HTMLDivElement>(null);
-const scriptViewportRef = useRef<HTMLDivElement>(null);
-const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
-const scrollAnchorsRef = useRef<ScrollAnchor[]>([]);
-const scrollSyncRafRef = useRef<number | null>(null);
-const scrollSyncLastTsRef = useRef<number | null>(null);
-const scrollSyncCurrentRef = useRef<number>(0);
-const scrollSyncLastVideoTimeRef = useRef<number>(0);
-const loopSilenceTimeoutRef = useRef<number | null>(null);
-const loopSilenceLockRef = useRef<boolean>(false);
-const previewAudioRef = useRef<HTMLAudioElement>(null);
-const recordingsPreviewAudioRef = useRef<HTMLAudioElement>(null);
-const recordingRowAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-const controlsTimeoutRef = useRef<number | null>(null);
-const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
+  // Refs
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const desktopVideoTextContainerRef = useRef<HTMLDivElement>(null);
+  const scriptViewportRef = useRef<HTMLDivElement>(null);
+  const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const scrollAnchorsRef = useRef<ScrollAnchor[]>([]);
+  const scrollSyncRafRef = useRef<number | null>(null);
+  const scrollSyncLastTsRef = useRef<number | null>(null);
+  const scrollSyncCurrentRef = useRef<number>(0);
+  const scrollSyncLastVideoTimeRef = useRef<number>(0);
+  const loopSilenceTimeoutRef = useRef<number | null>(null);
+  const loopSilenceLockRef = useRef<boolean>(false);
+  const previewAudioRef = useRef<HTMLAudioElement>(null);
+  const recordingsPreviewAudioRef = useRef<HTMLAudioElement>(null);
+  const recordingRowAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+  const controlsTimeoutRef = useRef<number | null>(null);
+  const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
-// Additional state
+  // Additional state
   const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
   const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
   const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
