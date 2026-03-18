@@ -459,13 +459,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     logAudioStep("character-selected", { characterId: character.id, characterName: character.name });
   }, [recordingProfile, sessionId, user?.id, emitVideoEvent, logAudioStep]);
 
-  const handleVideoTouchStart = useCallback((e: React.TouchEvent) => {
-    // Handle video touch start
-  }, []);
-
-  const handleVideoTouchMove = useCallback((e: React.TouchEvent) => {
-    // Handle video touch move
-  }, []);
   const applyScriptLinePatch = useCallback((lineIndex: number, patch: ScriptLineOverride) => {
     if (!Number.isInteger(lineIndex) || lineIndex < 0) return;
     setLineOverrides((prev) => {
@@ -2620,8 +2613,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               onPause={() => setIsPlaying(false)}
               onTimeUpdate={setVideoTime}
               onDurationChange={setVideoDuration}
-              onTouchStart={handleVideoTouchStart}
-              onTouchMove={handleVideoTouchMove}
               countdownValue={countdownValue}
               volumeOverlay={null}
               loopInfo={loopInfo}
