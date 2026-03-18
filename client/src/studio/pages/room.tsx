@@ -312,7 +312,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     outputDeviceId: "default",
     monitorVolume: 1.0,
   });
-  const hasPersistedDeviceSettings = false;
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
   const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
 
@@ -1269,7 +1268,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, [deviceSettings]);
 
   useEffect(() => {
-    if (hasPersistedDeviceSettings) return;
     const ua = navigator.userAgent.toLowerCase();
     const mobileDetected = /iphone|ipad|ipod|android/.test(ua);
     if (!mobileDetected) return;
@@ -1279,7 +1277,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       title: "Modo lossless ativado",
       description: "Captura em alta fidelidade habilitada por padrão no dispositivo móvel.",
     });
-  }, [deviceSettings.voiceCaptureMode, hasPersistedDeviceSettings, toast]);
+  }, [deviceSettings.voiceCaptureMode, toast]);
 
   useEffect(() => {
     const targetSinkId = String(deviceSettings.outputDeviceId || "").trim() || "default";
