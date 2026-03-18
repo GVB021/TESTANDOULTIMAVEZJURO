@@ -148,7 +148,7 @@ type RecordingAvailabilityState = "available" | "loading" | "error";
 
 import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
 import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
-import { DirectorReview, ShortcutsDialog } from "@studio/components/room/modals";
+import { DirectorReview, ShortcutsDialog, DiscardTakeModal } from "@studio/components/room/modals";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
 
@@ -3112,42 +3112,17 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         </div>
       )}
 
-      {discardModalTake && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm" style={{ zIndex: UI_LAYER_BASE.confirmationModal }}>
-          <div className="w-[calc(100vw-32px)] max-w-md rounded-2xl border border-border bg-card p-5 shadow-2xl">
-            <h3 className="text-sm font-bold text-foreground">Excluir take</h3>
-            <p className="text-xs text-muted-foreground mt-2">
-              {discardFinalStep
-                ? "Tem certeza que deseja excluir permanentemente este take? Esta ação não pode ser desfeita."
-                : "Você está prestes a excluir este take da sessão."}
-            </p>
-            <div className="flex justify-end gap-2 mt-5">
-              <button
-                onClick={() => { setDiscardModalTake(null); setDiscardFinalStep(false); }}
-                className="h-9 px-3 rounded-lg bg-muted/70 text-muted-foreground hover:text-foreground"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={async () => {
-                  if (!discardFinalStep) {
-                    setDiscardFinalStep(true);
-                    return;
-                  }
-                  await handleDiscardTake(discardModalTake);
-                  emitVideoEvent("take-status", { status: "deleted", takeId: discardModalTake.id, targetUserId: discardModalTake.voiceActorId });
-                }}
-                className={cn(
-                  "h-9 px-3 rounded-lg text-white",
-                  discardFinalStep ? "bg-destructive hover:bg-destructive/90" : "bg-amber-600 hover:bg-amber-500"
-                )}
-              >
-                {discardFinalStep ? "Excluir permanentemente" : "Prosseguir"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <DiscardTakeModal
+        take={discardModalTake}
+        isFinalStep={discardFinalStep}
+        zIndex={UI_LAYER_BASE.confirmationModal}
+        onCancel={() => { setDiscardModalTake(null); setDiscardFinalStep(false); }}
+        onConfirm={async () => {
+          if (!discardFinalStep) { setDiscardFinalStep(true); return; }
+          await handleDiscardTake(discardModalTake);
+          emitVideoEvent("take-status", { status: "deleted", takeId: discardModalTake.id, targetUserId: discardModalTake.voiceActorId });
+        }}
+      />
 
       <audio ref={previewAudioRef} preload="none" />
       <audio
