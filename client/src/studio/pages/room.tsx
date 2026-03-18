@@ -1808,10 +1808,7 @@ export default function RecordingRoom() {
   useEffect(() => {
     if (!editingField) return;
     const handler = setTimeout(() => {
-      emitTextControlEvent("text:live-change", {
-        lineIndex: editingField.lineIndex,
-        text: editingDraftValue
-      });
+      emitTextControlEvent("text:live-change", { lineIndex: editingField.lineIndex, text: editingDraftValue });
     }, 500);
     return () => clearTimeout(handler);
   }, [editingDraftValue, editingField, emitTextControlEvent]);
@@ -1879,11 +1876,7 @@ export default function RecordingRoom() {
     applyScriptLinePatch(editingField.lineIndex, patch);
     pushEditHistory(editingField.lineIndex, editingField.field, before, after, by);
     
-    emitTextControlEvent("text-control:update-line", {
-      lineIndex: editingField.lineIndex,
-      ...patch,
-      history: { field: editingField.field, before, after, by },
-    });
+    emitTextControlEvent("text-control:update-line", { lineIndex: editingField.lineIndex, ...patch, history: { field: editingField.field, before, after, by } });
     
     // Unlock ao salvar
     emitTextControlEvent("text:unlock-line", { lineIndex: editingField.lineIndex });
