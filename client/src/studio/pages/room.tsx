@@ -2403,11 +2403,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     setRecordingAvailability((prev) => ({ ...prev, [tid]: "error" }));
   }, []);
 
-  const handleSaveProfile = (profile: RecordingProfile) => {
+  const handleSaveProfile = useCallback((profile: RecordingProfile) => {
     setRecordingProfile(profile);
     localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(profile));
     setShowProfilePanel(false);
-  };
+  }, [sessionId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
