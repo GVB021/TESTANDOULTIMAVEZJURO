@@ -1433,39 +1433,22 @@ export default function RecordingRoom() {
 
   const startCountdown = useCallback(() => {
     if (recordingStatus !== "idle") {
-      toast({ 
-        title: "Gravação em andamento", 
-        description: "Pare a gravação atual antes de iniciar outra.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Gravação em andamento", description: "Pare a gravação atual antes de iniciar outra.", variant: "destructive" });
       return;
     }
     
     if (!micState) {
-      toast({ 
-        title: "Microfone não inicializado", 
-        description: "Tentando iniciar microfone automaticamente...", 
-        variant: "default" 
-      });
+      toast({ title: "Microfone não inicializado", description: "Tentando iniciar microfone automaticamente...", variant: "default" });
     }
     
     // Permitir gravação mesmo sem personagem selecionado
     if (!recordingProfile) {
-      toast({
-        title: "Nenhum personagem selecionado",
-        description: "Gravando como 'Sem Personagem'.",
-        variant: "default"
-      });
+      toast({ title: "Nenhum personagem selecionado", description: "Gravando como 'Sem Personagem'.", variant: "default" });
     }
     
     const video = videoRef.current;
     if (!video) {
-      console.error("Elemento de vídeo não encontrado");
-      toast({ 
-        title: "Erro de reprodução", 
-        description: "Elemento de vídeo não encontrado.", 
-        variant: "destructive" 
-      });
+      toast({ title: "Erro de reprodução", description: "Elemento de vídeo não encontrado.", variant: "destructive" });
       return;
     }
     
