@@ -124,11 +124,13 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
             <div className="space-y-2">
               <label className="text-sm font-medium">Microfone</label>
               <Select
-                value={localConfig.selectedMicrophone}
+                value={localConfig.selectedMicrophone || undefined}
                 onValueChange={(value) => {
-                  setLocalConfig({ ...localConfig, selectedMicrophone: value });
-                  if (hasPermission) {
-                    changeMicrophone(value);
+                  if (value && value !== "") {
+                    setLocalConfig({ ...localConfig, selectedMicrophone: value });
+                    if (hasPermission) {
+                      changeMicrophone(value);
+                    }
                   }
                 }}
               >
@@ -149,8 +151,12 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
             <div className="space-y-2">
               <label className="text-sm font-medium">Alto-falante</label>
               <Select
-                value={localConfig.selectedSpeaker}
-                onValueChange={(value) => setLocalConfig({ ...localConfig, selectedSpeaker: value })}
+                value={localConfig.selectedSpeaker || undefined}
+                onValueChange={(value) => {
+                  if (value && value !== "") {
+                    setLocalConfig({ ...localConfig, selectedSpeaker: value });
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um alto-falante" />

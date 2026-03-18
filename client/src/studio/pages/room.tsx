@@ -618,20 +618,6 @@ const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
 const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
 const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
 const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const { studioId, sessionId } = useParams();
-  const [, navigate] = useLocation();
-  
-  // 🔥 HARDWARE CONTROL
-  const {
-    requestMicrophoneAccess,
-    hasPermission,
-    devices,
-    audioLevel,
-  } = useHardwareControl(sessionId || "");
-  
-  const [hardwareDialogOpen, setHardwareDialogOpen] = useState(false);
 
   // WebSocket state
   const [wsConnected, setWsConnected] = useState(false);
@@ -3217,7 +3203,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
       <header 
         className={cn(
-          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header room-debug",
+          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header",
           !isMobile ? "grid" : "justify-between"
         )} 
         style={{
