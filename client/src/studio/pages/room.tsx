@@ -2059,6 +2059,17 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     else startCountdown();
   }, [recordingStatus, handleStopRecording, startCountdown]);
 
+  const handleDiscardModalCancel = useCallback(() => {
+    setDiscardModalTake(null);
+    setDiscardFinalStep(false);
+  }, []);
+
+  const handleDiscardModalConfirm = useCallback(async () => {
+    if (!discardFinalStep) { setDiscardFinalStep(true); return; }
+    await handleDiscardTake(discardModalTake);
+    emitVideoEvent("take-status", { status: "deleted", takeId: discardModalTake.id, targetUserId: discardModalTake.voiceActorId });
+  }, [discardFinalStep, discardModalTake, handleDiscardTake, emitVideoEvent]);
+
   // Debounce para live updates de texto
   useEffect(() => {
     if (!editingField) return;
@@ -2578,12 +2589,8 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         take={discardModalTake}
         isFinalStep={discardFinalStep}
         zIndex={UI_LAYER_BASE.confirmationModal}
-        onCancel={() => { setDiscardModalTake(null); setDiscardFinalStep(false); }}
-        onConfirm={async () => {
-          if (!discardFinalStep) { setDiscardFinalStep(true); return; }
-          await handleDiscardTake(discardModalTake);
-          emitVideoEvent("take-status", { status: "deleted", takeId: discardModalTake.id, targetUserId: discardModalTake.voiceActorId });
-        }}
+        onCancel={handleDiscardModalCancel}
+        onConfirm={handleDiscardModalConfirm}
       />
 
       <audio ref={previewAudioRef} preload="none" />
