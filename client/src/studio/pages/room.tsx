@@ -413,7 +413,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
           localStorage.setItem(`hardware_configured_${sessionId}`, "true");
         }
       } catch (error) {
-        console.error("❌ Falha ao inicializar hardware:", error);
+        console.error("Falha ao inicializar hardware:", error);
         toast({
           title: "Configuração de Hardware",
           description: "Configure seu microfone para melhor experiência.",
