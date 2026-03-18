@@ -250,7 +250,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [timecodeFormat, setTimecodeFormat] = useState<TimecodeFormat>("HH:MM:SS");
+  const timecodeFormat: TimecodeFormat = "HH:MM:SS";
   const [scriptAutoFollow, setScriptAutoFollow] = useState(() => {
     try {
       const saved = sessionStorage.getItem(`vhub_script_follow_${sessionId}`);
@@ -315,7 +315,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     outputDeviceId: "default",
     monitorVolume: 1.0,
   });
-  const [hasPersistedDeviceSettings, setHasPersistedDeviceSettings] = useState(false);
+  const hasPersistedDeviceSettings = false;
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
   const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
   const [preRoll, setPreRoll] = useState(1);
