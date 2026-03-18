@@ -197,7 +197,7 @@ export default function RecordingRoom() {
   // Additional state
   const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
   const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
-  const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
+  const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(60);
   const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
   const [sideScriptWidth, setSideScriptWidth] = useState(320);
   const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
@@ -888,8 +888,8 @@ export default function RecordingRoom() {
       const localY = event.clientY - rect.top;
       const next = (localY / rect.height) * 100;
       // Script height = 100 - next. Se scriptHeight <= 50%, então next >= 50%.
-      // Mínimo 20% para o roteiro, logo next <= 80%.
-      const constrained = Math.max(50, Math.min(80, next));
+      // Mínimo 30% para o daily.co, logo next <= 70%.
+      const constrained = Math.max(50, Math.min(70, next));
       setDesktopVideoTextSplit(constrained);
       localStorage.setItem("vhub_desktop_video_text_split", String(constrained));
     };
@@ -1006,13 +1006,23 @@ export default function RecordingRoom() {
     return Array.from(map.values());
   }, [presenceUsers, canViewOnlineUsers]);
   const textControlCandidates = useMemo(() => {
-    // Fallback: mostrar todos os usuários online se presenceUsers não tiver dados
-    const candidates = presenceUsers.length > 0 
+    // Try to get candidates from presence users first
+    let candidates = presenceUsers.length > 0 
       ? presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role))
-      : [{ userId: user?.id, name: user?.displayName || user?.fullName || 'Você', role: 'actor' }];
+      : [];
+    
+    // If no presence users, fall back to room users
+    if (candidates.length === 0 && roomUsers.length > 0) {
+      candidates = roomUsers.filter((user: any) => canReceiveTextControl(user?.role));
+    }
+    
+    // If still no candidates, add current user as fallback
+    if (candidates.length === 0) {
+      candidates = [{ userId: user?.id, name: user?.displayName || user?.fullName || 'Você', role: 'actor' }];
+    }
     
     return candidates;
-  }, [presenceUsers, user]);
+  }, [presenceUsers, roomUsers, user]);
 
   const mobileMenuItems = useMemo(() => [
     {
@@ -1444,11 +1454,10 @@ export default function RecordingRoom() {
     }
     
     const currentLineTime = scriptLines[currentLine]?.start || 0;
-    const prerollStart = Math.max(0, currentLineTime - 3);
     
-    video.currentTime = prerollStart;
-    emitVideoEvent("seek", { currentTime: prerollStart });
-    logAudioStep("countdown-started", { initiatorUserId: user?.id, prerollStart });
+    video.currentTime = currentLineTime;
+    emitVideoEvent("seek", { currentTime: currentLineTime });
+    logAudioStep("countdown-started", { initiatorUserId: user?.id, startTime: currentLineTime });
     
     // Iniciar countdown e gravação IMEDIATAMENTE
     setCountdownValue(3);

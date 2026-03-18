@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Circle, Users, Mic, Square, Menu, ListMusic, Edit3, Monitor, Settings } from "lucide-react";
 import { cn } from "@studio/lib/utils";
 import { type RecordingStatus } from "@studio/pages/room";
+import { ThemeTogglePill } from "@studio/components/ui/ThemeTogglePill";
 
 interface RoomHeaderActionsProps {
   isMobile: boolean;
@@ -81,6 +82,8 @@ export function RoomHeaderActions({
         </>
       ) : (
         <>
+          <ThemeTogglePill />
+          
           <button
             onClick={onOpenRecordings}
             className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1"
