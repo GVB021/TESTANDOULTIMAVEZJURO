@@ -953,7 +953,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     const rawRole = String(user?.role || "").trim().toLowerCase();
     return rawRole === "platform_owner" || rawRole === "master" || rawRole === "admin";
   }, [user?.role]);
-  const canReleaseText = hasUiPermission(uiRole, "text_control");
   const canDiscardTake = isPlatformOwner;
   const canAccessDashboard = hasUiPermission(uiRole, "dashboard_access");
   const isPrivileged = canManageAudio || canTextControl;
@@ -1049,7 +1048,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       title: "Liberar Texto",
       subtitle: "Permissões em tempo real",
       onClick: () => { setTextControlPopupOpen(true); setMobileMenuOpen(false); },
-      visible: canReleaseText,
+      visible: canTextControl,
     },
     {
       icon: <Settings className="w-5 h-5" />,
@@ -1076,7 +1075,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       subtitle: "Chat da equipe",
       onClick: () => { setDailyMeetOpen(true); setMobileMenuOpen(false); },
     },
-  ], [canReleaseText, canAccessDashboard, studioId]);
+  ], [canTextControl, canAccessDashboard, studioId]);
 
   const loopInfo = useMemo((): string | null => {
     if (!customLoop && loopSelectionMode === "idle" && !loopPreparing && !loopSilenceActive) return null;
@@ -1970,10 +1969,10 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
   }, [editingField, scriptLines, user?.displayName, user?.fullName, editingDraftValue, toast, applyScriptLinePatch, pushEditHistory, emitTextControlEvent]);
 
   const toggleUserTextControl = useCallback((targetUserId: string) => {
-    if (!canReleaseText) return;
+    if (!canTextControl) return;
     const hasPermission = textControllerUserIds.has(targetUserId);
     emitTextControlEvent(hasPermission ? "text-control:revoke-controller" : "text-control:grant-controller", { targetUserId });
-  }, [canReleaseText, textControllerUserIds, emitTextControlEvent]);
+  }, [canTextControl, textControllerUserIds, emitTextControlEvent]);
 
   const getTakeStreamUrl = useCallback((take: any) => {
     const takeId = String(take?.id || "").trim();
@@ -2360,7 +2359,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
         />
       )}
 
-      {textControlPopupOpen && canReleaseText && (
+      {textControlPopupOpen && canTextControl && (
         <TextControlPopup
           authorizedCount={textControllerUserIds.size}
           candidates={textControlCandidates}
@@ -2450,7 +2449,7 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
             isMobile={isMobile}
             recordingStatus={recordingStatus}
             canViewOnlineUsers={canViewOnlineUsers}
-            canReleaseText={canReleaseText}
+            canTextControl={canTextControl}
             canAccessDashboard={canAccessDashboard}
             roomUsers={roomUsers}
             studioId={studioId}

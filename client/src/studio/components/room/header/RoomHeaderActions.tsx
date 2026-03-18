@@ -7,7 +7,7 @@ interface RoomHeaderActionsProps {
   isMobile: boolean;
   recordingStatus: RecordingStatus;
   canViewOnlineUsers: boolean;
-  canReleaseText: boolean;
+  canTextControl: boolean;
   canAccessDashboard: boolean;
   roomUsers: Array<{ displayName?: string; fullName?: string; name?: string; userId: string }>;
   studioId: string;
@@ -24,7 +24,7 @@ export function RoomHeaderActions({
   isMobile,
   recordingStatus,
   canViewOnlineUsers,
-  canReleaseText,
+  canTextControl,
   canAccessDashboard,
   roomUsers,
   studioId,
@@ -90,7 +90,7 @@ export function RoomHeaderActions({
             Gravações
           </button>
 
-          {canReleaseText && (
+          {canTextControl && (
             <button
               onClick={onOpenTextControl}
               className="h-7 px-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 hover:bg-indigo-500/20 flex items-center gap-1"
