@@ -586,14 +586,37 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
                       onChange={handleScriptUpload}
                     />
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowJsonModal(true)} data-testid="button-paste-json">
-                    <ClipboardPaste className="w-3.5 h-3.5" /> Colar JSON
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setShowJsonModal(v => !v); setJsonPasteText(""); }} data-testid="button-paste-json">
+                    <ClipboardPaste className="w-3.5 h-3.5" /> {showJsonModal ? "Cancelar" : "Colar JSON"}
                   </Button>
                   <Button size="sm" onClick={addScriptLine} className="gap-1.5" data-testid="button-add-script-line">
                     <Plus className="w-3.5 h-3.5" /> Adicionar Linha
                   </Button>
                 </div>
               </div>
+
+              {showJsonModal && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Cole um array JSON com os campos <span className="text-primary font-semibold">personagem</span>, <span className="text-primary font-semibold">fala</span> e <span className="text-muted-foreground font-semibold">tempo</span> (opcional).
+                  </p>
+                  <textarea
+                    value={jsonPasteText}
+                    onChange={(e) => setJsonPasteText(e.target.value)}
+                    placeholder={`[\n  { "personagem": "NOME", "tempo": "00:00:00", "fala": "Texto da fala" }\n]`}
+                    className="w-full min-h-[160px] rounded-md border border-border bg-background text-xs font-mono text-foreground p-3 resize-y outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/50"
+                    data-testid="textarea-json-paste"
+                    spellCheck={false}
+                    autoFocus
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" size="sm" onClick={() => { setShowJsonModal(false); setJsonPasteText(""); }} data-testid="button-cancel-json">Cancelar</Button>
+                    <Button size="sm" onClick={handleJsonPaste} disabled={!jsonPasteText.trim()} className="gap-1.5" data-testid="button-confirm-json">
+                      <Upload className="w-3.5 h-3.5" /> Confirmar Importação
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {scriptLines.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -729,34 +752,6 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
       </DialogContent>
     </Dialog>
 
-    {/* JSON PASTE MODAL — sibling to outer Dialog to avoid Radix nested-dialog keyboard block */}
-    <Dialog open={showJsonModal} onOpenChange={(open) => { setShowJsonModal(open); if (!open) setJsonPasteText(""); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-sm font-bold uppercase tracking-widest">Importar Roteiro via JSON</DialogTitle>
-        </DialogHeader>
-        <p className="text-xs text-muted-foreground">
-          Cole um array JSON com os campos <span className="text-primary font-semibold">personagem</span>, <span className="text-primary font-semibold">fala</span> e <span className="text-muted-foreground font-semibold">tempo</span> (opcional).
-        </p>
-        <textarea
-          value={jsonPasteText}
-          onChange={(e) => setJsonPasteText(e.target.value)}
-          placeholder={`[\n  { "personagem": "NOME", "tempo": "00:00:00", "fala": "Texto da fala" }\n]`}
-          className="w-full min-h-[200px] rounded-md border border-border bg-background text-xs font-mono text-foreground p-3 resize-y outline-none focus:ring-1 focus:ring-primary/50 placeholder:text-muted-foreground/50"
-          data-testid="textarea-json-paste"
-          spellCheck={false}
-          autoFocus
-        />
-        <DialogFooter className="gap-2">
-          <Button variant="ghost" onClick={() => { setShowJsonModal(false); setJsonPasteText(""); }} data-testid="button-cancel-json">
-            Cancelar
-          </Button>
-          <Button onClick={handleJsonPaste} disabled={!jsonPasteText.trim()} className="gap-1.5" data-testid="button-confirm-json">
-            <Upload className="w-4 h-4" /> Confirmar Importação
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
     </>
   );
 }
