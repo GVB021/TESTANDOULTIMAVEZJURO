@@ -409,53 +409,51 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
     e.target.value = "";
   };
 
-  const handleJsonPaste = () => {
-    try {
-      const json = JSON.parse(jsonPasteText.trim());
-      let rawLines: any[];
-      if (Array.isArray(json)) {
-        rawLines = json;
-      } else if (json.lines && Array.isArray(json.lines)) {
-        rawLines = json.lines;
-      } else if (json.script && Array.isArray(json.script)) {
-        rawLines = json.script;
-      } else {
-        toast({ title: "Formato nao reconhecido", description: "Cole um array JSON ou um objeto com chave 'lines'.", variant: "destructive" });
-        return;
-      }
-      const normalized: ScriptLine[] = [];
-      for (let i = 0; i < rawLines.length; i += 1) {
-        const line = rawLines[i];
-        const tempoOriginal = line?.tempo ?? line?.start ?? line?.timecode ?? line?.tc ?? line?.in ?? null;
-        let tempoEmSegundos: number;
-        try {
-          tempoEmSegundos = toTempoEmSegundos(tempoOriginal);
-        } catch (err: any) {
-          toast({
-            title: "Tempo inválido no JSON",
-            description: `Linha ${i + 1}: ${String(tempoOriginal ?? "")} (${String(err?.message || "erro")})`,
-            variant: "destructive",
-          });
-          return;
-        }
+  const safeToTempoEmSegundos = (val: any): number => {
+    try { return toTempoEmSegundos(val); } catch { return 0; }
+  };
 
-        normalized.push({
-          character: String(line?.character || line?.personagem || line?.char || line?.name || ""),
-          start: toTimecodeString(tempoOriginal),
-          tempo: String(tempoOriginal ?? "00:00:00"),
-          tempoEmSegundos,
-          text: String(line?.text || line?.fala || line?.dialogue || line?.dialog || line?.line || ""),
-          notes: String(line?.notes || line?.notas || line?.note || ""),
-        });
-      }
-      setScriptLines(normalized);
-      setScriptDirty(true);
-      setShowJsonModal(false);
-      setJsonPasteText("");
-      toast({ title: `${normalized.length} linha${normalized.length !== 1 ? "s" : ""} importada${normalized.length !== 1 ? "s" : ""} com sucesso` });
+  const parseRawLines = (rawLines: any[]): ScriptLine[] =>
+    rawLines.map((line: any) => {
+      const tempoRaw = line?.tempo ?? line?.start ?? line?.timecode ?? line?.tc ?? line?.in ?? null;
+      const startStr = tempoRaw != null ? String(tempoRaw) : "00:00:00:00";
+      return {
+        character: String(line?.character || line?.personagem || line?.char || line?.name || ""),
+        start: startStr,
+        tempo: startStr,
+        tempoEmSegundos: safeToTempoEmSegundos(tempoRaw),
+        text: String(line?.text || line?.fala || line?.dialogue || line?.dialog || line?.line || ""),
+        notes: String(line?.notes || line?.notas || line?.note || ""),
+      };
+    });
+
+  const handleJsonPaste = () => {
+    const raw = jsonPasteText.trim();
+    if (!raw) return;
+    let json: any;
+    try {
+      json = JSON.parse(raw);
     } catch {
-      toast({ title: "JSON invalido", description: "Verifique a sintaxe do JSON colado e tente novamente.", variant: "destructive" });
+      toast({ title: "JSON inválido", description: "Verifique a sintaxe e tente novamente.", variant: "destructive" });
+      return;
     }
+    let rawLines: any[];
+    if (Array.isArray(json)) {
+      rawLines = json;
+    } else if (json?.lines && Array.isArray(json.lines)) {
+      rawLines = json.lines;
+    } else if (json?.script && Array.isArray(json.script)) {
+      rawLines = json.script;
+    } else {
+      toast({ title: "Formato não reconhecido", description: "Cole um array JSON ou objeto com chave 'lines'.", variant: "destructive" });
+      return;
+    }
+    const normalized = parseRawLines(rawLines);
+    setScriptLines(normalized);
+    setScriptDirty(true);
+    setShowJsonModal(false);
+    setJsonPasteText("");
+    toast({ title: `${normalized.length} linha${normalized.length !== 1 ? "s" : ""} importadas com sucesso` });
   };
 
   const handleSaveScript = async () => {
