@@ -1,6 +1,6 @@
 import { useParams, Link, useLocation } from "wouter";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { authFetch } from "@studio/lib/auth-fetch";
 import { useQueryClient } from "@tanstack/react-query";
 import {
