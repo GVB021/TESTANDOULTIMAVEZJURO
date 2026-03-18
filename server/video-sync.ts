@@ -320,16 +320,26 @@ export function setupVideoSync(httpServer: Server) {
             setTextControllers(roomKey, allowedTargets);
           } else if (msg.type === "text-control:grant-controller" && msg.targetUserId) {
             const target = getRoster(room as any).find((user) => user.userId === msg.targetUserId);
-            if (!canReceiveTextControl(target?.role)) return;
+            console.log(`[WS] grant-controller: targetUserId=${msg.targetUserId} target=`, target);
+            if (!canReceiveTextControl(target?.role)) {
+              console.warn(`[WS] grant-controller bloqueado: role=${target?.role} canReceive=${canReceiveTextControl(target?.role)}`);
+              return;
+            }
             const next = new Set(getTextControllers(roomKey));
             next.add(msg.targetUserId);
             setTextControllers(roomKey, next);
+            console.log(`[WS] grant-controller OK: controllers=${Array.from(next)}`);
           } else if (msg.type === "text-control:revoke-controller" && msg.targetUserId) {
             const target = getRoster(room as any).find((user) => user.userId === msg.targetUserId);
-            if (!canReceiveTextControl(target?.role)) return;
+            console.log(`[WS] revoke-controller: targetUserId=${msg.targetUserId} target=`, target);
+            if (!canReceiveTextControl(target?.role)) {
+              console.warn(`[WS] revoke-controller bloqueado: role=${target?.role}`);
+              return;
+            }
             const next = new Set(getTextControllers(roomKey));
             next.delete(msg.targetUserId);
             setTextControllers(roomKey, next);
+            console.log(`[WS] revoke-controller OK: controllers=${Array.from(next)}`);
           }
 
           const permissions = Array.from(tempPermissions.get(roomKey) || []);
