@@ -6,8 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   Settings,
-  X,
-  Check,
   Monitor,
   User,
   Edit3,
