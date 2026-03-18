@@ -798,11 +798,7 @@ export default function RecordingRoom() {
     const takesQueryKey = ["/api/sessions", sessionId, "takes"] as const;
     const recordingsQueryKey = ["/api/sessions", sessionId, "recordings"] as const;
     const previousTakes = queryClient.getQueryData(takesQueryKey);
-    setOptimisticRemovingTakeIds((prev) => {
-      const next = new Set(prev);
-      next.add(takeId);
-      return next;
-    });
+    setOptimisticRemovingTakeIds((prev) => { const next = new Set(prev); next.add(takeId); return next; });
     queryClient.setQueryData(takesQueryKey, (current: any) =>
       Array.isArray(current) ? current.filter((item: any) => String(item?.id || "") !== takeId) : current
     );
@@ -826,11 +822,7 @@ export default function RecordingRoom() {
       queryClient.setQueryData(takesQueryKey, previousTakes);
       toast({ title: canDeletePermanently ? "Falha ao excluir take" : "Falha ao descartar take", description: error?.message || "Tente novamente", variant: "destructive" });
     } finally {
-      setOptimisticRemovingTakeIds((prev) => {
-        const next = new Set(prev);
-        next.delete(takeId);
-        return next;
-      });
+      setOptimisticRemovingTakeIds((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
     }
   }, [queryClient, sessionId, toast, logFeatureAudit, user?.role]);
 
