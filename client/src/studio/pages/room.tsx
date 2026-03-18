@@ -2334,6 +2334,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     setRecordingAvailability((prev) => ({ ...prev, [tid]: "error" }));
   }, []);
 
+  const handleRecordingsAudioEnded = useCallback(() => {
+    setRecordingsPreviewId(null);
+    setRecordingsPlayerOpenId(null);
+  }, []);
+
   const handleSaveProfile = useCallback((profile: RecordingProfile) => {
     setRecordingProfile(profile);
     localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(profile));
@@ -2543,10 +2548,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       <audio
         ref={recordingsPreviewAudioRef}
         preload="none"
-        onEnded={() => {
-          setRecordingsPreviewId(null);
-          setRecordingsPlayerOpenId(null);
-        }}
+        onEnded={handleRecordingsAudioEnded}
       />
 
       <RoomHeader
