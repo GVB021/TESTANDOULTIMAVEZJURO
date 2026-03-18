@@ -50,7 +50,6 @@ import { cn } from "@studio/lib/utils";
 import {
   parseTimecode,
   formatTimecodeByFormat,
-  type TimecodeFormat,
   parseUniversalTimecodeToSeconds,
 } from "@studio/lib/timecode";
 import {
@@ -246,7 +245,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
   const [isMuted, setIsMuted] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
-  const timecodeFormat: TimecodeFormat = "HH:MM:SS";
   const [scriptAutoFollow, setScriptAutoFollow] = useState(() => {
     try {
       const saved = sessionStorage.getItem(`vhub_script_follow_${sessionId}`);
