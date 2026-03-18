@@ -86,6 +86,7 @@ import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
+import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
 
 export interface ScriptLine {
   character: string;
@@ -464,103 +465,8 @@ function useRecordingsList(sessionId: string, params: RecordingsQueryParams) {
   return query;
 }
 
-function CountdownOverlay({ count }: { count: number }) {
-  return (
-    <div className="absolute inset-0 z-[100] flex items-center justify-center pointer-events-none">
-      <motion.div
-        key={count}
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 1.5, opacity: 0 }}
-        className="text-9xl font-bold text-red-500 drop-shadow-[0_0_20px_rgba(255,0,0,0.5)]"
-      >
-        {count}
-      </motion.div>
-    </div>
-  );
-}
-
-function DirectorConsole({
-  users,
-  clientAcks,
-  onClose
-}: {
-  users: any[];
-  clientAcks: Record<string, { lastAck: number; command: string }>;
-  onClose: () => void;
-}) {
-  return (
-    <div className="absolute top-20 right-4 z-50 w-64 room-bg-elevated backdrop-blur border border-border rounded-xl shadow-2xl p-4 animate-in slide-in-from-right-10 fade-in">
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-white">Console do Diretor</h3>
-        <button onClick={onClose} className="text-white/50 hover:text-white transition-colors">
-          <X className="w-3 h-3" />
-        </button>
-      </div>
-      <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
-        {users.map((u) => {
-          const ack = clientAcks[String(u.userId)];
-          const hasRecentAck = ack && (Date.now() - ack.lastAck < 2000);
-          return (
-            <div key={u.userId} className="flex items-center justify-between text-xs p-2 rounded bg-white/5">
-              <div className="flex flex-col">
-                <span className="font-bold text-white truncate max-w-[120px]">{u.name || "Usuario"}</span>
-                <span className="text-[10px] text-white/40">{normalizeRoomRole(u.role)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {hasRecentAck && (
-                  <span className="text-[9px] text-emerald-400 font-mono animate-pulse">ACK: {ack.command}</span>
-                )}
-                <div className={cn("w-2 h-2 rounded-full transition-all", hasRecentAck ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-muted-foreground/40")} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 
-function DirectorEntryModal({
-  isOpen,
-  onConfirm,
-  studioId
-}: {
-  isOpen: boolean;
-  onConfirm: () => void;
-  studioId: string;
-}) {
-  return (
-    <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-[425px] room-bg-elevated border-border text-foreground">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold flex items-center gap-2">
-            <Monitor className="w-5 h-5 text-primary" />
-            Assumir Controle de Direção
-          </DialogTitle>
-          <DialogDescription className="room-text-muted mt-2">
-            Você está entrando como Diretor. Isso lhe dará controle total sobre:
-            <ul className="list-disc list-inside mt-2 space-y-1 ml-2 text-sm room-text-secondary">
-              <li>Controle de Playback e Gravação</li>
-              <li>Aprovação e Rejeição de Takes</li>
-              <li>Gerenciamento de Usuários e Permissões</li>
-              <li>Edição de Texto do Script</li>
-            </ul>
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="mt-4">
-          <Button 
-            onClick={onConfirm}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold h-11"
-          >
-            Assumir Controle
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 export default function RecordingRoom() {
   const { studioId, sessionId } = useParams<{ studioId: string; sessionId: string }>();
@@ -3607,6 +3513,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               <DirectorConsole
                 users={onlineRosterForCurrentRole}
                 clientAcks={clientAcks}
+                normalizeRole={normalizeRoomRole}
                 onClose={() => setDirectorConsoleOpen(false)}
               />
             )}
