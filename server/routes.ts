@@ -2100,18 +2100,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       interface ScriptEntry { character: string; text: string; start: string; notes: string; }
       const entries: ScriptEntry[] = [];
+      // Matches HH:MM:SS:FF (NDF) or HH:MM:SS;FF (DF) and plain HH:MM:SS
       const tcPattern = /^(\d{1,2}[:;]\d{2}[:;]\d{2}(?:[;:]\d{2})?)\s+(.*)/;
       const allCapsPattern = /^([A-ZÁÉÍÓÚÀÃÕÂÊÎÔÛÇ\s\-\.]{2,40})\s*$/;
 
       let pendingChar = "";
-      let pendingTc = "00:00:00";
+      let pendingTc = "00:00:00:00";
 
       for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
         const tcMatch = line.match(tcPattern);
         if (tcMatch) {
-          // Line starts with timecode
-          const rawTc = tcMatch[1].replace(/;/g, ":").split(":").slice(0, 3).join(":");
+          // Keep full timecode including frames (HH:MM:SS:FF) for 23.976fps accuracy
+          const rawTc = tcMatch[1].replace(/;(\d{2})$/, ":$1"); // normalise DF semicolons to colon
           const rest = tcMatch[2].trim();
           // rest might be "CHARACTER dialogue" or just dialogue
           const parts = rest.split(/\s{2,}/);

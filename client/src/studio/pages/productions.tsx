@@ -316,7 +316,7 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
   };
 
   const toTempoEmSegundos = (val: any): number => {
-    return parseUniversalTimecodeToSeconds(val ?? "00:00:00", 24);
+    return parseUniversalTimecodeToSeconds(val ?? "00:00:00:00", 23.976);
   };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
