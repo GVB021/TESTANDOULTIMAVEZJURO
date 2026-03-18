@@ -332,6 +332,7 @@ export default function RecordingRoom() {
   // Permission calculations - moved here to be used in useEffect
   const uiRole = resolveUiRole(studioRole, textControllerUserIds.has(String(user?.id ?? "")));
   const canTextControl = hasUiPermission(uiRole, "text_control");
+  console.log("[Room] uiRole debug:", { studioRole, myId: user?.id, controllers: Array.from(textControllerUserIds), uiRole, canTextControl });
   const canManageAudio = hasUiPermission(uiRole, "audio_control");
   const canApproveTake = hasUiPermission(uiRole, "approve_take");
   const canViewOnlineUsers = hasUiPermission(uiRole, "presence_view");
@@ -616,6 +617,7 @@ export default function RecordingRoom() {
           }
         } else if (msg.type === "text-control:set-controllers" || msg.type === "text-control:state") {
           const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
+          console.log("[Room] text-control state received:", { type: msg.type, ids, myId: user?.id });
           setTextControllerUserIds(new Set(Array.from(new Set(ids || []))));
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
