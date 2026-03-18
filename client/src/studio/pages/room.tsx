@@ -47,6 +47,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
 import SessionBlockedScreen from "@studio/pages/admin/components/SessionBlockedScreen";
 import { useToast } from "@studio/hooks/use-toast";
@@ -612,7 +618,6 @@ const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
 const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
 const [sideScriptWidth, setSideScriptWidth] = useState(320);
 const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
-const [scriptFontSize, setScriptFontSize] = useState(16);
 const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
 const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
 const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
@@ -688,6 +693,18 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
   // Recording state
   const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(null);
+  
+  // Carregar perfil persistido ao iniciar
+  useEffect(() => {
+    const saved = localStorage.getItem(`recording_profile_${sessionId}`);
+    if (saved) {
+      try {
+        setRecordingProfile(JSON.parse(saved));
+      } catch (e) {
+        console.warn("Failed to load saved recording profile");
+      }
+    }
+  }, [sessionId]);
   const [micReady, setMicReady] = useState(false);
   const [micInitializing, setMicInitializing] = useState(false);
   const [micState, setMicState] = useState<any>(null);
@@ -825,8 +842,20 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, [presenceUsers]);
 
   const handleCharacterChange = useCallback((character: any) => {
-    setRecordingProfile((prev) => prev ? { ...prev, characterId: character.id, characterName: character.name } : null);
-  }, []);
+    const updated = { 
+      ...recordingProfile, 
+      characterId: character.id, 
+      characterName: character.name,
+      actorName: recordingProfile?.actorName || user?.displayName || user?.fullName || 'Ator',
+      voiceActorId: user?.id || '',
+      voiceActorName: user?.displayName || user?.fullName || 'Ator'
+    };
+    setRecordingProfile(updated);
+    localStorage.setItem(`recording_profile_${sessionId}`, JSON.stringify(updated));
+    // Sincronizar via WebSocket
+    emitVideoEvent("character-selected", { characterId: character.id, userId: user?.id });
+    logAudioStep("character-selected", { characterId: character.id, characterName: character.name });
+  }, [recordingProfile, sessionId, user?.id, emitVideoEvent, logAudioStep]);
 
   const handleVideoTouchStart = useCallback((e: React.TouchEvent) => {
     // Handle video touch start
@@ -1312,13 +1341,32 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     };
   }, [isDraggingSideScript, isMobile]);
 
+  const [scriptFontSize, setScriptFontSize] = useState(16);
+
+  const FONT_SIZES = [
+    { label: "Muito Pequeno", value: 10 },
+    { label: "Pequeno", value: 12 },
+    { label: "Normal", value: 16 },
+    { label: "Médio", value: 18 },
+    { label: "Grande", value: 20 },
+    { label: "Muito Grande", value: 24 },
+    { label: "Extra Grande", value: 28 },
+    { label: "Gigante", value: 32 },
+    { label: "Máximo", value: 36 }
+  ];
+
   const changeScriptFontSize = (delta: number) => {
     setScriptFontSize(prev => {
       const next = prev + delta;
-      const constrained = Math.max(12, Math.min(24, next));
+      const constrained = Math.max(10, Math.min(36, next));
       localStorage.setItem("vhub_script_font_size", String(constrained));
       return constrained;
     });
+  };
+
+  const setScriptFontSizeExact = (size: number) => {
+    setScriptFontSize(size);
+    localStorage.setItem("vhub_script_font_size", String(size));
   };
 
   const mySessionRole = useMemo(() => {
@@ -1390,8 +1438,14 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     return Array.from(map.values());
   }, [presenceUsers, canViewOnlineUsers]);
   const textControlCandidates = useMemo(() => {
-    return presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role));
-  }, [presenceUsers]);
+    // Fallback: mostrar todos os usuários online se presenceUsers não tiver dados
+    const candidates = presenceUsers.length > 0 
+      ? presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role))
+      : [{ userId: user?.id, name: user?.displayName || user?.fullName || 'Você', role: 'actor' }];
+    
+    console.log("Text control candidates:", candidates);
+    return candidates;
+  }, [presenceUsers, user]);
 
   // Note: applyScriptLinePatch and pushEditHistory moved above to avoid hoisting issues
 
@@ -1829,6 +1883,16 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       }
       return;
     }
+    
+    // Permitir gravação mesmo sem personagem selecionado (fallback)
+    if (!recordingProfile) {
+      toast({
+        title: "Nenhum personagem selecionado",
+        description: "Gravando como 'Sem Personagem'. Selecione um personagem para melhor organização.",
+        variant: "default"
+      });
+    }
+    
     const video = videoRef.current;
     if (!video) return;
     const loopPreroll = isLooping ? 3 : preRoll;
@@ -3455,11 +3519,32 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                   Roteiro Completo
                 </span>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 12} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
+                  <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 10} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="text-xs font-mono w-8 text-center text-white/70 font-bold">{scriptFontSize}</span>
-                  <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 24} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-xs font-mono w-12 text-center text-white/70 font-bold hover:bg-white/10 rounded px-1 py-0.5 transition-all">
+                        {scriptFontSize}
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-32 max-h-64 overflow-y-auto">
+                      {FONT_SIZES.map((size) => (
+                        <DropdownMenuItem 
+                          key={size.value}
+                          onClick={() => setScriptFontSizeExact(size.value)}
+                          className={cn(
+                            "text-xs",
+                            scriptFontSize === size.value && "bg-primary/20 text-primary"
+                          )}
+                        >
+                          {size.label}
+                          <span className="ml-auto font-mono">{size.value}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 36} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
@@ -3516,33 +3601,43 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                       </p>
                       {canTextControl && !isLockedByOther && (
                         <div className="mt-3 flex items-center gap-2">
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              startInlineEdit(i, "character");
-                            }}
-                            className="h-8 px-3 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105"
-                          >
-                            Personagem
-                          </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              startInlineEdit(i, "text");
-                            }}
-                            className="h-8 px-3 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105"
-                          >
-                            Fala
-                          </button>
-                          <button
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              startInlineEdit(i, "timecode");
-                            }}
-                            className="h-8 px-3 rounded-lg bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105"
-                          >
-                            Timecode
-                          </button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                onClick={(event) => event.stopPropagation()}
+                                className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 hover:border-primary/30 transition-all hover:scale-105 flex items-center justify-center"
+                                title="Editar linha"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-40">
+                              <DropdownMenuItem 
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  startInlineEdit(i, "character");
+                                }}
+                              >
+                                Personagem
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  startInlineEdit(i, "text");
+                                }}
+                              >
+                                Fala
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  startInlineEdit(i, "timecode");
+                                }}
+                              >
+                                Timecode
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       )}
                       {editingField?.lineIndex === i && (
@@ -3958,6 +4053,21 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                           </button>
                         </Link>
                       )}
+                      <button
+                        onClick={() => { setDailyMeetOpen(true); setMobileMenuOpen(false); }}
+                        className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400">
+                            <Video className="w-5 h-5" />
+                          </div>
+                          <div className="text-left">
+                            <div className="font-bold text-sm text-white">Vídeo & Voz</div>
+                            <div className="text-[11px] text-white/40 uppercase tracking-wider">Chat da equipe</div>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-white/20" />
+                      </button>
                     </div>
                   </div>
                 </Drawer.Content>
@@ -3979,15 +4089,31 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                     <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-800 mb-8" />
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-xl font-bold text-white">Roteiro</h2>
-                      <button onClick={() => setScriptOpen(false)} className="p-2 rounded-full bg-white/5 text-white/40">
-                        <X className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        {/* Controles de fonte mobile */}
+                        <div className="flex items-center gap-1 mr-2">
+                          <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 10} className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all">
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="text-xs font-mono w-6 text-center text-white/70">{scriptFontSize}</span>
+                          <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 36} className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <button onClick={() => setScriptOpen(false)} className="p-2 rounded-full bg-white/5 text-white/40">
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex-1 overflow-y-auto pb-20">
                       {displayedScriptLines.map((line) => {
                         const i = line.originalIndex;
                         const isActive = i === currentLine;
                         const isDone = savedTakes.has(i);
+                        const lock = lockedLines[i];
+                        const isLockedByOther = lock && lock.userId !== user?.id;
+                        const lockingUser = isLockedByOther ? presenceUsers.find(u => u.userId === lock.userId)?.name || "Alguém" : null;
+                        const liveText = isLockedByOther && liveDrafts[i] ? liveDrafts[i] : line.text;
                         return (
                           <div
                             key={i}
@@ -4003,8 +4129,50 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                                 {line.character}
                               </span>
                               {isDone && <CheckCircle2 className="w-4 h-4 ml-auto text-emerald-500" />}
+                              {/* Botão de edição mobile */}
+                              {canTextControl && !isLockedByOther && (
+                                <div className="ml-auto">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        onClick={(event) => event.stopPropagation()}
+                                        className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 hover:border-primary/30 transition-all flex items-center justify-center"
+                                        title="Editar linha"
+                                      >
+                                        <Edit3 className="w-3 h-3" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="w-32">
+                                      <DropdownMenuItem 
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          startInlineEdit(i, "character");
+                                        }}
+                                      >
+                                        Personagem
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          startInlineEdit(i, "text");
+                                        }}
+                                      >
+                                        Fala
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          startInlineEdit(i, "timecode");
+                                        }}
+                                      >
+                                        Timecode
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              )}
                             </div>
-                            <p className={cn("text-[17px] leading-relaxed", isActive ? "text-white font-medium" : "text-white/50")}>
+                            <p className={cn("leading-relaxed", isActive ? "text-white font-medium" : "text-white/50")} style={{ fontSize: `${scriptFontSize}px` }}>
                               {line.text}
                             </p>
                           </div>

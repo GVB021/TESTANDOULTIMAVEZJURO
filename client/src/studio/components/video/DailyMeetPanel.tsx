@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import DailyIframe from "@daily-co/daily-js";
-import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, ChevronUp, ChevronDown } from "lucide-react";
+import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, ChevronUp, ChevronDown, Camera, User, Phone } from "lucide-react";
 import { authFetch } from "@studio/lib/auth-fetch";
 import { motion, AnimatePresence } from "framer-motion";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@studio/hooks/use-auth";
 
 interface DailyMeetPanelProps {
   sessionId: string;
@@ -13,6 +16,7 @@ interface DailyMeetPanelProps {
 }
 
 export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChange, mode = "floating" }: DailyMeetPanelProps) {
+  const { user } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const callRef = useRef<any>(null);
@@ -29,6 +33,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
   const [status, setStatus] = useState<"conectando" | "conectado" | "desconectado">("conectando");
   const [roomUrl, setRoomUrl] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [showJoinScreen, setShowJoinScreen] = useState(true);
   const isOpen = open ?? internalOpen;
 
   const setOpen = (next: boolean) => {
@@ -199,7 +204,77 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
             className={`bg-zinc-900 border border-zinc-800 ${mode === "embedded" ? "rounded-none h-full" : "rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]"} flex flex-col overflow-hidden backdrop-blur-xl`}
             data-testid="daily-meet-popup"
           >
-            {/* Header / Minimized Bar */}
+            {/* Custom Join Screen */}
+            {showJoinScreen && (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 bg-zinc-950/95">
+                <div className="w-full max-w-sm space-y-6">
+                  {/* User Profile */}
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800">
+                    <Avatar className="w-16 h-16">
+                      <AvatarImage src={user?.profileImageUrl || undefined} />
+                      <AvatarFallback className="text-lg font-bold bg-primary/20 text-primary">
+                        {user?.displayName?.[0] || user?.firstName?.[0] || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="font-semibold text-white text-lg">
+                        {user?.displayName || user?.fullName || 'Usuário'}
+                      </div>
+                      <div className="text-sm text-zinc-400">
+                        Pronto para entrar na chamada
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Device Controls */}
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Button 
+                        variant={isVideoOff ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => setIsVideoOff(!isVideoOff)}
+                        className="flex-1"
+                      >
+                        {isVideoOff ? <VideoOff className="w-4 h-4 mr-2" /> : <Camera className="w-4 h-4 mr-2" />}
+                        Câmera {isVideoOff ? "Desligada" : "Ligada"}
+                      </Button>
+                      <Button 
+                        variant={isMuted ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => setIsMuted(!isMuted)}
+                        className="flex-1"
+                      >
+                        {isMuted ? <MicOff className="w-4 h-4 mr-2" /> : <Mic className="w-4 h-4 mr-2" />}
+                        Microfone {isMuted ? "Desligado" : "Ligado"}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Join Button */}
+                  <Button 
+                    size="lg" 
+                    className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                    onClick={() => {
+                      setShowJoinScreen(false);
+                      // Aqui iniciaria a conexão real com Daily.co
+                      setStatus("conectado");
+                    }}
+                  >
+                    <Phone className="w-5 h-5 mr-2" />
+                    Entrar na Chamada
+                  </Button>
+
+                  {/* Status */}
+                  <div className="text-center text-xs text-zinc-500">
+                    Sala de vídeo e voz para dublagem colaborativa
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Original Daily.co Content (when not showing join screen) */}
+            {!showJoinScreen && (
+              <div>
             <div className="h-14 px-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/40 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -367,6 +442,8 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
                   {isVideoOff ? "Câmera Off" : "Câmera On"}
                 </button>
               </div>
+            )}
+            </div>
             )}
           </motion.div>
         </motion.div>
