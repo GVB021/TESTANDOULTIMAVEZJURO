@@ -32,13 +32,10 @@ import {
   Save,
   Repeat,
   ListMusic,
-  ArrowUpDown,
-  UserCheck,
   MousePointer2,
   Video,
   ArrowLeft,
 } from "lucide-react";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@studio/components/ui/button";
 import { Badge } from "@studio/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -152,6 +149,7 @@ type RecordingAvailabilityState = "available" | "loading" | "error";
 import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
 import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview } from "@studio/components/room/modals/DirectorReview";
+import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 
 const DEFAULT_SHORTCUTS: Shortcuts = {
   playPause: "Space",
@@ -499,7 +497,7 @@ function DirectorConsole({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute top-20 right-4 z-50 w-64 bg-zinc-950/95 backdrop-blur border border-white/10 rounded-xl shadow-2xl p-4 animate-in slide-in-from-right-10 fade-in">
+    <div className="absolute top-20 right-4 z-50 w-64 room-bg-elevated backdrop-blur border border-border rounded-xl shadow-2xl p-4 animate-in slide-in-from-right-10 fade-in">
       <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
         <h3 className="text-xs font-bold uppercase tracking-wider text-white">Console do Diretor</h3>
         <button onClick={onClose} className="text-white/50 hover:text-white transition-colors">
@@ -520,7 +518,7 @@ function DirectorConsole({
                 {hasRecentAck && (
                   <span className="text-[9px] text-emerald-400 font-mono animate-pulse">ACK: {ack.command}</span>
                 )}
-                <div className={cn("w-2 h-2 rounded-full transition-all", hasRecentAck ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-zinc-600")} />
+                <div className={cn("w-2 h-2 rounded-full transition-all", hasRecentAck ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-muted-foreground/40")} />
               </div>
             </div>
           );
@@ -542,15 +540,15 @@ function DirectorEntryModal({
 }) {
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800 text-white">
+      <DialogContent className="sm:max-w-[425px] room-bg-elevated border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <Monitor className="w-5 h-5 text-primary" />
             Assumir Controle de Direção
           </DialogTitle>
-          <DialogDescription className="text-zinc-400 mt-2">
+          <DialogDescription className="room-text-muted mt-2">
             Você está entrando como Diretor. Isso lhe dará controle total sobre:
-            <ul className="list-disc list-inside mt-2 space-y-1 ml-2 text-sm text-zinc-300">
+            <ul className="list-disc list-inside mt-2 space-y-1 ml-2 text-sm room-text-secondary">
               <li>Controle de Playback e Gravação</li>
               <li>Aprovação e Rejeição de Takes</li>
               <li>Gerenciamento de Usuários e Permissões</li>
@@ -3213,234 +3211,124 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         }}
       />
 
-      <header 
-        className={cn(
-          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header",
-          !isMobile ? "grid" : "justify-between"
-        )} 
-        style={{
-          background: "hsl(var(--background) / 0.90)", 
-          backdropFilter: "blur(16px)", 
-          WebkitBackdropFilter: "blur(16px)", 
-          borderBottom: "1px solid hsl(var(--border) / 0.9)",
-          gridTemplateColumns: !isMobile ? `1fr ${sideScriptWidth}px` : undefined
+      <RoomHeader
+        isMobile={isMobile}
+        productionName={production?.name || "Sessão"}
+        sessionTitle={session?.title}
+        sideScriptWidth={sideScriptWidth}
+        recordingProfile={recordingProfile}
+        charSelectorOpen={charSelectorOpen}
+        setCharSelectorOpen={setCharSelectorOpen}
+        charactersList={charactersList || []}
+        handleCharacterChange={handleCharacterChange}
+        onBack={() => {
+          if (recordingStatus === 'recording' && !window.confirm('Você tem uma gravação em andamento. Deseja realmente sair?')) return;
+          setLocation(`/hub-dub/studio/${studioId}/dashboard`);
         }}
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          <button 
-            onClick={() => {
-              if (recordingStatus === 'recording' && !window.confirm('Você tem uma gravação em andamento. Deseja realmente sair?')) {
-                return;
-              }
-              setLocation(`/hub-dub/studio/${studioId}/dashboard`);
-            }}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-xs sm:text-sm truncate text-foreground">{production?.name || "Sessao"}</span>
-            <span className="text-[10px] text-muted-foreground truncate">{session?.title}</span>
-          </div>
-          
-          <div className="relative ml-2">
-            <button
-              onClick={() => setCharSelectorOpen((v: boolean) => !v)}
-              className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1.5"
-              data-testid="button-character-selector"
-            >
-              <User className="w-3.5 h-3.5" />
-              <span className="max-w-[140px] truncate">{recordingProfile?.characterName || "Personagem"}</span>
-              <ChevronRight className={cn("w-3 h-3 transition-transform", charSelectorOpen && "rotate-90")} />
-            </button>
-            <AnimatePresence>
-              {charSelectorOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
-                  className="absolute top-full left-0 mt-2 w-64 rounded-xl bg-popover/95 backdrop-blur-xl border border-border shadow-2xl p-2"
-                  style={{ zIndex: UI_LAYER_BASE.chatPanel }}
-                >
-                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-2 py-1.5 border-b border-border/60 mb-1">Selecionar personagem</div>
-                  <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                    {(charactersList || []).map((char) => (
-                      <button
-                        key={char.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCharacterChange(char);
-                        }}
-                        className={cn(
-                          "w-full text-left px-2 py-2 rounded-md text-xs transition-colors",
-                          recordingProfile?.characterId === char.id ? "bg-primary/12 text-primary" : "text-foreground hover:bg-muted/60"
-                        )}
-                      >
-                        {char.name}
-                      </button>
-                    ))}
-                    {(!charactersList || charactersList.length === 0) && (
-                      <div className="px-2 py-3 text-xs text-muted-foreground">Nenhum personagem cadastrado.</div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <TooltipProvider delayDuration={300}>
-            <div className="flex items-center gap-1.5 ml-2 border-l border-white/10 pl-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !scriptAutoFollow;
-                      setScriptAutoFollow(next);
-                      if (next) syncScrollToCurrentVideoTime();
-                      logFeatureAudit("room.scroll", "mode_changed", { mode: next ? "automatic" : "manual" });
-                    }}
-                    className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
-                      scriptAutoFollow
-                        ? "bg-primary/20 border-primary/30 text-primary"
-                        : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10"
-                    )}
-                  >
-                    <ArrowUpDown className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{scriptAutoFollow ? "Desativar Rolagem Automática" : "Ativar Rolagem Automática"}</p>
-                </TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !onlySelectedCharacter;
-                      setOnlySelectedCharacter(next);
-                      logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
-                    }}
-                    disabled={!recordingProfile}
-                    className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
-                      onlySelectedCharacter
-                        ? "bg-primary/20 border-primary/30 text-primary"
-                        : "bg-white/5 border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10",
-                      !recordingProfile && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    <UserCheck className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{onlySelectedCharacter ? "Mostrar Todos os Personagens" : "Apenas Meu Personagem"}</p>
-                </TooltipContent>
-              </Tooltip>
-
-            </div>
-          </TooltipProvider>
-        </div>
-
-        <div className={cn(
-          "flex items-center gap-2",
-          !isMobile && "justify-end px-4 border-l border-white/5"
-        )}>          {recordingStatus === "recording" && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-500 animate-pulse">
-              <Circle className="w-2 h-2 fill-current" /> <span className="hidden xs:inline">REC</span>
-            </div>
-          )}
-          {canViewOnlineUsers && !isMobile && (
-            <div
-              className="h-7 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 flex items-center gap-1.5"
-              title={roomUsers.map((u: any) => u.displayName || u.fullName || u.name || u.userId).join(", ")}
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span>{roomUsers.length} online</span>
-            </div>
-          )}
-          
-          {isMobile ? (
-            <>
-              <button
-                onClick={() => (recordingStatus === 'recording' ? handleStopRecording() : startCountdown())}
-                className={cn(
-                  'w-14 h-14 flex items-center justify-center rounded-full transition-all',
-                  recordingStatus === 'recording'
-                    ? 'bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse'
-                    : 'bg-primary text-primary-foreground'
-                )}
-                aria-label={recordingStatus === 'recording' ? 'Parar Gravação' : 'Iniciar Gravação'}
+        scriptAutoFollow={scriptAutoFollow}
+        onToggleAutoFollow={() => {
+          const next = !scriptAutoFollow;
+          setScriptAutoFollow(next);
+          if (next) syncScrollToCurrentVideoTime();
+          logFeatureAudit("room.scroll", "mode_changed", { mode: next ? "automatic" : "manual" });
+        }}
+        onlySelectedCharacter={onlySelectedCharacter}
+        onToggleCharacterFilter={() => {
+          const next = !onlySelectedCharacter;
+          setOnlySelectedCharacter(next);
+          logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
+        }}
+        rightSlot={
+          <>
+            {recordingStatus === "recording" && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-500 animate-pulse">
+                <Circle className="w-2 h-2 fill-current" /> <span className="hidden xs:inline">REC</span>
+              </div>
+            )}
+            {canViewOnlineUsers && !isMobile && (
+              <div
+                className="h-7 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 flex items-center gap-1.5"
+                title={roomUsers.map((u: any) => u.displayName || u.fullName || u.name || u.userId).join(", ")}
               >
-                {recordingStatus === 'recording' ? (
-                  <Square className="w-6 h-6" />
-                ) : (
-                  <Mic className="w-6 h-6" />
-                )}
-              </button>
-              <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="w-11 h-11 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Menu principal"
-              >
-                <Menu className="w-5 h-5" />
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => setRecordingsOpen(true)}
-                className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
-                data-testid="button-room-recordings"
-              >
-                <ListMusic className="w-3.5 h-3.5" />
-                Gravações
-              </button>
-              {canReleaseText && (
+                <Users className="w-3.5 h-3.5" />
+                <span>{roomUsers.length} online</span>
+              </div>
+            )}
+            {isMobile ? (
+              <>
                 <button
-                  onClick={() => setTextControlPopupOpen(true)}
-                  className="h-7 px-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 hover:bg-indigo-500/20 flex items-center gap-1"
-                  data-testid="button-room-release-text"
+                  onClick={() => (recordingStatus === 'recording' ? handleStopRecording() : startCountdown())}
+                  className={cn(
+                    'w-14 h-14 flex items-center justify-center rounded-full transition-all',
+                    recordingStatus === 'recording'
+                      ? 'bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse'
+                      : 'bg-primary text-primary-foreground'
+                  )}
+                  aria-label={recordingStatus === 'recording' ? 'Parar Gravação' : 'Iniciar Gravação'}
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  Liberar Texto
+                  {recordingStatus === 'recording' ? <Square className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                 </button>
-              )}
-              <button
-                onClick={() => setDeviceSettingsOpen(true)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Configurações de dispositivos"
-                data-testid="button-open-device-settings"
-              >
-                <Monitor className="w-4 h-4" />
-              </button>
-              {canAccessDashboard && (
-                <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
+                <button
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="w-11 h-11 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Menu principal"
+                >
+                  <Menu className="w-5 h-5" />
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => setRecordingsOpen(true)}
+                  className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
+                  data-testid="button-room-recordings"
+                >
+                  <ListMusic className="w-3.5 h-3.5" />
+                  Gravações
+                </button>
+                {canReleaseText && (
                   <button
-                    onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); }}
-                    className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
-                    data-testid="button-room-panel"
+                    onClick={() => setTextControlPopupOpen(true)}
+                    className="h-7 px-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 hover:bg-indigo-500/20 flex items-center gap-1"
+                    data-testid="button-room-release-text"
                   >
-                    <Monitor className="w-3.5 h-3.5" />
-                    PAINEL
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Liberar Texto
                   </button>
-                </Link>
-              )}
-              <button
-                onClick={() => setIsCustomizing(true)}
-                className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Atalhos de teclado"
-                data-testid="button-open-shortcuts"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            </>
-          )}
-        </div>
-      </header>
+                )}
+                <button
+                  onClick={() => setDeviceSettingsOpen(true)}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Configurações de dispositivos"
+                  data-testid="button-open-device-settings"
+                >
+                  <Monitor className="w-4 h-4" />
+                </button>
+                {canAccessDashboard && (
+                  <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
+                    <button
+                      onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); }}
+                      className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
+                      data-testid="button-room-panel"
+                    >
+                      <Monitor className="w-3.5 h-3.5" />
+                      PAINEL
+                    </button>
+                  </Link>
+                )}
+                <button
+                  onClick={() => setIsCustomizing(true)}
+                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Atalhos de teclado"
+                  data-testid="button-open-shortcuts"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </>
+        }
+      />
 
       {isMobile && (
         <DailyMeetPanel
@@ -3557,14 +3445,14 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                 onPointerDown={() => setIsDraggingVideoTextSplit(true)}
                 className={cn(
                   "h-2 w-full cursor-row-resize flex items-center justify-center transition-all group z-30 relative",
-                  isDraggingVideoTextSplit ? "bg-primary" : "bg-zinc-800/80 hover:bg-primary/50"
+                  isDraggingVideoTextSplit ? "bg-primary" : "room-bg-surface hover:bg-primary/50"
                 )}
                 aria-label="Redimensionar roteiro (máx 50%)"
                 data-testid="video-text-resizer"
               >
                 <div className={cn(
                   "w-12 h-0.5 rounded-full transition-all",
-                  isDraggingVideoTextSplit ? "bg-white" : "bg-zinc-600 group-hover:bg-white"
+                  isDraggingVideoTextSplit ? "bg-white" : "bg-muted-foreground/30 group-hover:bg-white"
                 )} />
                 {isDraggingVideoTextSplit && (
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-lg">
@@ -3575,7 +3463,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             )}
             {!isMobile && (
               <div
-                className="border-t border-white/10 min-h-[220px] bg-zinc-950/90"
+                className="border-t border-border min-h-[220px] room-bg-subtle"
                 style={{ height: `${100 - desktopVideoTextSplit}%` }}
               >
                 <DailyMeetPanel
@@ -3859,7 +3747,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             {canApproveTake && !directorConsoleOpen && !isMobile && (
               <button
                 onClick={() => setDirectorConsoleOpen(true)}
-                className="absolute top-20 right-4 z-40 w-10 h-10 rounded-full bg-zinc-900/80 backdrop-blur border border-white/10 flex items-center justify-center text-white/70 hover:text-white hover:scale-105 transition-all shadow-lg"
+                className="absolute top-20 right-4 z-40 w-10 h-10 rounded-full room-bg-elevated backdrop-blur border border-border flex items-center justify-center room-text-muted hover:text-foreground hover:scale-105 transition-all shadow-lg"
                 title="Abrir Console do Diretor"
               >
                 <div className="relative">
@@ -3947,7 +3835,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             {/* Toast de Aprovação Integrado no Rodapé se necessário, ou overlay acima dele */}
             {recordingStatus === "recorded" && (
               <div className="absolute bottom-full left-0 right-0 mb-4 px-6 pointer-events-none">
-                <div className="max-w-md mx-auto h-12 rounded-2xl bg-zinc-900 border border-white/10 shadow-2xl flex items-center justify-between px-4 text-xs text-white/90 pointer-events-auto backdrop-blur-xl">
+                <div className="max-w-md mx-auto h-12 rounded-2xl room-bg-elevated border border-border shadow-2xl flex items-center justify-between px-4 text-xs room-text-primary pointer-events-auto backdrop-blur-xl">
                   <span>Take salvo automaticamente.</span>
                 </div>
               </div>
@@ -3962,9 +3850,9 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             <Drawer.Root open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm" style={{ zIndex: UI_LAYER_BASE.mobileDrawerOverlay }} />
-                <Drawer.Content className="bg-zinc-950 flex flex-col rounded-t-[32px] fixed bottom-0 left-0 right-0 outline-none max-h-[90vh]" style={{ zIndex: UI_LAYER_BASE.mobileDrawerContent }}>
+                <Drawer.Content className="room-bg-elevated flex flex-col rounded-t-[32px] fixed bottom-0 left-0 right-0 outline-none max-h-[90vh]" style={{ zIndex: UI_LAYER_BASE.mobileDrawerContent }}>
                   <div className="p-6 pb-12 overflow-y-auto">
-                    <div className="mx-auto w-12 h-1.5 rounded-full bg-zinc-800 mb-8" />
+                    <div className="mx-auto w-12 h-1.5 rounded-full bg-muted mb-8" />
                     <h2 className="text-xl font-bold mb-6 text-white">Menu do Estúdio</h2>
                     <div className="space-y-4">
                       <button
@@ -4088,7 +3976,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
             <button
               onClick={() => setScriptOpen(true)}
-              className="fixed bottom-20 left-5 h-12 w-12 rounded-full flex items-center justify-center shadow-lg z-[90] bg-zinc-900/80 backdrop-blur-md border border-white/10 text-white"
+              className="fixed bottom-20 left-5 h-12 w-12 rounded-full flex items-center justify-center shadow-lg z-[90] room-bg-elevated backdrop-blur-md border border-border room-text-primary"
             >
               <Edit3 className="w-5 h-5" />
             </button>
@@ -4096,9 +3984,9 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             <Drawer.Root open={scriptOpen} onOpenChange={setScriptOpen}>
               <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110]" />
-                <Drawer.Content className="bg-zinc-950 flex flex-col rounded-t-[32px] h-[85vh] fixed bottom-0 left-0 right-0 z-[120] outline-none">
+                <Drawer.Content className="room-bg-elevated flex flex-col rounded-t-[32px] h-[85vh] fixed bottom-0 left-0 right-0 z-[120] outline-none">
                   <div className="p-6 flex-1 flex flex-col overflow-hidden">
-                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-zinc-800 mb-8" />
+                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted mb-8" />
                     <div className="flex items-center justify-between mb-6">
                       <h2 className="text-xl font-bold text-white">Roteiro</h2>
                       <div className="flex items-center gap-2">
