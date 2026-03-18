@@ -755,8 +755,8 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
   const currentScriptLine = scriptLines[currentLine];
   const formatLiveTimecode = useCallback((seconds: number) => {
-    return formatTimecodeByFormat(seconds, timecodeFormat, 24);
-  }, [timecodeFormat]);
+    return formatTimecodeByFormat(seconds, "HH:MM:SS", 24);
+  }, []);
 
   const displayedScriptLines = useMemo(() => {
     return scriptLines
