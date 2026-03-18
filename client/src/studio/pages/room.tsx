@@ -1615,16 +1615,7 @@ export default function RecordingRoom() {
     } catch (err: any) {
       logAudioStep("upload-error", { message: String(err?.message || err) });
       try {
-        await enqueuePendingUpload({
-          dataUrl: await blobToBase64(pendingTake.blob),
-          characterId: recordingProfile?.characterId || "",
-          voiceActorId: user?.id || recordingProfile?.voiceActorId || "",
-          lineIndex: pendingTake.lineIndex,
-          durationSeconds: pendingTake.durationSeconds,
-          startTimeSeconds: pendingTake.startTimeSeconds,
-          qualityScore: pendingTake.metrics.score,
-          isPreferred: !hasApproverPresent && !isPrivileged,
-        });
+        await enqueuePendingUpload({ dataUrl: await blobToBase64(pendingTake.blob), characterId: recordingProfile?.characterId || "", voiceActorId: user?.id || recordingProfile?.voiceActorId || "", lineIndex: pendingTake.lineIndex, durationSeconds: pendingTake.durationSeconds, startTimeSeconds: pendingTake.startTimeSeconds, qualityScore: pendingTake.metrics.score, isPreferred: !hasApproverPresent && !isPrivileged });
         toast({ title: "Sem conexão. Take salvo no cache local para reenvio automático.", variant: "destructive" });
         
         URL.revokeObjectURL(pendingTake.url);
