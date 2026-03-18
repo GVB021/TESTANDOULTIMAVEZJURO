@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authFetch } from "@studio/lib/auth-fetch";
 import {
   Users, CheckCircle2, XCircle, Loader2, UserPlus, Pencil,
-  BarChart3, Film, Calendar, Mic2, Shield, Trash2, Download, Settings
+  BarChart3, Film, Calendar, Mic2, Shield, Trash2, Download, Settings, Activity
 } from "lucide-react";
 import { Button } from "@studio/components/ui/button";
 import { Badge } from "@studio/components/ui/badge";
@@ -25,6 +25,7 @@ import { useToast } from "@studio/hooks/use-toast";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
 import { useAuth } from "@studio/hooks/use-auth";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 const STUDIO_ROLES = [
   { value: "studio_admin", label: pt.roles.studio_admin },
@@ -311,6 +312,29 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
 
   const approvedMembers = members?.filter((m: any) => m.status === "approved") || [];
 
+  // Helper function to check if session is blocked
+  const isSessionBlocked = (session: any) => {
+    if (!session.scheduledAt) return false;
+    const now = new Date();
+    const scheduledTime = new Date(session.scheduledAt);
+    return scheduledTime > now;
+  };
+
+  const getTimeUntilStart = (session: any) => {
+    if (!session.scheduledAt) return null;
+    const now = new Date();
+    const scheduledTime = new Date(session.scheduledAt);
+    if (scheduledTime <= now) return null;
+    
+    const timeUntilStart = scheduledTime.getTime() - now.getTime();
+    const minutesUntilStart = Math.ceil(timeUntilStart / (1000 * 60));
+    
+    if (minutesUntilStart < 60) return `${minutesUntilStart}min`;
+    const hours = Math.floor(minutesUntilStart / 60);
+    const mins = minutesUntilStart % 60;
+    return `${hours}h${mins > 0 ? ` ${mins}min` : ''}`;
+  };
+
   const tabs: { key: AdminTab; label: string; icon: typeof BarChart3; count?: number }[] = [
     { key: "overview", label: "Visao Geral", icon: BarChart3 },
     { key: "pending", label: "Cadastros Pendentes", icon: UserPlus, count: pendingMembers?.length || 0 },
@@ -328,6 +352,21 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
         title="Painel do Estudio"
         subtitle="Gerencie membros, producoes e sessoes do seu estudio"
       />
+
+      {/* Admin Avançado Link - apenas para studio_admin */}
+      {canManageMembers && (
+        <div className="mb-6">
+          <Link to={`/hub-dub/studio/${studioId}/admin/main`}>
+            <Button className="gap-2" variant="default">
+              <Activity className="w-4 h-4" />
+              Painel Avançado do Estúdio
+            </Button>
+          </Link>
+          <p className="text-xs text-muted-foreground mt-1">
+            Controle total de hardware, monitoramento e eventos em tempo real
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-6">
         <nav className="lg:w-56 shrink-0">
@@ -608,26 +647,44 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
                     <span className="vhub-col-label w-20"></span>
                   </div>
                   <div className="divide-y divide-border/40">
-                    {sessions.map((s: any) => (
-                      <div key={s.id} className="vhub-table-row" data-testid={`session-${s.id}`}>
-                        <span className="text-sm font-medium text-foreground flex-1 truncate">{s.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {s.scheduledAt ? format(new Date(s.scheduledAt), "dd/MM/yy HH:mm") : "-"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{s.durationMinutes}min</span>
-                        <StatusBadge status={s.status || "scheduled"} />
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="icon" variant="ghost"
-                            onClick={() => {
-                              setEditSession(s);
-                              const dt = s.scheduledAt ? new Date(s.scheduledAt).toISOString().slice(0, 16) : "";
-                              setEditSessionForm({ title: s.title, scheduledAt: dt, durationMinutes: String(s.durationMinutes || 60), status: s.status || "scheduled" });
-                            }}
-                            data-testid={`button-edit-session-${s.id}`}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
+                    {sessions.map((s: any) => {
+                      const blocked = isSessionBlocked(s);
+                      const timeUntilStart = getTimeUntilStart(s);
+                      
+                      return (
+                        <div key={s.id} className="vhub-table-row" data-testid={`session-${s.id}`}>
+                          <span className="text-sm font-medium text-foreground flex-1 truncate">
+                            {s.title}
+                            {blocked && (
+                              <Badge variant="destructive" className="ml-2 text-xs">
+                                Bloqueada
+                              </Badge>
+                            )}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {s.scheduledAt ? format(new Date(s.scheduledAt), "dd/MM/yy HH:mm") : "-"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{s.durationMinutes}min</span>
+                          <div className="flex items-center gap-1">
+                            <StatusBadge status={s.status || "scheduled"} />
+                            {blocked && timeUntilStart && (
+                              <span className="text-xs text-orange-600 font-medium">
+                                {timeUntilStart}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon" variant="ghost"
+                              onClick={() => {
+                                setEditSession(s);
+                                const dt = s.scheduledAt ? new Date(s.scheduledAt).toISOString().slice(0, 16) : "";
+                                setEditSessionForm({ title: s.title, scheduledAt: dt, durationMinutes: String(s.durationMinutes || 60), status: s.status || "scheduled" });
+                              }}
+                              data-testid={`button-edit-session-${s.id}`}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
                           {isPlatformOwner && (
                             <Button
                               size="icon" variant="ghost"
@@ -640,7 +697,8 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
                           )}
                         </div>
                       </div>
-                    ))}
+                    );
+                    })}
                   </div>
                 </div>
               ) : (

@@ -159,7 +159,7 @@ async function getAuthenticatedUserId(req: any) {
   return typeof userId === "string" && userId ? userId : null;
 }
 
-async function getWsIdentity(sessionId: string, req: any) {
+async function getWsIdentity(studioId: string, req: any) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) return null;
 
@@ -173,21 +173,16 @@ async function getWsIdentity(sessionId: string, req: any) {
   const platformRole = normalizePlatformRole(userRow.role);
   const name = String(userRow.display_name || userRow.full_name || userRow.email || "Usuario");
 
-  const pres = await pool.query(
-    "select role from session_participants where session_id = $1 and user_id = $2 limit 1",
-    [sessionId, userId],
-  );
-  const participantRole = pres.rows?.[0]?.role;
+  let studioRole: string | null = null;
 
-  let studioRole: string | null = participantRole ? normalizeStudioRole(participantRole) : null;
-
-  if (!studioRole && platformRole !== "platform_owner") {
+  if (platformRole === "platform_owner") {
+    studioRole = "platform_owner";
+  } else {
     const studioMembership = await pool.query(
       `select coalesce(usr.role, sm.role) as role
-       from sessions s
-       join studio_memberships sm on sm.studio_id = s.studio_id and sm.user_id = $2 and sm.status = 'approved'
+       from studio_memberships sm
        left join user_studio_roles usr on usr.membership_id = sm.id
-       where s.id = $1
+       where sm.studio_id = $1 and sm.user_id = $2 and sm.status = 'approved'
        order by case
          when coalesce(usr.role, sm.role) = 'studio_admin' then 1
          when coalesce(usr.role, sm.role) = 'diretor' then 2
@@ -197,16 +192,12 @@ async function getWsIdentity(sessionId: string, req: any) {
          else 99
        end
        limit 1`,
-      [sessionId, userId],
+      [studioId, userId],
     );
     const membershipRole = studioMembership.rows?.[0]?.role;
     if (membershipRole) {
       studioRole = normalizeStudioRole(membershipRole);
     }
-  }
-
-  if (!studioRole && platformRole === "platform_owner") {
-    studioRole = "platform_owner";
   }
 
   if (!studioRole) return null;
@@ -217,40 +208,44 @@ async function getWsIdentity(sessionId: string, req: any) {
 export function setupVideoSync(httpServer: Server) {
   const wss = new WebSocketServer({ server: httpServer, path: "/ws/video-sync" });
 
-  wss.on("connection", (ws: WebSocket & { userId?: string; role?: string; name?: string; sessionId?: string }, req) => {
+  wss.on("connection", (ws: WebSocket & { userId?: string; role?: string; name?: string; sessionId?: string; studioId?: string }, req) => {
     (async () => {
       const rawUrl = req.url ?? "";
       const url = new URL(rawUrl, `http://${req.headers.host ?? "localhost"}`);
+      const studioId = url.searchParams.get("studioId");
       const sessionId = url.searchParams.get("sessionId");
 
-      if (!sessionId) {
-        ws.close(1008, "sessionId required");
-        console.log("[WS] Conexão rejeitada: sessionId ausente");
+      if (!studioId) {
+        ws.close(1008, "studioId required");
+        console.log("[WS] Conexão rejeitada: studioId ausente");
         return;
       }
 
-      console.log(`[WS] Nova conexão tentando entrar na sala: ${sessionId}`);
-      const identity = await getWsIdentity(sessionId, req);
+      console.log(`[WS] Nova conexão tentando entrar no estúdio: ${studioId} (Sessão: ${sessionId})`);
+      const identity = await getWsIdentity(studioId, req);
       if (!identity) {
         ws.close(1008, "unauthorized");
-        console.log(`[WS] Conexão rejeitada: não autorizado na sala ${sessionId}`);
+        console.log(`[WS] Conexão rejeitada: não autorizado no estúdio ${studioId}`);
         return;
       }
 
       ws.userId = identity.userId;
       ws.role = identity.role;
       ws.name = identity.name;
-      ws.sessionId = sessionId;
+      ws.studioId = studioId;
+      ws.sessionId = sessionId || undefined;
 
-      if (!rooms.has(sessionId)) rooms.set(sessionId, new Set());
-      rooms.get(sessionId)!.add(ws);
+      const roomKey = studioId; // Use Studio ID as the room key
 
-      const room = rooms.get(sessionId)!;
-      const perms = Array.from(tempPermissions.get(sessionId) || []);
-      const globalControl = globalControlSessions.get(sessionId) || false;
-      const controllerUserIds = Array.from(getTextControllers(sessionId));
+      if (!rooms.has(roomKey)) rooms.set(roomKey, new Set());
+      rooms.get(roomKey)!.add(ws);
+
+      const room = rooms.get(roomKey)!;
+      const perms = Array.from(tempPermissions.get(roomKey) || []);
+      const globalControl = globalControlSessions.get(roomKey) || false;
+      const controllerUserIds = Array.from(getTextControllers(roomKey));
       
-      console.log(`[WS] Usuário ${identity.name} (${identity.role}) entrou na sala ${sessionId}. Total clientes na sala: ${room.size}`);
+      console.log(`[WS] Usuário ${identity.name} (${identity.role}) entrou no estúdio ${roomKey}. Total clientes na sala: ${room.size}`);
 
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "permission-sync", permissions: perms, globalControl } satisfies SyncMessage));
@@ -267,22 +262,23 @@ export function setupVideoSync(httpServer: Server) {
 
     ws.on("message", (data) => {
       try {
-        if (!ws.userId || !ws.role) {
-          console.warn("[WS] Mensagem ignorada: Usuário sem role/id definido");
+        if (!ws.userId || !ws.role || !ws.studioId) {
+          console.warn("[WS] Mensagem ignorada: Usuário sem role/id/studioId definido");
           return;
         }
         const msg = JSON.parse(data.toString()) as SyncMessage;
-        const sessionId = String(ws.sessionId || "");
-        const room = rooms.get(sessionId);
+        const roomKey = ws.studioId; // Use Studio ID as room key
+        const room = rooms.get(roomKey);
+        
         if (!room) {
-          console.warn(`[WS] Sala ${sessionId} não encontrada para mensagem de ${ws.name}`);
+          console.warn(`[WS] Sala (Estúdio) ${roomKey} não encontrada para mensagem de ${ws.name}`);
           return;
         }
 
-        console.log(`[WS] Recebido ${msg.type} de ${ws.name} (${ws.userId}) na sala ${sessionId}`);
+        console.log(`[WS] Recebido ${msg.type} de ${ws.name} (${ws.userId}) no estúdio ${roomKey}`);
 
         const isPrivileged = isPrivilegedStudioRole(ws.role);
-        const controllerUserIds = getTextControllers(sessionId);
+        const controllerUserIds = getTextControllers(roomKey);
         const isController = Boolean(ws.userId && controllerUserIds.has(ws.userId));
 
         if (
@@ -302,43 +298,43 @@ export function setupVideoSync(httpServer: Server) {
           }
 
           if (msg.type === "grant-permission" && msg.targetUserId) {
-            if (!tempPermissions.has(sessionId)) tempPermissions.set(sessionId, new Set());
-            tempPermissions.get(sessionId)!.add(msg.targetUserId);
+            if (!tempPermissions.has(roomKey)) tempPermissions.set(roomKey, new Set());
+            tempPermissions.get(roomKey)!.add(msg.targetUserId);
           } else if (msg.type === "revoke-permission" && msg.targetUserId) {
-            tempPermissions.get(sessionId)?.delete(msg.targetUserId);
+            tempPermissions.get(roomKey)?.delete(msg.targetUserId);
           } else if (msg.type === "toggle-global-control") {
-            globalControlSessions.set(sessionId, !!msg.globalControl);
+            globalControlSessions.set(roomKey, !!msg.globalControl);
           } else if (msg.type === "revoke-all") {
-            tempPermissions.get(sessionId)?.clear();
-            globalControlSessions.set(sessionId, false);
-            textControllerSessions.delete(sessionId);
+            tempPermissions.get(roomKey)?.clear();
+            globalControlSessions.set(roomKey, false);
+            textControllerSessions.delete(roomKey);
           } else if (msg.type === "text-control:set-controller" && msg.targetUserId) {
-            setTextControllers(sessionId, [msg.targetUserId]);
+            setTextControllers(roomKey, [msg.targetUserId]);
           } else if (msg.type === "text-control:clear-controller") {
-            textControllerSessions.delete(sessionId);
+            textControllerSessions.delete(roomKey);
           } else if (msg.type === "text-control:set-controllers") {
             const allowedTargets = (msg.targetUserIds || []).filter((targetUserId) => {
               const target = getRoster(room as any).find((user) => user.userId === targetUserId);
               return canReceiveTextControl(target?.role);
             });
-            setTextControllers(sessionId, allowedTargets);
+            setTextControllers(roomKey, allowedTargets);
           } else if (msg.type === "text-control:grant-controller" && msg.targetUserId) {
             const target = getRoster(room as any).find((user) => user.userId === msg.targetUserId);
             if (!canReceiveTextControl(target?.role)) return;
-            const next = new Set(getTextControllers(sessionId));
+            const next = new Set(getTextControllers(roomKey));
             next.add(msg.targetUserId);
-            setTextControllers(sessionId, next);
+            setTextControllers(roomKey, next);
           } else if (msg.type === "text-control:revoke-controller" && msg.targetUserId) {
             const target = getRoster(room as any).find((user) => user.userId === msg.targetUserId);
             if (!canReceiveTextControl(target?.role)) return;
-            const next = new Set(getTextControllers(sessionId));
+            const next = new Set(getTextControllers(roomKey));
             next.delete(msg.targetUserId);
-            setTextControllers(sessionId, next);
+            setTextControllers(roomKey, next);
           }
 
-          const permissions = Array.from(tempPermissions.get(sessionId) || []);
-          const globalControl = globalControlSessions.get(sessionId) || false;
-          const controllerUserIds = Array.from(getTextControllers(sessionId));
+          const permissions = Array.from(tempPermissions.get(roomKey) || []);
+          const globalControl = globalControlSessions.get(roomKey) || false;
+          const controllerUserIds = Array.from(getTextControllers(roomKey));
           broadcast(room as any, { type: "permission-sync", permissions, globalControl } satisfies SyncMessage);
           broadcast(room as any, { type: "text-control:state", controllerUserIds } satisfies SyncMessage);
           return;
@@ -360,7 +356,14 @@ export function setupVideoSync(httpServer: Server) {
 
           (async () => {
             try {
-              const sessionRes = await pool.query("SELECT production_id FROM recording_sessions WHERE id = $1", [sessionId]);
+              // Try to use the session ID from the WebSocket connection if available
+              const targetSessionId = ws.sessionId;
+              if (!targetSessionId) {
+                console.warn("[WS] Cannot persist script: No session ID linked to WebSocket connection");
+                return;
+              }
+
+              const sessionRes = await pool.query("SELECT production_id FROM recording_sessions WHERE id = $1", [targetSessionId]);
               const productionId = sessionRes.rows[0]?.production_id;
 
               if (productionId) {
@@ -425,7 +428,7 @@ export function setupVideoSync(httpServer: Server) {
         if (msg.type === "text:lock-line") {
           if (!isPrivileged && !isController) return;
           if (typeof msg.lineIndex !== "number") return;
-          const locks = getLineLocks(sessionId);
+          const locks = getLineLocks(roomKey);
           const existing = locks.get(msg.lineIndex);
           // Se já bloqueado por outro, ignora (ou poderia enviar erro)
           if (existing && existing.userId !== ws.userId) {
@@ -437,7 +440,7 @@ export function setupVideoSync(httpServer: Server) {
         if (msg.type === "text:unlock-line") {
           if (!isPrivileged && !isController) return;
           if (typeof msg.lineIndex !== "number") return;
-          const locks = getLineLocks(sessionId);
+          const locks = getLineLocks(roomKey);
           const existing = locks.get(msg.lineIndex);
           
           const isDirector = isDirectorRole(ws.role);
@@ -462,10 +465,10 @@ export function setupVideoSync(httpServer: Server) {
           if (!isPrivileged && !isController) return;
         }
 
-        console.log(`[WS] Fazendo broadcast de ${msg.type} para sala ${sessionId}. Remetente: ${ws.name}`);
+        console.log(`[WS] Fazendo broadcast de ${msg.type} para estúdio ${roomKey}. Remetente: ${ws.name}`);
         
         const clientsInRoom = Array.from(room).map(c => (c as any).name || (c as any).userId);
-        console.log(`[WS] Clientes na sala ${sessionId}: ${clientsInRoom.join(", ")}`);
+        console.log(`[WS] Clientes no estúdio ${roomKey}: ${clientsInRoom.join(", ")}`);
 
         const payload = JSON.stringify({ ...msg, userId: ws.userId });
         let sentCount = 0;
@@ -482,20 +485,22 @@ export function setupVideoSync(httpServer: Server) {
     });
 
     const cleanup = () => {
-      const sessionId = String(ws.sessionId || "");
-      const room = rooms.get(sessionId);
+      const roomKey = ws.studioId;
+      if (!roomKey) return;
+      
+      const room = rooms.get(roomKey);
       if (room) {
         room.delete(ws);
         if (room.size === 0) {
-          rooms.delete(sessionId);
+          rooms.delete(roomKey);
         }
         const roster = getRoster(room as any);
         broadcast(room as any, { type: "presence-sync", users: roster } satisfies SyncMessage);
-        const controllers = getTextControllers(sessionId);
+        const controllers = getTextControllers(roomKey);
         if (controllers.size) {
           const next = new Set(Array.from(controllers).filter((id) => roster.some((u) => u.userId === id)));
           if (next.size !== controllers.size) {
-            setTextControllers(sessionId, next);
+            setTextControllers(roomKey, next);
             broadcast(room as any, { type: "text-control:state", controllerUserIds: Array.from(next) } satisfies SyncMessage);
           }
         }

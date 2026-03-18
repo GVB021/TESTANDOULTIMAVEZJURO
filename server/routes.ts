@@ -413,12 +413,35 @@ async function verifyProductionAccess(req: Request, res: Response, productionId:
   return prod;
 }
 
-async function verifySessionAccess(req: Request, res: Response, sessionId: string): Promise<Session | null> {
+async function verifySessionAccess(req: Request, res: Response, sessionId: string): Promise<any> {
   const session = await storage.getSession(sessionId);
   if (!session) { res.status(404).json({ message: "Sessao nao encontrada" }); return null; }
+  
   const user = (req as any).user!;
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
+
+  // Verificar se a sessão está agendada para o futuro
+  const now = new Date();
+  const scheduledTime = new Date(session.scheduledAt);
+  
+  // Permitir acesso para platform_owner, master e diretores mesmo antes do horário
+  const isAdmin = user.role === "platform_owner" || isMaster;
+  const studioRoles = (await storage.getUserRolesInStudio(user.id, session.studioId)).map(normalizeStudioRole);
+  const isDirector = studioRoles.includes("diretor");
+  
+  if (!isAdmin && !isDirector && scheduledTime > now) {
+    const timeUntilStart = scheduledTime.getTime() - now.getTime();
+    const minutesUntilStart = Math.ceil(timeUntilStart / (1000 * 60));
+    
+    return res.status(403).json({ 
+      message: "Sessao bloqueada ate o horario de inicio",
+      scheduledAt: session.scheduledAt,
+      minutesUntilStart,
+      canAccess: false,
+      sessionTitle: session.title
+    });
+  }
 
   if (user.role === "platform_owner" || isMaster) return session;
   const hasAccess = await storage.verifyUserStudioAccess(user.id, session.studioId);
@@ -1083,6 +1106,171 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       res.status(200).json({ ok: true, format: payload.format });
     } catch (err) {
       res.status(400).json({ message: "Formato de timecode inválido" });
+    }
+  });
+
+  // STUDIO HARDWARE CONFIG
+  app.get("/api/studios/:studioId/hardware-config", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+    try {
+      const key = `studio_hardware_config_${req.params.studioId}`;
+      const config = await storage.getSetting(key);
+      
+      if (!config) {
+        // Return default config
+        const defaultConfig = {
+          sampleRate: 44100,
+          bufferSize: 256,
+          latencyTarget: 20,
+          allowedFormats: ['WAV', 'MP3']
+        };
+        return res.status(200).json(defaultConfig);
+      }
+      
+      res.status(200).json(JSON.parse(config));
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar configurações de hardware" });
+    }
+  });
+
+  app.put("/api/studios/:studioId/hardware-config", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+    try {
+      const payload = z.object({
+        sampleRate: z.union([z.literal(44100), z.literal(48000)]),
+        bufferSize: z.union([z.literal(128), z.literal(256), z.literal(512), z.literal(1024)]),
+        latencyTarget: z.union([z.literal(10), z.literal(20), z.literal(50)]),
+        allowedFormats: z.array(z.enum(["WAV", "MP3", "M4A"])),
+      }).parse(req.body);
+      
+      const key = `studio_hardware_config_${req.params.studioId}`;
+      await storage.upsertSetting(key, JSON.stringify(payload));
+      
+      await storage.createAuditLog({
+        userId: (req as any).user?.id || null,
+        action: "studio.hardware_config.updated",
+        details: JSON.stringify({ studioId: req.params.studioId, config: payload }),
+      });
+      
+      res.status(200).json(payload);
+    } catch (err) {
+      res.status(400).json({ message: "Configurações de hardware inválidas" });
+    }
+  });
+
+  // STUDIO MONITORING LOGS
+  app.get("/api/studios/:studioId/monitoring/logs", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+    try {
+      // Get audit logs for this studio
+      const auditLogs = await storage.getAuditLogs();
+      const studioLogs = auditLogs.filter(log => {
+        try {
+          const details = JSON.parse(log.details || '{}');
+          return details.studioId === req.params.studioId || 
+                 log.action?.includes('studio') ||
+                 log.action?.includes('take') ||
+                 log.action?.includes('recording') ||
+                 log.action?.includes('upload');
+        } catch {
+          return false;
+        }
+      });
+
+      // Transform to simplified format
+      const simplifiedLogs = studioLogs.map(log => {
+        const details = JSON.parse(log.details || '{}');
+        let type = 'access';
+        let message = 'Atividade registrada';
+
+        if (log.action?.includes('recording')) {
+          type = 'recording';
+          message = log.action?.includes('started') ? 'Iniciou gravação' : 'Parou gravação';
+        } else if (log.action?.includes('upload')) {
+          type = 'upload';
+          message = log.action?.includes('completed') ? 'Concluiu upload' : 'Iniciou upload';
+        } else if (log.action?.includes('error')) {
+          type = 'error';
+          message = 'Erro detectado';
+        } else if (log.action?.includes('access') || log.action?.includes('login')) {
+          type = 'access';
+          message = log.action?.includes('login') ? 'Acessou o sistema' : 'Entrou no estúdio';
+        }
+
+        return {
+          id: log.id,
+          type,
+          message,
+          timestamp: log.createdAt,
+          userId: log.userId,
+          userName: details.userName || details.userDisplayName || 'Usuário',
+          action: log.action,
+          details: log.details
+        };
+      });
+
+      res.status(200).json(simplifiedLogs);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar logs de monitoramento" });
+    }
+  });
+
+  // STUDIO SESSIONS STATUS
+  app.get("/api/studios/:studioId/sessions/status", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+    try {
+      const sessions = await storage.getSessions(req.params.studioId);
+      const sessionsWithStatus = sessions.map(session => ({
+        id: session.id,
+        title: session.title,
+        status: session.status,
+        scheduledAt: session.scheduledAt,
+        startedAt: null, // TODO: Add to session schema if needed
+        completedAt: null, // TODO: Add to session schema if needed
+        participantCount: 0, // TODO: Calculate from participants table
+        productionName: session.productionId || 'Sem produção'
+      }));
+      
+      res.status(200).json(sessionsWithStatus);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar status das sessões" });
+    }
+  });
+
+  // SESSION STATUS ENDPOINT
+  app.get("/api/sessions/:sessionId/status", requireAuth, async (req, res) => {
+    try {
+      const session = await storage.getSession(req.params.sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Sessão não encontrada" });
+      }
+
+      const user = (req as any).user!;
+      const now = new Date();
+      const scheduledTime = new Date(session.scheduledAt);
+      
+      // Verificar permissões especiais
+      const email = String(user?.email || "").toLowerCase().trim();
+      const isMaster = email === "borbaggabriel@gmail.com";
+      const isAdmin = user.role === "platform_owner" || isMaster;
+      const studioRoles = (await storage.getUserRolesInStudio(user.id, session.studioId)).map(normalizeStudioRole);
+      const isDirector = studioRoles.includes("diretor");
+      
+      const hasSpecialAccess = isAdmin || isDirector;
+      const canAccess = hasSpecialAccess || scheduledTime <= now;
+      
+      let minutesUntilStart = 0;
+      if (!canAccess && scheduledTime > now) {
+        const timeUntilStart = scheduledTime.getTime() - now.getTime();
+        minutesUntilStart = Math.ceil(timeUntilStart / (1000 * 60));
+      }
+
+      res.json({
+        canAccess,
+        scheduledAt: session.scheduledAt,
+        minutesUntilStart,
+        hasSpecialAccess,
+        sessionTitle: session.title,
+        productionId: session.productionId
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao verificar status da sessão" });
     }
   });
 

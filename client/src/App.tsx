@@ -45,9 +45,9 @@ const Sessions = lazyWithRetry(() => import("@studio/pages/sessions"));
 const RecordingRoom = lazyWithRetry(() => import("@studio/pages/room"));
 const Staff = lazyWithRetry(() => import("@studio/pages/staff"));
 const Admin = lazyWithRetry(() => import("@studio/pages/admin"));
-const Notifications = lazyWithRetry(() => import("@studio/pages/notifications"));
-const Members = lazyWithRetry(() => import("@studio/pages/members"));
 const StudioAdmin = lazyWithRetry(() => import("@studio/pages/studio-admin"));
+const StudioMain = lazyWithRetry(() => import("@studio/pages/admin/StudioMain"));
+const Members = lazyWithRetry(() => import("@studio/pages/members"));
 const Takes = lazyWithRetry(() => import("@studio/pages/takes"));
 const Profile = lazyWithRetry(() => import("@studio/pages/profile"));
 const Daw = lazyWithRetry(() => import("@studio/pages/daw"));
@@ -189,7 +189,7 @@ function Router() {
           </Route>
 
           <Route path="/hub-dub/studio/:studioId/notifications">
-            {params => <ProtectedRoute component={Notifications} requireStudio params={params} />}
+            {params => <ProtectedRoute component={Notification} requireStudio params={params} />}
           </Route>
 
           <Route path="/hub-dub/studio/:studioId/takes">
@@ -198,6 +198,10 @@ function Router() {
 
           <Route path="/hub-dub/studio/:studioId/admin">
             {params => <ProtectedRoute component={StudioAdmin} requireStudio params={params} />}
+          </Route>
+
+          <Route path="/hub-dub/studio/:studioId/admin/main">
+            {params => <ProtectedRoute component={StudioMain} requireStudio params={params} />}
           </Route>
 
           <Route path="/hub-dub/studio/:studioId/sessions/:sessionId/room">

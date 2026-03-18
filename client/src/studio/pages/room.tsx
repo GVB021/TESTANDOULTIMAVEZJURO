@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
+import SessionBlockedScreen from "@studio/pages/admin/components/SessionBlockedScreen";
 import { useToast } from "@studio/hooks/use-toast";
 import { useAuth } from "@studio/hooks/use-auth";
 import {
@@ -536,7 +537,7 @@ function DirectorEntryModal({
 }) {
   return (
     <Dialog open={isOpen}>
-      <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800 text-white" hideClose>
+      <DialogContent className="sm:max-w-[425px] bg-zinc-950 border-zinc-800 text-white">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold flex items-center gap-2">
             <Monitor className="w-5 h-5 text-primary" />
@@ -579,7 +580,7 @@ const [recordingsSearch, setRecordingsSearch] = useState("");
 const [recordingsScope, setRecordingsScope] = useState<"all" | "mine">("mine");
 const [recordingsDateFrom, setRecordingsDateFrom] = useState("");
 const [recordingsDateTo, setRecordingsDateTo] = useState("");
-const [recordingsSortBy, setRecordingsSortBy] = useState("createdAt");
+const [recordingsSortBy, setRecordingsSortBy] = useState<"createdAt" | "durationSeconds" | "lineIndex" | "characterName">("createdAt");
 const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
 
 // Modal state
@@ -591,32 +592,30 @@ const videoRef = useRef<HTMLVideoElement>(null);
 const desktopVideoTextContainerRef = useRef<HTMLDivElement>(null);
 const scriptViewportRef = useRef<HTMLDivElement>(null);
 const lineRefs = useRef<Record<number, HTMLDivElement | null>>({});
-const scrollAnchorsRef = useRef<Record<number, number>>({});
+const scrollAnchorsRef = useRef<ScrollAnchor[]>([]);
 const scrollSyncRafRef = useRef<number | null>(null);
-const scrollSyncLastTsRef = useRef<number>(0);
+const scrollSyncLastTsRef = useRef<number | null>(null);
 const scrollSyncCurrentRef = useRef<number>(0);
 const scrollSyncLastVideoTimeRef = useRef<number>(0);
-const loopSilenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const loopSilenceTimeoutRef = useRef<number | null>(null);
 const loopSilenceLockRef = useRef<boolean>(false);
 const previewAudioRef = useRef<HTMLAudioElement>(null);
 const recordingsPreviewAudioRef = useRef<HTMLAudioElement>(null);
-const recordingRowAudioRefs = useRef<Record<string, HTMLAudioElement>>({});
-const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const recordingRowAudioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
+const controlsTimeoutRef = useRef<number | null>(null);
 const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
 // Additional state
 const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
 const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
-const [recordingsIsLoading, setRecordingsIsLoading] = useState(false);
 const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
 const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
 const [sideScriptWidth, setSideScriptWidth] = useState(320);
 const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
 const [scriptFontSize, setScriptFontSize] = useState(16);
 const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
-const [recordingAvailability, setRecordingAvailability] = useState<Record<string, boolean>>({});
+const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
 const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
-const [textControllerUserIds, setTextControllerUserIds] = useState<string[]>([]);
 const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
 const [studioTimecode, setStudioTimecode] = useState<any>(null);
 const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
@@ -625,11 +624,16 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const studioRole = useStudioRole(studioId, sessionId);
+  const studioRole = useStudioRole(studioId);
 
   // WebSocket state
   const [wsConnected, setWsConnected] = useState(false);
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
+  const [clientAcks, setClientAcks] = useState<Record<string, any>>({});
+  const [lockedLines, setLockedLines] = useState<Record<number, any>>({});
+  const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
+const [lastUploadedTakeId, setLastUploadedTakeId] = useState<string | null>(null);
+const [isWaitingReview, setIsWaitingReview] = useState(false);
 
   // Data fetching hooks
   const { data: session, isLoading: sessionLoading, error: sessionError } = useSessionData(studioId || "", sessionId || "");
@@ -647,13 +651,22 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
 
+  // Session access state
+  const [sessionAccessStatus, setSessionAccessStatus] = useState<{
+    canAccess: boolean;
+    scheduledAt?: Date;
+    minutesUntilStart?: number;
+    sessionTitle?: string;
+    hasSpecialAccess?: boolean;
+  } | null>(null);
+
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [videoTime, setVideoTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [teleprompterSpeed, setTeleprompterSpeed] = useState(1.0);
-  const [timecodeFormat, setTimecodeFormat] = useState<TimecodeFormat>("seconds");
+  const [timecodeFormat, setTimecodeFormat] = useState<TimecodeFormat>("HH:MM:SS");
   const [scriptAutoFollow, setScriptAutoFollow] = useState(() => {
     try {
       const saved = sessionStorage.getItem(`vhub_script_follow_${sessionId}`);
@@ -666,22 +679,29 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
   // Script editing state
   const [lineOverrides, setLineOverrides] = useState<Record<number, ScriptLineOverride>>({});
   const [lineEditHistory, setLineEditHistory] = useState<Record<number, Array<{ field: string; before: string; after: string; by: string }>>>({});
-  const [editingField, setEditingField] = useState<{ lineIndex: number; field: "character" | "text" } | null>(null);
+  const [editingField, setEditingField] = useState<{ lineIndex: number; field: "character" | "text" | "timecode" } | null>(null);
   const [editingDraftValue, setEditingDraftValue] = useState("");
   const [currentLine, setCurrentLine] = useState(0);
+  const [charSelectorOpen, setCharSelectorOpen] = useState(false);
   const [onlySelectedCharacter, setOnlySelectedCharacter] = useState(false);
 
   // Recording state
   const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(null);
   const [micReady, setMicReady] = useState(false);
-  const [micState, setMicState] = useState<"idle" | "requesting" | "granted" | "denied" | "error">("idle");
-  const [recordingStatus, setRecordingStatus] = useState<"idle" | "countdown" | "recording" | "stopped">("idle");
+  const [micState, setMicState] = useState<any>("idle");
+  const [recordingStatus, setRecordingStatus] = useState<"idle" | "countdown" | "recording" | "stopped" | "recorded">("idle");
   const [countdownValue, setCountdownValue] = useState(0);
   const [lastRecording, setLastRecording] = useState<any>(null);
   const [qualityMetrics, setQualityMetrics] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingTake, setPendingTake] = useState<any>(null);
   const [reviewingTake, setReviewingTake] = useState<any>(null);
+  const [recordingsIsLoading, setRecordingsIsLoading] = useState<Set<string>>(new Set());
+  const loopPreparationTimeoutRef = useRef<any>(null);
+  const countdownTimerRef = useRef<any>(null);
+  const [loopAnchorIndex, setLoopAnchorIndex] = useState<number | null>(null);
+  const [textControllerUserIds, setTextControllerUserIds] = useState<Set<string>>(new Set());
+  const [recordingsPlayerOpenId, setRecordingsPlayerOpenId] = useState<string | null>(null);
 
   // Loop state
   const [isLooping, setIsLooping] = useState(false);
@@ -696,7 +716,14 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     inputDeviceId: "default",
     inputGain: 1.0,
     outputDeviceId: "default",
+    monitorVolume: 1.0,
   });
+  const [hasPersistedDeviceSettings, setHasPersistedDeviceSettings] = useState(false);
+  const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
+  const [volumeOverlay, setVolumeOverlay] = useState<number | null>(null);
+  const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
+  const [preRoll, setPreRoll] = useState(1);
+  const [postRoll, setPostRoll] = useState(1);
 
   // Shortcuts
   const [shortcuts, setShortcuts] = useState<Shortcuts>(() => {
@@ -714,6 +741,17 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     console.info(`[AudioPipeline][Room] ${step}`, payload || {});
   }, []);
 
+  const logFeatureAudit = useCallback((feature: string, action: string, details?: Record<string, unknown>) => {
+    console.info(`[Audit][${feature}] ${action}`, details || {});
+  }, []);
+
+  // Permission calculations - moved here to be used in useEffect
+  const uiRole = resolveUiRole(studioRole?.role, false);
+  const canTextControl = hasUiPermission(uiRole, "text_control");
+  const canManageAudio = hasUiPermission(uiRole, "audio_control");
+  const canApproveTake = hasUiPermission(uiRole, "approve_take");
+  const canViewOnlineUsers = hasUiPermission(uiRole, "presence_view");
+
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 1024);
@@ -724,6 +762,106 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Session access verification
+  const checkSessionAccess = useCallback(async () => {
+    if (!sessionId) return;
+    
+    try {
+      const response = await authFetch(`/api/sessions/${sessionId}/status`);
+      if (!response.canAccess) {
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const scheduledAt = new Date(response.scheduledAt);
+        
+        // Converter para o fuso horário do usuário
+        const localScheduledAt = new Date(scheduledAt.toLocaleString("en-US", { timeZone: userTimezone }));
+        
+        setSessionAccessStatus({
+          canAccess: false,
+          scheduledAt: localScheduledAt,
+          minutesUntilStart: response.minutesUntilStart,
+          sessionTitle: response.sessionTitle,
+          hasSpecialAccess: response.hasSpecialAccess
+        });
+      } else {
+        setSessionAccessStatus({ canAccess: true });
+      }
+    } catch (err) {
+      console.error('Erro ao verificar acesso à sessão:', err);
+      // Se der erro, permitir acesso (fallback)
+      setSessionAccessStatus({ canAccess: true });
+    }
+  }, [sessionId]);
+
+  // Check session access on mount and periodically
+  useEffect(() => {
+    if (!sessionId) return;
+    
+    checkSessionAccess();
+    
+    // Verificar a cada 30 segundos se estiver bloqueado
+    const interval = setInterval(() => {
+      if (sessionAccessStatus?.canAccess === false) {
+        checkSessionAccess();
+      }
+    }, 30000);
+    
+    return () => clearInterval(interval);
+  }, [sessionId, checkSessionAccess, sessionAccessStatus?.canAccess]);
+
+  // WebSocket event emitters
+  const emitVideoEvent = useCallback((type: string, data: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: `video:${type}`, ...data }));
+    }
+  }, []);
+
+  const emitTextControlEvent = useCallback((type: string, data: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type, ...data }));
+    }
+  }, [presenceUsers]);
+
+  const handleCharacterChange = useCallback((character: any) => {
+    setRecordingProfile((prev) => prev ? { ...prev, characterId: character.id, characterName: character.name } : null);
+  }, []);
+
+  const handleVideoTouchStart = useCallback((e: React.TouchEvent) => {
+    // Handle video touch start
+  }, []);
+
+  const handleVideoTouchMove = useCallback((e: React.TouchEvent) => {
+    // Handle video touch move
+  }, []);
+  const applyScriptLinePatch = useCallback((lineIndex: number, patch: ScriptLineOverride) => {
+    if (!Number.isInteger(lineIndex) || lineIndex < 0) return;
+    setLineOverrides((prev) => {
+      const current = prev[lineIndex] || {};
+      return {
+        ...prev,
+        [lineIndex]: { ...current, ...patch },
+      };
+    });
+  }, []);
+
+  const pushEditHistory = useCallback((lineIndex: number, field: "character" | "text" | "timecode", before: string, after: string, by: string) => {
+    if (before === after) return;
+    const entry = {
+      id: `${lineIndex}_${field}_${Date.now()}`,
+      field,
+      before,
+      after,
+      at: new Date().toISOString(),
+      by,
+    };
+    setLineEditHistory((prev) => {
+      const list = prev[lineIndex] || [];
+      return {
+        ...prev,
+        [lineIndex]: [entry, ...list].slice(0, 25),
+      };
+    });
+  }, []);
 
   // WebSocket connection
   useEffect(() => {
@@ -820,8 +958,10 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
           }
         } else if (msg.type === "video:countdown" || msg.type === "video:countdown-start" || msg.type === "video:countdown-tick") {
           setCountdownValue(msg.count);
-          if (msg.count > 0 && micState?.audioContext) {
-            playCountdownBeep(micState.audioContext);
+          if (msg.count > 0) {
+            // Create audio context for beep
+            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            playCountdownBeep(audioContext);
           }
         } else if (msg.type === "video:loop-preparing") {
           setLoopPreparing(true);
@@ -856,7 +996,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
           }
         } else if (msg.type === "text-control:set-controllers" || msg.type === "text-control:state") {
           const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
-          setTextControllerUserIds(new Set(ids || []));
+          setTextControllerUserIds(new Set(Array.from(new Set(ids || []))));
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
         } else if (msg.type === "video:take-ready-for-review") {
@@ -1065,7 +1205,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
       }
       await queryClient.invalidateQueries({ queryKey: takesQueryKey });
       await queryClient.invalidateQueries({ queryKey: recordingsQueryKey, exact: false });
-      await logFeatureAudit(canDeletePermanently ? "room.take.deleted" : "room.take.discarded", { takeId });
+      await logFeatureAudit("room.take", canDeletePermanently ? "deleted" : "discarded", { takeId });
       toast({ title: canDeletePermanently ? "Take excluído permanentemente" : "Take descartado" });
       setDiscardModalTake(null);
       setDiscardFinalStep(false);
@@ -1105,9 +1245,9 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     const handleActivity = () => {
       setControlsVisible(true);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      controlsTimeoutRef.current = setTimeout(() => {
+      controlsTimeoutRef.current = window.setTimeout(() => {
         setControlsVisible(false);
-      }, 3000);
+      }, 3000) as unknown as number;
     };
 
     window.addEventListener("mousemove", handleActivity);
@@ -1178,16 +1318,11 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     if (participantRole) return normalizeRoomRole(participantRole);
     return normalizeRoomRole(user?.role);
   }, [session?.participants, user?.id, user?.role]);
-  const uiRole = useMemo(() => resolveUiRole(mySessionRole, Boolean(user?.id && textControllerUserIds.has(user.id))), [mySessionRole, user?.id, textControllerUserIds]);
   const isPlatformOwner = useMemo(() => {
     const rawRole = String(user?.role || "").trim().toLowerCase();
-    return rawRole === "platform_owner" || rawRole === "master";
+    return rawRole === "platform_owner" || rawRole === "master" || rawRole === "admin";
   }, [user?.role]);
   const canReleaseText = hasUiPermission(uiRole, "text_control");
-  const canTextControl = hasUiPermission(uiRole, "text_control");
-  const canViewOnlineUsers = hasUiPermission(uiRole, "presence_view");
-  const canManageAudio = hasUiPermission(uiRole, "audio_control");
-  const canApproveTake = hasUiPermission(uiRole, "approve_take");
   const canDiscardTake = isPlatformOwner;
   const canAccessDashboard = hasUiPermission(uiRole, "dashboard_access");
   const isPrivileged = canManageAudio || canTextControl;
@@ -1201,7 +1336,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
       scopedRecordings.forEach((take: any) => {
         const id = String(take?.id || "");
         if (!id) return;
-        next[id] = prev[id] || (take?.audioUrl || take?.id ? "loading" : "error");
+        next[id] = prev[id] || (take?.audioUrl || take?.id ? "available" : "error");
       });
       return next;
     });
@@ -1250,47 +1385,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
     return presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role));
   }, [presenceUsers]);
 
-  const emitVideoEvent = useCallback((type: string, data: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type: `video:${type}`, ...data }));
-    }
-  }, []);
-
-  const emitTextControlEvent = useCallback((type: string, data: any) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ type, ...data }));
-    }
-  }, []);
-
-  const applyScriptLinePatch = useCallback((lineIndex: number, patch: ScriptLineOverride) => {
-    if (!Number.isInteger(lineIndex) || lineIndex < 0) return;
-    setLineOverrides((prev) => {
-      const current = prev[lineIndex] || {};
-      return {
-        ...prev,
-        [lineIndex]: { ...current, ...patch },
-      };
-    });
-  }, []);
-
-  const pushEditHistory = useCallback((lineIndex: number, field: "character" | "text" | "timecode", before: string, after: string, by: string) => {
-    if (before === after) return;
-    const entry = {
-      id: `${lineIndex}_${field}_${Date.now()}`,
-      field,
-      before,
-      after,
-      at: new Date().toISOString(),
-      by,
-    };
-    setLineEditHistory((prev) => {
-      const list = prev[lineIndex] || [];
-      return {
-        ...prev,
-        [lineIndex]: [entry, ...list].slice(0, 25),
-      };
-    });
-  }, []);
+  // Note: applyScriptLinePatch and pushEditHistory moved above to avoid hoisting issues
 
   const rebuildScrollAnchors = useCallback(() => {
     const viewport = scriptViewportRef.current;
@@ -1782,8 +1877,8 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
       countdownTimerRef.current = null;
     }
     setCountdownValue(0);
-    logAudioStep("stop-requested", { captureMode: micState.captureMode });
-    const result = await stopCapture(micState);
+    logAudioStep("stop-requested", { state: micState });
+    const result = await stopCapture(micState as any);
     if (!result.samples.length) {
       toast({ title: "Sem áudio capturado", description: "Nenhum sample foi registrado. Verifique microfone e ganho.", variant: "destructive" });
       setRecordingStatus("idle");
@@ -1897,7 +1992,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
         toast({ title: "Salvamento acima da meta", description: `${Math.round(elapsedMs)}ms`, variant: "destructive" });
       }
       toast({ title: "Take gravado com sucesso" });
-      await logFeatureAudit("room.take.auto_saved", { lineIndex: pendingTake.lineIndex });
+      await logFeatureAudit("room.take", "auto_saved", { lineIndex: pendingTake.lineIndex });
       
       // Cleanup
       URL.revokeObjectURL(pendingTake.url);
@@ -2029,7 +2124,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
       setPostRoll(calculatedPostRoll);
       toast({ title: "Loop definido", description: "Preroll de 3s e posroll adaptativo aplicados." });
       emitVideoEvent("sync-loop", { loopRange: { start, end } });
-      logFeatureAudit("room.loop.defined", { start, end, startLineIndex: normalizedStartIndex, endLineIndex: normalizedEndIndex });
+      logFeatureAudit("room.loop", "defined", { start, end, startLineIndex: normalizedStartIndex, endLineIndex: normalizedEndIndex });
     } else {
       const video = videoRef.current;
       if (video) {
@@ -2049,14 +2144,14 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
       setLoopAnchorIndex(null);
       setPreRoll(1);
       setPostRoll(1);
-      await logFeatureAudit("room.loop.cleared");
+      await logFeatureAudit("room.loop", "cleared");
       return;
     }
     setLoopSelectionMode("selecting-start");
     setCustomLoop(null);
     setLoopRangeMeta(null);
     setLoopAnchorIndex(null);
-    await logFeatureAudit("room.loop.selection_started");
+    await logFeatureAudit("room.loop", "selection_started");
     toast({ title: "Selecione a primeira fala do loop" });
   }, [loopSelectionMode, customLoop, logFeatureAudit, toast]);
 
@@ -2748,7 +2843,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
                                 return;
                               }
 
-                              setRecordingAvailability((prev) => ({ ...prev, [takeId]: "loading" }));
+                              setRecordingAvailability((prev) => ({ ...prev, [String(takeId)]: "loading" }));
                               const resolvedUrl = await resolveTakePlayableUrl(take);
                               if (recordingsPreviewAudioRef.current) {
                                 recordingsPreviewAudioRef.current.src = resolvedUrl;
@@ -2804,7 +2899,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
                     {recordingsPlayerOpenId === take.id && (
                       <div className="mt-2 pl-[16.8%]">
                         <audio
-                          ref={(node) => { recordingRowAudioRefs.current[String(take.id)] = node; }}
+                          ref={(node: HTMLAudioElement | null) => { recordingRowAudioRefs.current[String(take.id)] = node; }}
                           controls
                           className="w-full h-8"
                           src={recordingPlayableUrls[String(take.id)] || getTakeStreamUrl(take)}
@@ -2927,7 +3022,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
           
           <div className="relative ml-2">
             <button
-              onClick={() => setCharSelectorOpen((v) => !v)}
+              onClick={() => setCharSelectorOpen((v: boolean) => !v)}
               className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1.5"
               data-testid="button-character-selector"
             >
@@ -2980,7 +3075,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
                       const next = !scriptAutoFollow;
                       setScriptAutoFollow(next);
                       if (next) syncScrollToCurrentVideoTime();
-                      logFeatureAudit("room.scroll.mode_changed", { mode: next ? "automatic" : "manual" });
+                      logFeatureAudit("room.scroll", "mode_changed", { mode: next ? "automatic" : "manual" });
                     }}
                     className={cn(
                       "w-8 h-8 rounded-lg flex items-center justify-center transition-all border",
@@ -3004,7 +3099,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
                     onClick={() => {
                       const next = !onlySelectedCharacter;
                       setOnlySelectedCharacter(next);
-                      logFeatureAudit("room.character_filter.toggled", { enabled: next, character: recordingProfile?.characterName || null });
+                      logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
                     }}
                     disabled={!recordingProfile}
                     className={cn(
@@ -3102,7 +3197,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
               {canAccessDashboard && (
                 <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
                   <button
-                    onClick={() => { logFeatureAudit("room.panel.redirect", { studioId }); }}
+                    onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); }}
                     className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
                     data-testid="button-room-panel"
                   >
@@ -3803,7 +3898,7 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
                       {canAccessDashboard && (
                         <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
                           <button
-                            onClick={() => { logFeatureAudit("room.panel.redirect", { studioId }); setMobileMenuOpen(false); }}
+                            onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); setMobileMenuOpen(false); }}
                             className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
                             data-testid="button-mobile-room-panel"
                           >
@@ -3881,11 +3976,21 @@ const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
         )}
       </AnimatePresence>
 
+      {/* Session Access Blocking */}
+      {sessionAccessStatus && !sessionAccessStatus.canAccess && sessionAccessStatus.scheduledAt && (
+        <SessionBlockedScreen
+          scheduledAt={sessionAccessStatus.scheduledAt}
+          minutesUntilStart={sessionAccessStatus.minutesUntilStart || 0}
+          sessionTitle={sessionAccessStatus.sessionTitle || ""}
+          productionName={production?.name}
+        />
+      )}
+
       {/* Director Entry Modal and Blocking Overlay */}
       {isDirector && !directorControlConfirmed && (
         <DirectorEntryModal
+          isOpen={true}
           studioId={studioId}
-          sessionId={sessionId}
           onConfirm={() => setDirectorControlConfirmed(true)}
         />
       )}
