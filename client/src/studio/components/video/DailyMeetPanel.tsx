@@ -219,7 +219,7 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
 
   return (
     <AnimatePresence>
-      {isOpen && (
+      {(isOpen || mode === "embedded") && (
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

@@ -236,7 +236,7 @@ export function RecordingsPanel({
                           "w-7 h-7 rounded-md flex items-center justify-center transition-all",
                           isPreviewActive && !recordingsPlayerOpenId
                             ? "bg-primary/20 text-primary hover:bg-primary/30"
-                            : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white",
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground",
                           isLoading && "opacity-50 cursor-not-allowed"
                         )}
                         title={isPreviewActive ? "Pausar" : "Tocar"}
