@@ -150,7 +150,7 @@ import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
 import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview } from "@studio/components/room/modals/DirectorReview";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
-import { MobileMenu } from "@studio/components/room/mobile/MobileMenu";
+import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
 
 const DEFAULT_SHORTCUTS: Shortcuts = {
   playPause: "Space",
@@ -3918,108 +3918,23 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               <Edit3 className="w-5 h-5" />
             </button>
 
-            <Drawer.Root open={scriptOpen} onOpenChange={setScriptOpen}>
-              <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110]" />
-                <Drawer.Content className="room-bg-elevated flex flex-col rounded-t-[32px] h-[85vh] fixed bottom-0 left-0 right-0 z-[120] outline-none">
-                  <div className="p-6 flex-1 flex flex-col overflow-hidden">
-                    <div className="mx-auto w-12 h-1.5 flex-shrink-0 rounded-full bg-muted mb-8" />
-                    <div className="flex items-center justify-between mb-6">
-                      <h2 className="text-xl font-bold text-white">Roteiro</h2>
-                      <div className="flex items-center gap-2">
-                        {/* Controles de fonte mobile */}
-                        <div className="flex items-center gap-1 mr-2">
-                          <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 10} className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all">
-                            <Minus className="w-3 h-3" />
-                          </button>
-                          <span className="text-xs font-mono w-6 text-center text-white/70">{scriptFontSize}</span>
-                          <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 36} className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all">
-                            <Plus className="w-3 h-3" />
-                          </button>
-                        </div>
-                        <button onClick={() => setScriptOpen(false)} className="p-2 rounded-full bg-white/5 text-white/40">
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                    <div className="flex-1 overflow-y-auto pb-20">
-                      {displayedScriptLines.map((line) => {
-                        const i = line.originalIndex;
-                        const isActive = i === currentLine;
-                        const isDone = savedTakes.has(i);
-                        const lock = lockedLines[i];
-                        const isLockedByOther = lock && lock.userId !== user?.id;
-                        const lockingUser = isLockedByOther ? presenceUsers.find(u => u.userId === lock.userId)?.name || "Alguém" : null;
-                        const liveText = isLockedByOther && liveDrafts[i] ? liveDrafts[i] : line.text;
-                        return (
-                          <div
-                            key={i}
-                            onClick={() => { handleLineClick(i); setScriptOpen(false); }}
-                            className={cn(
-                              "mb-4 px-6 py-5 rounded-2xl transition-all border",
-                              isActive ? "bg-primary/10 border-primary/25 shadow-lg shadow-primary/5" : "bg-white/[0.03] border-white/[0.06]"
-                            )}
-                          >
-                            <div className="flex items-center gap-2 mb-3">
-                              <span className="text-[11px] font-mono text-white/30">#{i + 1} · {formatLiveTimecode(line.start)}</span>
-                              <span className={cn("text-sm font-bold uppercase tracking-widest", isActive ? "text-primary" : "text-white/40")}>
-                                {line.character}
-                              </span>
-                              {isDone && <CheckCircle2 className="w-4 h-4 ml-auto text-emerald-500" />}
-                              {/* Botão de edição mobile */}
-                              {canTextControl && !isLockedByOther && (
-                                <div className="ml-auto">
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <button
-                                        onClick={(event) => event.stopPropagation()}
-                                        className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 hover:border-primary/30 transition-all flex items-center justify-center"
-                                        title="Editar linha"
-                                      >
-                                        <Edit3 className="w-3 h-3" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-32">
-                                      <DropdownMenuItem 
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          startInlineEdit(i, "character");
-                                        }}
-                                      >
-                                        Personagem
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem 
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          startInlineEdit(i, "text");
-                                        }}
-                                      >
-                                        Fala
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem 
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          startInlineEdit(i, "timecode");
-                                        }}
-                                      >
-                                        Timecode
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              )}
-                            </div>
-                            <p className={cn("leading-relaxed", isActive ? "text-white font-medium" : "text-white/50")} style={{ fontSize: `${scriptFontSize}px` }}>
-                              {line.text}
-                            </p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </Drawer.Content>
-              </Drawer.Portal>
-            </Drawer.Root>
+            <MobileScriptDrawer
+              open={scriptOpen}
+              onOpenChange={setScriptOpen}
+              lines={displayedScriptLines}
+              currentLine={currentLine}
+              scriptFontSize={scriptFontSize}
+              onFontSizeChange={changeScriptFontSize}
+              savedTakes={savedTakes}
+              lockedLines={lockedLines}
+              liveDrafts={liveDrafts}
+              userId={user?.id}
+              presenceUsers={presenceUsers}
+              canTextControl={canTextControl}
+              formatTimecode={formatLiveTimecode}
+              onLineClick={handleLineClick}
+              onEditField={startInlineEdit}
+            />
           </>
         )}
       </AnimatePresence>
