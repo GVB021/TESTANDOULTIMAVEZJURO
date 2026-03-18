@@ -972,18 +972,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
   const [scriptFontSize, setScriptFontSize] = useState(16);
 
-  const FONT_SIZES = [
-    { label: "Muito Pequeno", value: 10 },
-    { label: "Pequeno", value: 12 },
-    { label: "Normal", value: 16 },
-    { label: "Médio", value: 18 },
-    { label: "Grande", value: 20 },
-    { label: "Muito Grande", value: 24 },
-    { label: "Extra Grande", value: 28 },
-    { label: "Gigante", value: 32 },
-    { label: "Máximo", value: 36 }
-  ];
-
   const changeScriptFontSize = useCallback((delta: number) => {
     setScriptFontSize(prev => {
       const next = prev + delta;
