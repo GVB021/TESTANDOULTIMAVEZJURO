@@ -485,14 +485,14 @@ async function canAccessTake(user: any, take: any, sessionId: string, studioId: 
   // Take owner (who recorded) has access
   if (String(take.voiceActorId || "") === String(user.id || "")) return true;
 
-  // Assigned dublador for the character has access
+  // Character director has access
   if (take.characterId) {
     const characterAssignments = await storage.getCharacterAssignments(take.characterId);
-    const isAssignedDublador = characterAssignments.some((assignment: any) => 
+    const isCharacterDirector = characterAssignments.some((assignment: any) => 
       String(assignment.userId || "") === String(user.id || "") && 
-      (normalizeStudioRole(assignment.role) === "dublador" || normalizeStudioRole(assignment.role) === "aluno")
+      normalizeStudioRole(assignment.role) === "diretor"
     );
-    if (isAssignedDublador) return true;
+    if (isCharacterDirector) return true;
   }
 
   return false;
