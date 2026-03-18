@@ -168,17 +168,17 @@ export default function RecordingRoom() {
   const isControlBlocked = isDirector && !directorControlConfirmed;
 
 // Recordings pagination and filtering
-const [recordingsPage, setRecordingsPage] = useState(1);
-const [recordingsSearch, setRecordingsSearch] = useState("");
-const [recordingsScope, setRecordingsScope] = useState<"all" | "mine">("mine");
-const [recordingsDateFrom, setRecordingsDateFrom] = useState("");
-const [recordingsDateTo, setRecordingsDateTo] = useState("");
-const [recordingsSortBy, setRecordingsSortBy] = useState<"createdAt" | "durationSeconds" | "lineIndex" | "characterName">("createdAt");
-const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
+  const [recordingsPage, setRecordingsPage] = useState(1);
+  const [recordingsSearch, setRecordingsSearch] = useState("");
+  const [recordingsScope, setRecordingsScope] = useState<"all" | "mine">("mine");
+  const [recordingsDateFrom, setRecordingsDateFrom] = useState("");
+  const [recordingsDateTo, setRecordingsDateTo] = useState("");
+  const [recordingsSortBy, setRecordingsSortBy] = useState<"createdAt" | "durationSeconds" | "lineIndex" | "characterName">("createdAt");
+  const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
 
 // Modal state
-const [discardModalTake, setDiscardModalTake] = useState<any>(null);
-const [discardFinalStep, setDiscardFinalStep] = useState(false);
+  const [discardModalTake, setDiscardModalTake] = useState<any>(null);
+  const [discardFinalStep, setDiscardFinalStep] = useState(false);
 
 // Refs
 const videoRef = useRef<HTMLVideoElement>(null);
@@ -199,15 +199,15 @@ const controlsTimeoutRef = useRef<number | null>(null);
 const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
 
 // Additional state
-const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
-const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
-const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
-const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
-const [sideScriptWidth, setSideScriptWidth] = useState(320);
-const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
-const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
-const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
-const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
+  const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
+  const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
+  const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(50);
+  const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
+  const [sideScriptWidth, setSideScriptWidth] = useState(320);
+  const [isDraggingSideScript, setIsDraggingSideScript] = useState(false);
+  const [optimisticRemovingTakeIds, setOptimisticRemovingTakeIds] = useState<Set<string>>(new Set());
+  const [recordingAvailability, setRecordingAvailability] = useState<Record<string, RecordingAvailabilityState>>({});
+  const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
 
   // WebSocket state
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
@@ -215,8 +215,8 @@ const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string
   const [lockedLines, setLockedLines] = useState<Record<number, any>>({});
   const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
   const queryClient = useQueryClient();
-const [lastUploadedTakeId, setLastUploadedTakeId] = useState<string | null>(null);
-const [isWaitingReview, setIsWaitingReview] = useState(false);
+  const [lastUploadedTakeId, setLastUploadedTakeId] = useState<string | null>(null);
+  const [isWaitingReview, setIsWaitingReview] = useState(false);
 
   // Data fetching hooks
   const { data: session, isLoading: sessionLoading, error: sessionError } = useSessionData(studioId || "", sessionId || "");
