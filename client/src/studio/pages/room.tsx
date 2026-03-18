@@ -1462,9 +1462,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       });
     }
     
-    if (micInitializing) {
-    }
-    
     // Permitir gravação mesmo sem personagem selecionado
     if (!recordingProfile) {
       toast({
