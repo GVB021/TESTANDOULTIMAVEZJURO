@@ -47,7 +47,7 @@ export function RoomHeader({
         !isMobile ? "grid" : "justify-between"
       )}
       style={{
-        gridTemplateColumns: !isMobile ? `1fr ${sideScriptWidth}px` : undefined,
+        gridTemplateColumns: !isMobile ? "1fr auto" : undefined,
       }}
     >
       {/* Left: back, title, character selector, script toggles */}
