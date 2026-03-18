@@ -215,7 +215,6 @@ const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string
   const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
   const [lockedLines, setLockedLines] = useState<Record<number, any>>({});
   const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
-  const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
   const queryClient = useQueryClient();
 const [lastUploadedTakeId, setLastUploadedTakeId] = useState<string | null>(null);
 const [isWaitingReview, setIsWaitingReview] = useState(false);
