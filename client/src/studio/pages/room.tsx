@@ -75,6 +75,7 @@ import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
 import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
+import { RoomHeaderActions } from "@studio/components/room/header/RoomHeaderActions";
 import { MobileMenu, MobileScriptDrawer, MobileFooterControls } from "@studio/components/room/mobile";
 import { DesktopScriptColumn, ScriptLineRow } from "@studio/components/room/script";
 import { DesktopControlsBar } from "@studio/components/room/controls";
@@ -2525,94 +2526,22 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
         }}
         rightSlot={
-          <>
-            {recordingStatus === "recording" && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-[10px] font-bold text-red-500 animate-pulse">
-                <Circle className="w-2 h-2 fill-current" /> <span className="hidden xs:inline">REC</span>
-              </div>
-            )}
-            {canViewOnlineUsers && !isMobile && (
-              <div
-                className="h-7 px-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 flex items-center gap-1.5"
-                title={roomUsers.map((u: any) => u.displayName || u.fullName || u.name || u.userId).join(", ")}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>{roomUsers.length} online</span>
-              </div>
-            )}
-            {isMobile ? (
-              <>
-                <button
-                  onClick={() => (recordingStatus === 'recording' ? handleStopRecording() : startCountdown())}
-                  className={cn(
-                    'w-14 h-14 flex items-center justify-center rounded-full transition-all',
-                    recordingStatus === 'recording'
-                      ? 'bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse'
-                      : 'bg-primary text-primary-foreground'
-                  )}
-                  aria-label={recordingStatus === 'recording' ? 'Parar Gravação' : 'Iniciar Gravação'}
-                >
-                  {recordingStatus === 'recording' ? <Square className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-                </button>
-                <button
-                  onClick={() => setMobileMenuOpen(true)}
-                  className="w-11 h-11 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Menu principal"
-                >
-                  <Menu className="w-5 h-5" />
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  onClick={() => setRecordingsOpen(true)}
-                  className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
-                  data-testid="button-room-recordings"
-                >
-                  <ListMusic className="w-3.5 h-3.5" />
-                  Gravações
-                </button>
-                {canReleaseText && (
-                  <button
-                    onClick={() => setTextControlPopupOpen(true)}
-                    className="h-7 px-2 rounded-md bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 hover:bg-indigo-500/20 flex items-center gap-1"
-                    data-testid="button-room-release-text"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    Liberar Texto
-                  </button>
-                )}
-                <button
-                  onClick={() => setDeviceSettingsOpen(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Configurações de dispositivos"
-                  data-testid="button-open-device-settings"
-                >
-                  <Monitor className="w-4 h-4" />
-                </button>
-                {canAccessDashboard && (
-                  <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
-                    <button
-                      onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); }}
-                      className="h-7 px-2 rounded-md bg-white/5 border border-white/10 text-[11px] text-muted-foreground hover:text-foreground hover:bg-white/10 flex items-center gap-1"
-                      data-testid="button-room-panel"
-                    >
-                      <Monitor className="w-3.5 h-3.5" />
-                      PAINEL
-                    </button>
-                  </Link>
-                )}
-                <button
-                  onClick={() => setIsCustomizing(true)}
-                  className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Atalhos de teclado"
-                  data-testid="button-open-shortcuts"
-                >
-                  <Settings className="w-4 h-4" />
-                </button>
-              </>
-            )}
-          </>
+          <RoomHeaderActions
+            isMobile={isMobile}
+            recordingStatus={recordingStatus}
+            canViewOnlineUsers={canViewOnlineUsers}
+            canReleaseText={canReleaseText}
+            canAccessDashboard={canAccessDashboard}
+            roomUsers={roomUsers}
+            studioId={studioId}
+            onRecordOrStop={() => recordingStatus === "recording" ? handleStopRecording() : startCountdown()}
+            onOpenMenu={() => setMobileMenuOpen(true)}
+            onOpenRecordings={() => setRecordingsOpen(true)}
+            onOpenTextControl={() => setTextControlPopupOpen(true)}
+            onOpenDeviceSettings={() => setDeviceSettingsOpen(true)}
+            onOpenShortcuts={() => setIsCustomizing(true)}
+            onPanelClick={() => logFeatureAudit("room.panel", "redirect", { studioId })}
+          />
         }
       />
 
