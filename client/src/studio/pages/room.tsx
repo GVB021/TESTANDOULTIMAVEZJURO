@@ -1975,11 +1975,7 @@ export default function RecordingRoom() {
     const streamUrl = getTakeStreamUrl(take);
     if (!streamUrl) throw new Error("URL de stream indisponível.");
     
-    setRecordingsIsLoading(prev => {
-      const next = new Set(prev);
-      next.add(takeId);
-      return next;
-    });
+    setRecordingsIsLoading((prev) => { const next = new Set(prev); next.add(takeId); return next; });
     setRecordingAvailability((prev) => ({ ...prev, [takeId]: "loading" }));
 
     try {
@@ -2027,11 +2023,7 @@ export default function RecordingRoom() {
         window.clearTimeout(timeout);
       }
     } finally {
-      setRecordingsIsLoading(prev => {
-        const next = new Set(prev);
-        next.delete(takeId);
-        return next;
-      });
+      setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
     }
   }, [getTakeStreamUrl, validateTakeAudioBlob]);
 
