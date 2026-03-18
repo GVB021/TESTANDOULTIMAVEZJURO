@@ -7,7 +7,6 @@ import {
   Mic,
   Play,
   Pause,
-  RotateCcw,
   Square,
   CheckCircle2,
   AlertCircle,
@@ -22,7 +21,6 @@ import {
   Download,
   Loader2,
   Menu,
-  Repeat,
   ListMusic,
   Video,
 } from "lucide-react";
