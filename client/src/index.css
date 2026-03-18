@@ -484,6 +484,117 @@
     @apply text-2xl font-bold tracking-tight;
     color: hsl(210 40% 96%);
   }
+
+  .room-card {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.7);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  }
+
+  .room-card-elevated {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.7);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.10);
+  }
+
+  .room-button-primary {
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    border: 1px solid hsl(var(--primary-border));
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .room-button-primary:hover {
+    filter: brightness(1.04);
+  }
+
+  .room-button-secondary {
+    background: hsl(var(--secondary) / 0.8);
+    color: hsl(var(--secondary-foreground));
+    border: 1px solid hsl(var(--border) / 0.5);
+    backdrop-filter: blur(8px);
+  }
+
+  .room-button-secondary:hover {
+    background: hsl(var(--secondary) / 0.96);
+    border-color: hsl(var(--border) / 0.7);
+  }
+
+  .room-popup {
+    background: hsl(var(--popover) / 0.92);
+    color: hsl(var(--popover-foreground));
+    border: 1px solid hsl(var(--border) / 0.55);
+    box-shadow: 0 20px 32px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(16px);
+  }
+
+  .room-text-primary {
+    color: hsl(var(--foreground));
+  }
+
+  .room-text-secondary {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .room-text-muted {
+    color: hsl(var(--muted-foreground) / 0.82);
+  }
+
+  .room-text-subtle {
+    color: hsl(var(--muted-foreground) / 0.62);
+  }
+
+  .room-rounded {
+    border-radius: 0.75rem;
+  }
+
+  .room-rounded-lg {
+    border-radius: 1rem;
+  }
+
+  .room-rounded-full {
+    border-radius: 9999px;
+  }
+
+  .room-rounded-2xl {
+    border-radius: 1rem;
+  }
+
+  .room-rounded-xl {
+    border-radius: 0.75rem;
+  }
+
+  .room-transition {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .room-bg-subtle {
+    background: hsl(var(--muted) / 0.5);
+  }
+
+  .room-bg-surface {
+    background: hsl(var(--card) / 0.8);
+  }
+
+  .room-bg-elevated {
+    background: hsl(var(--card));
+  }
+
+  .room-controls {
+    background: hsl(var(--background) / 0.8);
+    border-color: hsl(var(--border) / 0.6);
+    backdrop-filter: blur(12px);
+  }
+
+  .room-status-online {
+    background: hsl(142 76% 36%);
+    box-shadow: 0 0 12px hsl(142 76% 36% / 0.35);
+  }
+
+  .room-status-recording {
+    background: hsl(0 78% 57%);
+    box-shadow: 0 0 12px hsl(0 78% 57% / 0.35);
+  }
 }
 
 @layer utilities {
@@ -643,5 +754,24 @@
     margin-left: 0.06em;
     color: currentColor;
     animation: vhubCursorBlink 0.8s step-end infinite;
+  }
+
+  @keyframes rrClickBlink {
+    0% { box-shadow: 0 0 0 rgba(16,185,129,0); }
+    50% { box-shadow: 0 0 16px rgba(16,185,129,0.55), 0 0 28px rgba(16,185,129,0.28); }
+    100% { box-shadow: 0 0 0 rgba(16,185,129,0); }
+  }
+
+  .recording-room button {
+    transition: box-shadow 180ms ease, border-color 180ms ease, filter 180ms ease;
+  }
+
+  .recording-room button:hover {
+    box-shadow: 0 0 12px rgba(37, 99, 235, 0.18), 0 0 24px rgba(37, 99, 235, 0.12);
+    filter: brightness(1.02);
+  }
+
+  .recording-room button.rr-click-blink {
+    animation: rrClickBlink 300ms ease-out;
   }
 }

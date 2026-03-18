@@ -395,12 +395,17 @@ export default function RecordingRoom() {
 
   useEffect(() => {
     const initializeHardware = async () => {
+      setMicInitializing(true);
       
       // Aguardar um pouco para garantir que o componente está montado
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       try {
         await requestMicrophoneAccess();
+        const nextMicState = await requestMicrophone(deviceSettings.voiceCaptureMode, deviceSettings.inputDeviceId === "default" ? undefined : deviceSettings.inputDeviceId);
+        setMicState(nextMicState);
+        setGain(nextMicState, deviceSettings.inputGain);
+        setMicReady(true);
         
         // Mostrar dialog de configuração na primeira vez
         const hasConfigured = localStorage.getItem(`hardware_configured_${sessionId}`);
@@ -410,14 +415,23 @@ export default function RecordingRoom() {
         }
       } catch (error) {
         console.error("Falha ao inicializar hardware:", error);
+        setMicState(null);
+        setMicReady(false);
         toast({ title: "Configuração de Hardware", description: "Configure seu microfone para melhor experiência.", variant: "default" });
+      } finally {
+        setMicInitializing(false);
       }
     };
 
     if (sessionId && user) {
       initializeHardware();
     }
-  }, [sessionId, user, requestMicrophoneAccess, hasPermission, toast]);
+    return () => {
+      releaseMicrophone();
+      setMicState(null);
+      setMicReady(false);
+    };
+  }, [sessionId, user, requestMicrophoneAccess, hasPermission, toast, deviceSettings.voiceCaptureMode, deviceSettings.inputDeviceId, deviceSettings.inputGain]);
   const emitVideoEvent = useCallback((type: string, data: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: `video:${type}`, ...data }));
@@ -1414,7 +1428,8 @@ export default function RecordingRoom() {
     }
     
     if (!micState) {
-      toast({ title: "Microfone não inicializado", description: "Tentando iniciar microfone automaticamente...", variant: "default" });
+      toast({ title: "Microfone não inicializado", description: "Configure ou reconecte seu microfone antes de gravar.", variant: "destructive" });
+      return;
     }
     
     // Permitir gravação mesmo sem personagem selecionado
@@ -2188,7 +2203,7 @@ export default function RecordingRoom() {
 
   return (
     <div
-      className="recording-room h-screen w-screen overflow-hidden flex flex-col select-none relative bg-background text-foreground dark"
+      className="recording-room h-screen w-screen overflow-hidden flex flex-col select-none relative bg-background text-foreground"
       onClickCapture={(event) => {
         const target = event.target as HTMLElement | null;
         const button = target?.closest?.("button") as HTMLButtonElement | null;

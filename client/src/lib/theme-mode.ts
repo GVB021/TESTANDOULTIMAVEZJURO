@@ -8,15 +8,6 @@ export function getTheme(): Theme {
 
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
-  // Check if we are in the Recording Room (Studio Room)
-  const isRecordingRoom = window.location.pathname.includes("/room");
-
-  if (isRecordingRoom) {
-    root.classList.add("dark");
-    root.style.colorScheme = "dark";
-    return;
-  }
-
   root.classList.remove("dark");
   root.style.colorScheme = "light";
 }
@@ -41,6 +32,6 @@ export function initThemeMode() {
 }
 
 export function toggleTheme(): Theme {
-  // Disabled as per requirements: force light mode globally except Room
+  // Disabled as per requirements: force light mode globally
   return "light";
 }
