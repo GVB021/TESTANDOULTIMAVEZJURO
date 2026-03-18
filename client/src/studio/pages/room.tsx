@@ -1566,14 +1566,7 @@ export default function RecordingRoom() {
     setIsWaitingReview(true);
     
     try {
-      const uploadedTake = await uploadTakeForDirector({
-        wavBlob: wavBlob,
-        durationSeconds: result.durationSeconds,
-        qualityScore: metrics.score,
-        autoApprove: false,
-        lineIndex: currentLine,
-        startTimeSeconds: Number(videoRef.current?.currentTime || 0),
-      });
+      const uploadedTake = await uploadTakeForDirector({ wavBlob, durationSeconds: result.durationSeconds, qualityScore: metrics.score, autoApprove: false, lineIndex: currentLine, startTimeSeconds: Number(videoRef.current?.currentTime || 0) });
 
       emitVideoEvent("take-ready-for-review", { takeId: uploadedTake.id, audioUrl: uploadedTake.audioUrl, duration: result.durationSeconds, metrics, lineIndex: currentLine, userId: user?.id, character: recordingProfile?.characterName || "Personagem", start: Number(videoRef.current?.currentTime || 0) });
       
@@ -1593,14 +1586,7 @@ export default function RecordingRoom() {
     try {
       setIsSaving(true);
       const startedAt = performance.now();
-      await uploadTakeForDirector({
-        wavBlob: pendingTake.blob,
-        durationSeconds: pendingTake.durationSeconds,
-        qualityScore: pendingTake.metrics.score,
-        autoApprove: true,
-        lineIndex: pendingTake.lineIndex,
-        startTimeSeconds: pendingTake.startTimeSeconds,
-      });
+      await uploadTakeForDirector({ wavBlob: pendingTake.blob, durationSeconds: pendingTake.durationSeconds, qualityScore: pendingTake.metrics.score, autoApprove: true, lineIndex: pendingTake.lineIndex, startTimeSeconds: pendingTake.startTimeSeconds });
       const elapsedMs = performance.now() - startedAt;
       if (elapsedMs > 3000) {
         toast({ title: "Salvamento acima da meta", description: `${Math.round(elapsedMs)}ms`, variant: "destructive" });
