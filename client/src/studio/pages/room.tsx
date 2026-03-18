@@ -158,7 +158,6 @@ export default function RecordingRoom() {
   const {
     requestMicrophoneAccess,
     hasPermission,
-    audioLevel,
   } = useHardwareControl(sessionId || "");
   
   // Se for diretor, só libera quando confirmar. Se não for, libera direto.
