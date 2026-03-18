@@ -6,7 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Mic,
   Square,
-  CheckCircle2,
   AlertCircle,
   Circle,
   Settings,
@@ -16,7 +15,6 @@ import {
   User,
   Users,
   Edit3,
-  Loader2,
   Menu,
   ListMusic,
   Video,
@@ -32,12 +30,6 @@ import {
   type RecordingsQueryParams,
   type RecordingsResponse,
 } from "@studio/hooks/room";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
 import SessionBlockedScreen from "@studio/pages/admin/components/SessionBlockedScreen";
 import { useToast } from "@studio/hooks/use-toast";
