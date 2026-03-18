@@ -2344,6 +2344,65 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     }
   }, [toast]);
 
+  const handlePlayRecordingTake = useCallback(async (take: any) => {
+    const audio = recordingsPreviewAudioRef.current;
+    if (!audio) return;
+    const takeId = String(take?.id || "");
+    if (!takeId) return;
+    if (recordingsPreviewId === take.id && !recordingsPlayerOpenId) {
+      audio.pause();
+      setRecordingsPreviewId(null);
+      setRecordingsPlayerOpenId(null);
+      return;
+    }
+    try {
+      setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
+      const streamUrl = await getTakeStreamUrl(take.id);
+      if (streamUrl) {
+        audio.src = streamUrl;
+        await audio.play();
+        setRecordingsPreviewId(String(take.id));
+        setRecordingsPlayerOpenId(String(take.id));
+        setRecordingPlayableUrls((prev) => ({ ...prev, [takeId]: streamUrl }));
+        setRecordingAvailability((prev) => ({ ...prev, [takeId]: "available" }));
+      }
+    } catch (error) {
+      console.error("Failed to play audio:", error);
+      setRecordingAvailability((prev) => ({ ...prev, [takeId]: "error" }));
+    } finally {
+      setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
+    }
+  }, [recordingsPreviewId, recordingsPlayerOpenId, getTakeStreamUrl]);
+
+  const handleDownloadRecordingTake = useCallback(async (take: any) => {
+    const takeId = String(take?.id || "");
+    if (!takeId) return;
+    try {
+      setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
+      await handleDownloadTake(take);
+    } catch (error) {
+      console.error("Failed to download take:", error);
+      toast({ title: "Erro ao baixar", description: "Não foi possível baixar a gravação.", variant: "destructive" });
+    } finally {
+      setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
+      setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
+    }
+  }, [handleDownloadTake, toast]);
+
+  const handleDiscardRecordingTake = useCallback((take: any) => {
+    setDiscardModalTake(take);
+    setDiscardFinalStep(false);
+  }, []);
+
+  const handleRecordingLoadedMetadata = useCallback((tid: string, rate: number, el: HTMLAudioElement) => {
+    el.playbackRate = rate;
+    setRecordingAvailability((prev) => ({ ...prev, [tid]: "available" }));
+  }, []);
+
+  const handleRecordingAudioError = useCallback((tid: string) => {
+    setRecordingAvailability((prev) => ({ ...prev, [tid]: "error" }));
+  }, []);
+
   const handleSaveProfile = (profile: RecordingProfile) => {
     setRecordingProfile(profile);
     localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(profile));
@@ -2533,55 +2592,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           onDateToChange={setRecordingsDateTo}
           onPagePrev={() => setRecordingsPage((p) => Math.max(1, p - 1))}
           onPageNext={() => setRecordingsPage((p) => Math.min(recordingsResponse?.pageCount || 1, p + 1))}
-          onPlayTake={async (take) => {
-            const audio = recordingsPreviewAudioRef.current;
-            if (!audio) return;
-            const takeId = String(take?.id || "");
-            if (!takeId) return;
-            if (recordingsPreviewId === take.id && !recordingsPlayerOpenId) {
-              audio.pause();
-              setRecordingsPreviewId(null);
-              setRecordingsPlayerOpenId(null);
-              return;
-            }
-            try {
-              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
-              const streamUrl = await getTakeStreamUrl(take.id);
-              if (streamUrl) {
-                audio.src = streamUrl;
-                await audio.play();
-                setRecordingsPreviewId(String(take.id));
-                setRecordingsPlayerOpenId(String(take.id));
-                setRecordingPlayableUrls((prev) => ({ ...prev, [takeId]: streamUrl }));
-                setRecordingAvailability((prev) => ({ ...prev, [takeId]: "available" }));
-              }
-            } catch (error) {
-              console.error("Failed to play audio:", error);
-              setRecordingAvailability((prev) => ({ ...prev, [takeId]: "error" }));
-            } finally {
-              setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
-            }
-          }}
-          onDownloadTake={async (take) => {
-            const takeId = String(take?.id || "");
-            if (!takeId) return;
-            try {
-              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
-              await handleDownloadTake(take);
-            } catch (error) {
-              console.error("Failed to download take:", error);
-              toast({ title: "Erro ao baixar", description: "Não foi possível baixar a gravação.", variant: "destructive" });
-            } finally {
-              setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
-              setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
-            }
-          }}
-          onDiscardTake={(take) => { setDiscardModalTake(take); setDiscardFinalStep(false); }}
-          onLoadedMetadata={(tid, rate, el) => {
-            el.playbackRate = rate;
-            setRecordingAvailability((prev) => ({ ...prev, [tid]: "available" }));
-          }}
-          onAudioError={(tid) => setRecordingAvailability((prev) => ({ ...prev, [tid]: "error" }))}
+          onPlayTake={handlePlayRecordingTake}
+          onDownloadTake={handleDownloadRecordingTake}
+          onDiscardTake={handleDiscardRecordingTake}
+          onLoadedMetadata={handleRecordingLoadedMetadata}
+          onAudioError={handleRecordingAudioError}
         />
       )}
 
