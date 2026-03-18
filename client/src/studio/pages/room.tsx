@@ -40,8 +40,6 @@ export type { MicrophoneState, VoiceCaptureMode };
 import {
   startCapture,
   stopCapture,
-  createPreviewUrl,
-  revokePreviewUrl,
   playCountdownBeep,
 } from "@studio/lib/audio/recordingEngine";
 import {
@@ -49,7 +47,6 @@ import {
   wavToBlob,
 } from "@studio/lib/audio/wavEncoder";
 import { analyzeTakeQuality } from "@studio/lib/audio/qualityAnalysis";
-import MonitorPanel from "@studio/components/audio/MonitorPanel";
 import { DeviceSettingsPanel } from "@studio/components/audio/DeviceSettingsPanel";
 import { cn } from "@studio/lib/utils";
 import {
@@ -84,8 +81,6 @@ import {
   resolveUiRole,
   hasUiPermission,
   canReceiveTextControl,
-  type UiRole,
-  type UiPermission,
 } from "@studio/lib/room-utils";
 
 export interface ScriptLine {
