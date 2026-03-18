@@ -793,7 +793,6 @@ export default function RecordingRoom() {
 
   const handleDiscardTake = useCallback(async (take: any) => {
     const takeId = String(take.id);
-    // const normalizedRole = normalizeRoomRole(user?.role); // Removed as we check user.role directly
     const rawRole = String(user?.role || "").trim().toLowerCase();
     const canDeletePermanently = rawRole === "platform_owner" || rawRole === "master";
     const takesQueryKey = ["/api/sessions", sessionId, "takes"] as const;
