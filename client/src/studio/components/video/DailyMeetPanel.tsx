@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type TouchEvent } from "react";
 import DailyIframe from "@daily-co/daily-js";
 import { Video, VideoOff, Mic, MicOff, PhoneOff, RefreshCw, ChevronUp, ChevronDown, Camera, User, Phone } from "lucide-react";
 import { authFetch } from "@studio/lib/auth-fetch";
@@ -35,6 +35,46 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [showJoinScreen, setShowJoinScreen] = useState(true);
   const isOpen = open ?? internalOpen;
+
+  // 🔥 AUTO-RESIZE RESPONSIVE
+  const updateViewport = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const rect = container.getBoundingClientRect();
+    setViewport({ 
+      width: rect.width, 
+      height: rect.height 
+    });
+  }, []);
+
+  useEffect(() => {
+    updateViewport();
+    const resizeObserver = new ResizeObserver(updateViewport);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+    return () => resizeObserver.disconnect();
+  }, [updateViewport]);
+
+  // 🔥 CUSTOM STYLING FOR DAILY.IFRAME
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .daily-co-iframe {
+        border: none !important;
+        background: transparent !important;
+        border-radius: 8px !important;
+      }
+      .daily-co-container {
+        background: transparent !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   const setOpen = (next: boolean) => {
     if (onOpenChange) onOpenChange(next);

@@ -28,6 +28,7 @@ import {
   Download,
   Loader2,
   Menu,
+  Type,
   Save,
   Repeat,
   ListMusic,
@@ -1039,6 +1040,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         } else if (msg.type === "video:take-ready-for-review") {
           // Se eu sou aprovador, recebo o take para revisar
           if (canApproveTake && msg.takeId && msg.audioUrl) {
+            console.log("👨‍💼 Diretor recebendo take para revisão", msg.takeId);
             setReviewingTake({
               takeId: msg.takeId,
               audioUrl: msg.audioUrl,
@@ -1049,7 +1051,27 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               characterName: msg.character || "Desconhecido",
               startTimeSeconds: msg.start || 0,
             });
-            toast({ title: "Novo take para revisão", description: "Um dublador enviou um take." });
+            
+            // 🔥 TOAST INTERATIVO GARANTIDO
+            toast({
+              title: "🎙️ Novo Take para Revisão",
+              description: `${msg.character || "Desconhecido"} enviou uma gravação.`,
+              action: (
+                <button 
+                  onClick={() => {
+                    // Scroll para o popup de revisão
+                    const popup = document.querySelector('[data-testid="director-review-popup"]');
+                    if (popup) {
+                      popup.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                  }}
+                  className="px-3 py-1 bg-primary text-primary-foreground rounded text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Revisar Agora
+                </button>
+              ),
+              duration: 10000, // 10 segundos para dar tempo de clicar
+            });
           }
         } else if (msg.type === "video:take-decision") {
           // Se a decisão for sobre um take meu
@@ -1866,8 +1888,40 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
   }, [recordingProfile, sessionId, user?.id, user?.displayName, user?.fullName, queryClient, logAudioStep]);
 
   const startCountdown = useCallback(() => {
-    // 🔒 CRITICAL FIX: Prevent recording without proper audio initialization
-    if (recordingStatus !== "idle" || !micState || !micReady || micInitializing) {
+    // 🔍 DEBUG DETALHADO
+    console.log("🎙️ startCountdown chamado", {
+      recordingStatus,
+      micReady,
+      micInitializing,
+      hasMicState: !!micState,
+      currentLine,
+      hasVideoRef: !!videoRef.current,
+      userRole: mySessionRole
+    });
+
+    // 🔒 VALIDAÇÕES DETALHADAS COM LOGS
+    if (recordingStatus !== "idle") {
+      console.warn("❌ Gravação não iniciada: status inválido", recordingStatus);
+      toast({ 
+        title: "Gravação em andamento", 
+        description: "Pare a gravação atual antes de iniciar outra.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (!micState) {
+      console.warn("❌ Gravação não iniciada: micState ausente");
+      toast({ 
+        title: "Microfone não inicializado", 
+        description: "Verifique as permissões de áudio.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (!micReady || micInitializing) {
+      console.warn("❌ Gravação não iniciada: microfone não pronto", { micReady, micInitializing });
       if (micInitializing) {
         toast({ 
           title: "Aguarde...", 
@@ -1886,6 +1940,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     
     // Permitir gravação mesmo sem personagem selecionado (fallback)
     if (!recordingProfile) {
+      console.log("⚠️ Gravando sem personagem selecionado");
       toast({
         title: "Nenhum personagem selecionado",
         description: "Gravando como 'Sem Personagem'. Selecione um personagem para melhor organização.",
@@ -1894,33 +1949,69 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     }
     
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      console.error("❌ Elemento de vídeo não encontrado");
+      toast({ 
+        title: "Erro de reprodução", 
+        description: "Elemento de vídeo não encontrado.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    console.log("✅ Iniciando gravação com sucesso");
+    
+    // 🔥 IMPLEMENTAÇÃO DO PREROLL PRECISO
+    const currentLineTime = scriptLines[currentLine]?.start || 0;
     const loopPreroll = isLooping ? 3 : preRoll;
-    const startFrom = isLooping && customLoop ? customLoop.start : (video.currentTime || 0);
+    const startFrom = isLooping && customLoop ? customLoop.start : currentLineTime;
     const prerollStart = Math.max(0, startFrom - loopPreroll);
+    
+    console.log("⏱️ Timing preroll", {
+      currentLine,
+      currentLineTime,
+      prerollStart,
+      startFrom,
+      prerollSeconds: loopPreroll
+    });
+    
     video.currentTime = prerollStart;
     emitVideoEvent("seek", { currentTime: prerollStart });
     logAudioStep("countdown-started", { initiatorUserId: user?.id, prerollStart, loopEnabled: isLooping });
+    
+    // Iniciar countdown e gravação
     setCountdownValue(3);
     setRecordingStatus("recording");
     startCapture(micState);
-    video.play().catch(() => {});
+    video.play().catch((error) => {
+      console.error("❌ Erro ao reproduzir vídeo", error);
+      toast({ title: "Erro na reprodução", description: "Não foi possível reproduzir o vídeo.", variant: "destructive" });
+    });
+    
     emitVideoEvent("play", { currentTime: video.currentTime });
     emitVideoEvent("countdown-start", { initiatorUserId: user?.id, count: 3 });
+    
     if (micState?.audioContext) playCountdownBeep(micState.audioContext);
+    
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     let count = 3;
+    
     countdownTimerRef.current = window.setInterval(() => {
       count -= 1;
       setCountdownValue(Math.max(0, count));
       emitVideoEvent("countdown-tick", { count: Math.max(0, count), initiatorUserId: user?.id });
-      if (count > 0 && micState?.audioContext) playCountdownBeep(micState.audioContext);
+      
+      if (count > 0 && micState?.audioContext) {
+        playCountdownBeep(micState.audioContext);
+      }
+      
       if (count <= 0 && countdownTimerRef.current) {
         window.clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
+        console.log("🎬 Gravação iniciada exatamente no timing previsto");
       }
     }, 1000);
-  }, [recordingStatus, micState, emitVideoEvent, logAudioStep, user?.id, isLooping, customLoop, preRoll]);
+  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, isLooping, customLoop, preRoll, recordingProfile, currentLine, scriptLines, mySessionRole]);
 
   const handleDirectorApprove = useCallback(async () => {
     if (!reviewingTake) return;
@@ -2922,53 +3013,68 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                             if (!audio) return;
                             const takeId = String(take?.id || "");
                             if (!takeId) return;
-                            if (recordingsPreviewId === take.id && !audio.paused) {
+                            if (recordingsPreviewId === take.id && !recordingsPlayerOpenId) {
                               audio.pause();
                               setRecordingsPreviewId(null);
                               setRecordingsPlayerOpenId(null);
                               return;
                             }
                             try {
-                              const immediateUrl = recordingPlayableUrls[takeId];
-                              if (immediateUrl) {
-                                audio.src = immediateUrl;
+                              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
+                              const streamUrl = await getTakeStreamUrl(take.id);
+                              if (streamUrl) {
+                                audio.src = streamUrl;
                                 await audio.play();
                                 setRecordingsPreviewId(take.id);
                                 setRecordingsPlayerOpenId(take.id);
-                                return;
+                                setRecordingPlayableUrls((prev) => ({ ...prev, [takeId]: streamUrl }));
+                                setRecordingAvailability((prev) => ({ ...prev, [takeId]: "available" }));
                               }
-
-                              setRecordingAvailability((prev) => ({ ...prev, [String(takeId)]: "loading" }));
-                              const resolvedUrl = await resolveTakePlayableUrl(take);
-                              if (recordingsPreviewAudioRef.current) {
-                                recordingsPreviewAudioRef.current.src = resolvedUrl;
-                                await recordingsPreviewAudioRef.current.play();
-                                setRecordingsPreviewId(take.id);
-                                setRecordingsPlayerOpenId(take.id);
-                              }
-                            } catch (err) {
-                              setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
-                              toast({ title: "Erro ao reproduzir take", description: String((err as any)?.message || err), variant: "destructive" });
+                            } catch (error) {
+                              console.error("Failed to play audio:", error);
+                              setRecordingAvailability((prev) => ({ ...prev, [takeId]: "error" }));
+                            } finally {
+                              setRecordingsIsLoading((prev) => {
+                                const next = new Set(prev);
+                                next.delete(takeId);
+                                return next;
+                              });
                             }
                           }}
-                          className="w-7 h-7 rounded-md bg-muted/70 text-foreground hover:bg-muted flex items-center justify-center disabled:opacity-50"
-                          title="Reproduzir take"
-                          data-testid={`button-play-recording-${take.id}`}
+                          className={cn(
+                            "w-7 h-7 rounded-md flex items-center justify-center transition-all",
+                            recordingsPreviewId === take.id && !recordingsPlayerOpenId
+                              ? "bg-primary/20 text-primary hover:bg-primary/30"
+                              : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white",
+                            recordingsIsLoading.has(String(take.id)) && "opacity-50 cursor-not-allowed"
+                          )}
+                          title={recordingsPreviewId === take.id ? "Pausar" : "Tocar"}
                         >
                           {recordingsIsLoading.has(String(take.id)) ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : recordingsPreviewId === take.id ? (
-                            <Pause className="w-3.5 h-3.5" />
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : recordingsPreviewId === take.id && recordingsPlayerOpenId ? (
+                            <Pause className="w-3 h-3" />
                           ) : (
-                            <Play className="w-3.5 h-3.5 ml-0.5" />
+                            <Play className="w-3 h-3" />
                           )}
                         </button>
                         <button
+                          disabled={recordingsIsLoading.has(String(take.id))}
                           onClick={async () => {
+                            const takeId = String(take?.id || "");
+                            if (!takeId) return;
                             try {
+                              setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
                               await handleDownloadTake(take);
-                              setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "available" }));
-                            } catch {
+                            } catch (error) {
+                              console.error("Failed to download take:", error);
+                              toast({ title: "Erro ao baixar", description: "Não foi possível baixar a gravação.", variant: "destructive" });
+                            } finally {
+                              setRecordingsIsLoading((prev) => {
+                                const next = new Set(prev);
+                                next.delete(takeId);
+                                return next;
+                              });
                               setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
                             }
                           }}
@@ -3087,7 +3193,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
       <header 
         className={cn(
-          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75",
+          "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75 room-header",
           !isMobile ? "grid" : "justify-between"
         )} 
         style={{
@@ -3402,16 +3508,21 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             </div>
 
             {!isMobile && (
-              <div className="shrink-0 h-20 bg-zinc-950/90 border-y border-white/10 flex items-center px-8 gap-6 z-40">
+              <div className="shrink-0 h-20 room-controls flex items-center px-8 gap-6 z-40">
                 <div className="flex items-center gap-2">
-                  <button onClick={() => seek(-2)} className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/70 hover:text-white" title="Recuar 2s">
+                  <button onClick={() => seek(-2)} className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition" title="Recuar 2s">
                     <RotateCcw className="w-4 h-4" />
                   </button>
-                  <button onClick={handlePlayPause} disabled={loopPreparing || loopSilenceActive} className="w-11 h-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 transition-all disabled:opacity-50" title={isPlaying ? "Pausar" : "Reproduzir"}>
-                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                  <button onClick={handlePlayPause} className={cn(
+                    "w-11 h-11 room-rounded flex items-center justify-center room-transition",
+                    isPlaying 
+                      ? "room-button-primary" 
+                      : "room-button-secondary"
+                  )} title={isPlaying ? "Pausar" : "Reproduzir"}>
+                    {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
                   </button>
-                  <button onClick={() => seek(2)} className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-white/70 hover:text-white" title="Avançar 2s">
-                    <RotateCcw className="w-4 h-4" style={{ transform: "scaleX(-1)" }} />
+                  <button onClick={() => seek(2)} className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition" title="Avançar 2s">
+                    <RotateCcw className="w-4 h-4" />
                   </button>
                 </div>
                 
@@ -3493,7 +3604,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
           {/* Coluna do Roteiro (Opcional/Lateral no Desktop) */}
           {!isMobile && (
-            <div className="flex flex-col min-h-0 bg-background/40 border-l border-border/60 relative group/side">
+            <div className="flex flex-col min-h-0 room-bg-surface border-l border-border relative group/side">
               {/* Handle de redimensionamento horizontal */}
               <div
                 onPointerDown={() => setIsDraggingSideScript(true)}
@@ -3504,39 +3615,43 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                 aria-label="Redimensionar largura do roteiro (máx 50%)"
               >
                 <div className={cn(
-                  "w-0.5 h-8 rounded-full transition-all",
-                  isDraggingSideScript ? "bg-white" : "bg-zinc-600 group-hover/side:bg-white"
+                  "w-0.5 h-8 room-rounded-full transition-all",
+                  isDraggingSideScript ? "bg-white" : "bg-muted group-hover/side:bg-white"
                 )} />
                 {isDraggingSideScript && (
-                  <div className="absolute top-1/2 -left-12 -translate-y-1/2 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-lg">
+                  <div className="absolute top-1/2 -left-12 -translate-y-1/2 bg-primary text-white text-[10px] px-2 py-0.5 room-rounded-full font-bold shadow-lg">
                     {Math.round((sideScriptWidth / window.innerWidth) * 100)}%
                   </div>
                 )}
               </div>
 
-              <div className="h-11 shrink-0 px-4 flex items-center justify-between border-b border-border/70 bg-muted/30">
-                <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                  Roteiro Completo
-                </span>
+              {/* Header do Roteiro */}
+              <div className="room-controls flex items-center justify-between p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold room-text-primary">Roteiro</h2>
+                  <span className="text-[10px] room-text-muted">{scriptLines.length} linhas</span>
+                </div>
+                
+                {/* Controles de Fonte */}
                 <div className="flex items-center gap-1">
-                  <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 10} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
-                    <Minus className="w-4 h-4" />
-                  </button>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="text-xs font-mono w-12 text-center text-white/70 font-bold hover:bg-white/10 rounded px-1 py-0.5 transition-all">
-                        {scriptFontSize}
+                      <button className="w-8 h-8 room-rounded flex items-center justify-center room-button-secondary room-transition">
+                        <Type className="w-4 h-4" />
                       </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-32 max-h-64 overflow-y-auto">
-                      {FONT_SIZES.map((size) => (
+                    <DropdownMenuContent align="end" className="w-32">
+                      {[
+                        { label: "Pequeno", value: 12 },
+                        { label: "Normal", value: 16 },
+                        { label: "Grande", value: 20 },
+                        { label: "Maior", value: 24 },
+                        { label: "Máximo", value: 28 },
+                        { label: "Gigante", value: 36 }
+                      ].map((size) => (
                         <DropdownMenuItem 
                           key={size.value}
                           onClick={() => setScriptFontSizeExact(size.value)}
-                          className={cn(
-                            "text-xs",
-                            scriptFontSize === size.value && "bg-primary/20 text-primary"
-                          )}
                         >
                           {size.label}
                           <span className="ml-auto font-mono">{size.value}</span>
@@ -3544,7 +3659,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 36} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 border border-white/20 text-white/80 hover:bg-white/20 hover:text-white disabled:opacity-50 transition-all hover:scale-105">
+                  <button onClick={() => changeScriptFontSize(-1)} disabled={scriptFontSize <= 10} className="w-8 h-8 room-rounded flex items-center justify-center room-button-secondary room-transition disabled:opacity-50">
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs font-mono w-6 text-center room-text-muted">{scriptFontSize}</span>
+                  <button onClick={() => changeScriptFontSize(1)} disabled={scriptFontSize >= 36} className="w-8 h-8 room-rounded flex items-center justify-center room-button-secondary room-transition disabled:opacity-50">
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
@@ -3690,110 +3809,130 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
           )}
         </div>
 
-        {/* Novo Sistema de Preview de Áudio (Mobile & Desktop) */}
+        {/* 🎙️ Popup de Revisão do Diretor - Melhorado */}
         <AnimatePresence>
           {(pendingTake || reviewingTake) && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="fixed inset-x-0 bottom-24 z-[100] px-4 pb-4 flex justify-center pointer-events-none"
+              className="fixed bottom-24 left-4 right-4 md:left-auto md:right-4 md:w-[420px] z-50"
+              data-testid="director-review-popup"
             >
-              <div className="w-full max-w-lg bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] p-4 sm:p-6 pointer-events-auto flex flex-col gap-4">
-                <div className="flex items-center justify-between">
+              <div className="room-popup rounded-2xl p-4 backdrop-blur-xl">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
-                      <Mic className="w-5 h-5" />
+                    <div className={cn(
+                      "w-12 h-12 room-rounded-full flex items-center justify-center",
+                      reviewingTake 
+                        ? "room-bg-surface border border-primary/30" 
+                        : "room-bg-surface border border-emerald-500/30"
+                    )}>
+                      {reviewingTake ? (
+                        <Monitor className="w-6 h-6 text-primary" />
+                      ) : (
+                        <Mic className="w-6 h-6 text-emerald-400" />
+                      )}
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-white">
-                        {reviewingTake ? "Revisão do Diretor" : "Preview da Gravação"}
+                      <h3 className="text-sm font-bold room-text-primary">
+                        {reviewingTake ? "👨‍💼 Revisão do Diretor" : "🎙️ Preview da Gravação"}
                       </h3>
-                      <p className="text-[10px] text-white/40 uppercase tracking-widest font-mono">
+                      <p className="text-[10px] room-text-muted uppercase tracking-widest font-mono">
                         {(reviewingTake ? reviewingTake.duration : pendingTake?.durationSeconds || 0).toFixed(2)}s • {(reviewingTake || pendingTake)?.metrics?.score}% Qualidade
                       </p>
                     </div>
                   </div>
                   
-                  {/* Actions Area */}
-                  <div className="flex items-center gap-2">
-                    {reviewingTake ? (
-                      /* Director Actions */
-                      <>
-                        <button
-                          onClick={handleDirectorReject}
-                          disabled={isSaving}
-                          className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all active:scale-90 disabled:opacity-50"
-                          aria-label="Rejeitar take"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={handleDirectorApprove}
-                          disabled={isSaving}
-                          className="h-10 px-6 rounded-full bg-green-500 text-white font-bold text-sm flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"
-                        >
-                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-5 h-5" />}
-                          {isSaving ? "Processando..." : "Aprovar"}
-                        </button>
-                      </>
-                    ) : isWaitingReview ? (
-                      /* Dubber Waiting State */
-                      <div className="h-10 px-4 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 font-bold text-xs flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Aguardando Diretor...
-                      </div>
-                    ) : (
-                      /* Dubber Pre-Upload / Fallback Actions */
-                      <>
-                        <button
-                          onClick={handleRejectTake}
-                          disabled={isSaving}
-                          className="w-10 h-10 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center hover:bg-red-500/20 transition-all active:scale-90 disabled:opacity-50"
-                          aria-label="Descartar"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={handleApproveTake}
-                          disabled={isSaving}
-                          className="h-10 px-6 rounded-full bg-primary text-primary-foreground font-bold text-sm flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
-                        >
-                           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-                           {isSaving ? "Enviando..." : "Reenviar"}
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {/* Status Indicator */}
+                  <div className={cn(
+                    "w-3 h-3 rounded-full animate-pulse",
+                    reviewingTake ? "room-status-online" : "room-status-recording"
+                  )} />
+                </div>
+                
+                {/* Actions Area */}
+                <div className="flex items-center gap-2 mb-4">
+                  {reviewingTake ? (
+                    /* Director Actions */
+                    <>
+                      <button
+                        onClick={handleDirectorApprove}
+                        disabled={isSaving}
+                        className="flex-1 h-10 room-button-primary room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition"
+                      >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={handleDirectorReject}
+                        disabled={isSaving}
+                        className="flex-1 h-10 room-bg-surface room-text-primary border border-destructive room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition hover:bg-destructive/10"
+                      >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                        Rejeitar
+                      </button>
+                    </>
+                  ) : (
+                    /* Dubler Actions */
+                    <>
+                      <button
+                        onClick={handleApproveTake}
+                        disabled={isSaving || isWaitingReview}
+                        className="flex-1 h-10 room-button-primary room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition"
+                      >
+                        {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        {isWaitingReview ? "Enviado..." : "Enviar"}
+                      </button>
+                      <button
+                        onClick={() => handleDiscardTake(pendingTake)}
+                        className="h-10 px-4 room-button-secondary room-rounded-lg font-medium flex items-center justify-center gap-2 room-transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
                 
                 {/* Player de Audio */}
-                <div className="bg-black/20 rounded-2xl p-3 border border-white/5 flex items-center gap-4">
+                <div className="room-bg-surface room-rounded-2xl p-3 flex items-center gap-4 mb-4">
                   <audio 
                     src={reviewingTake ? reviewingTake.audioUrl : pendingTake?.url} 
                     controls 
                     className="w-full h-10 accent-primary"
                     controlsList="nodownload noplaybackrate"
+                    preload="metadata"
                   />
                 </div>
-
-                {/* Métricas Rápidas */}
+                
+                {/* Metrics */}
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="bg-white/5 rounded-xl p-2 text-center">
-                    <p className="text-[9px] text-white/40 uppercase font-bold">Loudness</p>
-                    <p className="text-xs font-mono text-white">{((reviewingTake || pendingTake)?.metrics?.loudness * 100 || 0).toFixed(0)}%</p>
+                  <div className="room-bg-surface room-rounded-xl p-2 text-center">
+                    <p className="text-[9px] room-text-subtle uppercase font-bold">Loudness</p>
+                    <p className="text-xs font-mono room-text-primary">{((reviewingTake || pendingTake)?.metrics?.loudness * 100 || 0).toFixed(0)}%</p>
                   </div>
-                  <div className="bg-white/5 rounded-xl p-2 text-center">
-                    <p className="text-[9px] text-white/40 uppercase font-bold">Clipping</p>
-                    <p className={cn("text-xs font-mono", (reviewingTake || pendingTake)?.metrics?.clipping ? "text-red-400" : "text-green-400")}>
+                  <div className="room-bg-surface room-rounded-xl p-2 text-center">
+                    <p className="text-[9px] room-text-subtle uppercase font-bold">Clipping</p>
+                    <p className={cn("text-xs font-mono", (reviewingTake || pendingTake)?.metrics?.clipping ? "text-destructive" : "text-emerald-400")}>
                       {(reviewingTake || pendingTake)?.metrics?.clipping ? "SIM" : "NÃO"}
                     </p>
                   </div>
-                  <div className="bg-white/5 rounded-xl p-2 text-center">
-                    <p className="text-[9px] text-white/40 uppercase font-bold">Noise</p>
-                    <p className="text-xs font-mono text-white">{((reviewingTake || pendingTake)?.metrics?.noiseFloor * 100 || 0).toFixed(0)}%</p>
+                  <div className="room-bg-surface room-rounded-xl p-2 text-center">
+                    <p className="text-[9px] room-text-subtle uppercase font-bold">Noise</p>
+                    <p className="text-xs font-mono room-text-primary">{((reviewingTake || pendingTake)?.metrics?.noiseFloor * 100 || 0).toFixed(0)}%</p>
                   </div>
                 </div>
+                
+                {/* Additional Info */}
+                {reviewingTake && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="room-text-muted">Linha #{reviewingTake.lineIndex + 1}</span>
+                      <span className="room-text-muted">{reviewingTake.characterName}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}
@@ -3803,36 +3942,36 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         {isMobile && (
           <footer
             className={cn(
-              "h-24 bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 flex flex-col sm:flex-row items-center px-6 gap-4 sm:gap-8 transition-all duration-300 ease-in-out z-50",
+              "h-24 room-controls flex flex-col sm:flex-row items-center px-6 gap-4 sm:gap-8 transition-all duration-300 ease-in-out z-50",
               !controlsVisible && "translate-y-full opacity-0 pointer-events-none"
             )}
             onMouseEnter={() => {
-              setControlsVisible(true);
-              if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+              if (!isLooping) setControlsVisible(true);
+            }}
+            onMouseLeave={() => {
+              if (!isLooping) setControlsVisible(false);
             }}
           >
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => seek(-2)}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all bg-white/5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10"
-                aria-label="Recuar 2 segundos"
-              >
-                <RotateCcw className="w-5 h-5" />
+            <div className="flex items-center gap-2">
+              <button onClick={() => seek(-2)} className="w-9 h-9 room-rounded flex items-center justify-center room-button-secondary room-transition" title="Recuar 2s">
+                <RotateCcw className="w-4 h-4" />
               </button>
-              <button
-                onClick={handlePlayPause}
-                disabled={loopPreparing || loopSilenceActive}
-                className="w-14 h-14 rounded-full flex items-center justify-center transition-all bg-primary text-primary-foreground shadow-lg hover:scale-105 active:scale-95 disabled:opacity-50"
-                aria-label={isPlaying ? "Pausar" : "Reproduzir"}
+              <button 
+                onClick={() => (recordingStatus === 'recording' ? handleStopRecording() : startCountdown())} 
+                className={cn(
+                  'w-14 h-14 room-rounded-full flex items-center justify-center transition-all',
+                  recordingStatus === 'recording'
+                    ? 'room-status-recording animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.6)] hover:scale-110 active:scale-95'
+                    : 'room-button-primary hover:scale-105 active:scale-95'
+                )}
               >
-                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-0.5" />}
+                {recordingStatus === 'recording' ? <Square className="w-7 h-7 text-white fill-white" /> : <Mic className="w-7 h-7" />}
               </button>
-              <button
-                onClick={() => seek(2)}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center transition-all bg-white/5 text-white/70 hover:text-white hover:bg-white/10 border border-white/10"
-                aria-label="Avançar 2 segundos"
-              >
-                <RotateCcw className="w-5 h-5 flip-horizontal" style={{ transform: "scaleX(-1)" }} />
+              <button onClick={handlePlayPause} className={cn(
+                "w-9 h-9 room-rounded flex items-center justify-center room-transition",
+                isPlaying ? "room-button-primary" : "room-button-secondary"
+              )} title={isPlaying ? "Pausar" : "Reproduzir"}>
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
               </button>
             </div>
 
