@@ -150,6 +150,7 @@ import { DailyMeetPanel } from "@studio/components/video/DailyMeetPanel";
 import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview } from "@studio/components/room/modals/DirectorReview";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
+import { MobileMenu } from "@studio/components/room/mobile/MobileMenu";
 
 const DEFAULT_SHORTCUTS: Shortcuts = {
   playPause: "Space",
@@ -3847,132 +3848,68 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
       <AnimatePresence>
         {isMobile && (
           <>
-            <Drawer.Root open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <Drawer.Portal>
-                <Drawer.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm" style={{ zIndex: UI_LAYER_BASE.mobileDrawerOverlay }} />
-                <Drawer.Content className="room-bg-elevated flex flex-col rounded-t-[32px] fixed bottom-0 left-0 right-0 outline-none max-h-[90vh]" style={{ zIndex: UI_LAYER_BASE.mobileDrawerContent }}>
-                  <div className="p-6 pb-12 overflow-y-auto">
-                    <div className="mx-auto w-12 h-1.5 rounded-full bg-muted mb-8" />
-                    <h2 className="text-xl font-bold mb-6 text-white">Menu do Estúdio</h2>
-                    <div className="space-y-4">
-                      <button
-                        onClick={() => { setDeviceSettingsOpen(true); setMobileMenuOpen(false); }}
-                        className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-500">
-                            <Monitor className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className="font-bold text-sm text-white">Dispositivos</div>
-                            <div className="text-[11px] text-white/40 uppercase tracking-wider">Configurar Áudio</div>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-white/20" />
-                      </button>
-                      <button
-                        onClick={() => { setShowProfilePanel(true); setMobileMenuOpen(false); }}
-                        className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
-                            <User className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className="font-bold text-sm text-white">Perfil de Gravação</div>
-                            <div className="text-[11px] text-white/40 uppercase tracking-wider">Ator & Personagem</div>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-white/20" />
-                      </button>
-                      <button
-                        onClick={() => { setRecordingsOpen(true); setMobileMenuOpen(false); }}
-                        className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                            <ListMusic className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className="font-bold text-sm text-white">Gravações</div>
-                            <div className="text-[11px] text-white/40 uppercase tracking-wider">Takes da Sessão</div>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-white/20" />
-                      </button>
-                      {canReleaseText && (
-                        <button
-                          onClick={() => { setTextControlPopupOpen(true); setMobileMenuOpen(false); }}
-                          className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-300">
-                              <Edit3 className="w-5 h-5" />
-                            </div>
-                            <div className="text-left">
-                              <div className="font-bold text-sm text-white">Liberar Texto</div>
-                              <div className="text-[11px] text-white/40 uppercase tracking-wider">Permissões em tempo real</div>
-                            </div>
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-white/20" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => { setIsCustomizing(true); setMobileMenuOpen(false); }}
-                        className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                        data-testid="button-mobile-open-shortcuts"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-300">
-                            <Settings className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className="font-bold text-sm text-white">Atalhos do Teclado</div>
-                            <div className="text-[11px] text-white/40 uppercase tracking-wider">Configurações rápidas</div>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-white/20" />
-                      </button>
-                      {canAccessDashboard && (
-                        <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
-                          <button
-                            onClick={() => { logFeatureAudit("room.panel", "redirect", { studioId }); setMobileMenuOpen(false); }}
-                            className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                            data-testid="button-mobile-room-panel"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-300">
-                                <Monitor className="w-5 h-5" />
-                              </div>
-                              <div className="text-left">
-                                <div className="font-bold text-sm text-white">Painel</div>
-                                <div className="text-[11px] text-white/40 uppercase tracking-wider">Voltar ao dashboard</div>
-                              </div>
-                            </div>
-                            <ChevronRight className="w-5 h-5 text-white/20" />
-                          </button>
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => { setDailyMeetOpen(true); setMobileMenuOpen(false); }}
-                        className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] transition-all min-h-[56px]"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-400">
-                            <Video className="w-5 h-5" />
-                          </div>
-                          <div className="text-left">
-                            <div className="font-bold text-sm text-white">Vídeo & Voz</div>
-                            <div className="text-[11px] text-white/40 uppercase tracking-wider">Chat da equipe</div>
-                          </div>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-white/20" />
-                      </button>
-                    </div>
-                  </div>
-                </Drawer.Content>
-              </Drawer.Portal>
-            </Drawer.Root>
+            <MobileMenu
+              open={mobileMenuOpen}
+              onOpenChange={setMobileMenuOpen}
+              overlayZIndex={UI_LAYER_BASE.mobileDrawerOverlay}
+              contentZIndex={UI_LAYER_BASE.mobileDrawerContent}
+              items={[
+                {
+                  icon: <Monitor className="w-5 h-5" />,
+                  iconBg: "bg-blue-500/10 text-blue-500",
+                  title: "Dispositivos",
+                  subtitle: "Configurar Áudio",
+                  onClick: () => { setDeviceSettingsOpen(true); setMobileMenuOpen(false); },
+                },
+                {
+                  icon: <User className="w-5 h-5" />,
+                  iconBg: "bg-purple-500/10 text-purple-500",
+                  title: "Perfil de Gravação",
+                  subtitle: "Ator & Personagem",
+                  onClick: () => { setShowProfilePanel(true); setMobileMenuOpen(false); },
+                },
+                {
+                  icon: <ListMusic className="w-5 h-5" />,
+                  iconBg: "bg-emerald-500/10 text-emerald-400",
+                  title: "Gravações",
+                  subtitle: "Takes da Sessão",
+                  onClick: () => { setRecordingsOpen(true); setMobileMenuOpen(false); },
+                },
+                {
+                  icon: <Edit3 className="w-5 h-5" />,
+                  iconBg: "bg-indigo-500/10 text-indigo-300",
+                  title: "Liberar Texto",
+                  subtitle: "Permissões em tempo real",
+                  onClick: () => { setTextControlPopupOpen(true); setMobileMenuOpen(false); },
+                  visible: canReleaseText,
+                },
+                {
+                  icon: <Settings className="w-5 h-5" />,
+                  iconBg: "bg-amber-500/10 text-amber-300",
+                  title: "Atalhos do Teclado",
+                  subtitle: "Configurações rápidas",
+                  onClick: () => { setIsCustomizing(true); setMobileMenuOpen(false); },
+                  testId: "button-mobile-open-shortcuts",
+                },
+                {
+                  icon: <Monitor className="w-5 h-5" />,
+                  iconBg: "bg-sky-500/10 text-sky-300",
+                  title: "Painel",
+                  subtitle: "Voltar ao dashboard",
+                  onClick: () => { logFeatureAudit("room.panel", "redirect", { studioId }); setMobileMenuOpen(false); },
+                  href: `/hub-dub/studio/${studioId}/dashboard`,
+                  testId: "button-mobile-room-panel",
+                  visible: canAccessDashboard,
+                },
+                {
+                  icon: <Video className="w-5 h-5" />,
+                  iconBg: "bg-green-500/10 text-green-400",
+                  title: "Vídeo & Voz",
+                  subtitle: "Chat da equipe",
+                  onClick: () => { setDailyMeetOpen(true); setMobileMenuOpen(false); },
+                },
+              ]}
+            />
 
             <button
               onClick={() => setScriptOpen(true)}
