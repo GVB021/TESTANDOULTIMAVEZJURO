@@ -20,7 +20,6 @@ import {
   useCharactersList,
   useTakesList,
   useRecordingsList,
-  type RecordingsResponse,
 } from "@studio/hooks/room";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
 import SessionBlockedScreen from "@studio/pages/admin/components/SessionBlockedScreen";
