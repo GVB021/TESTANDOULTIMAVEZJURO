@@ -1515,19 +1515,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
   }, [recordingProfile, sessionId, user?.id, user?.displayName, user?.fullName, queryClient, logAudioStep]);
 
   const startCountdown = useCallback(() => {
-    // 🔍 DEBUG DETALHADO
-    console.log("🎙️ startCountdown chamado - DEBUG COMPLETO", {
-      recordingStatus,
-      micReady,
-      micInitializing,
-      hasMicState: !!micState,
-      currentLine,
-      hasVideoRef: !!videoRef.current,
-      userRole: mySessionRole,
-      timestamp: new Date().toISOString()
-    });
-
-    // 🔥 SIMPLIFICAR VALIDAÇÕES PARA DEBUG
     if (recordingStatus !== "idle") {
       console.warn("❌ Gravação não iniciada: status não é idle", recordingStatus);
       toast({ 
@@ -1577,13 +1564,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
     // 🔥 IMPLEMENTAÇÃO DO PREROLL SIMPLIFICADA
     const currentLineTime = scriptLines[currentLine]?.start || 0;
     const prerollStart = Math.max(0, currentLineTime - 3);
-    
-    console.log("⏱️ Timing preroll simplificado", {
-      currentLine,
-      currentLineTime,
-      prerollStart,
-      prerollSeconds: 3
-    });
     
     video.currentTime = prerollStart;
     emitVideoEvent("seek", { currentTime: prerollStart });
