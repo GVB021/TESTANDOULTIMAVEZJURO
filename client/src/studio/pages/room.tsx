@@ -1479,7 +1479,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
       return;
     }
     
-    
     const currentLineTime = scriptLines[currentLine]?.start || 0;
     const prerollStart = Math.max(0, currentLineTime - 3);
     
