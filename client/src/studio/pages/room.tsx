@@ -29,8 +29,6 @@ import {
   ListMusic,
   Video,
 } from "lucide-react";
-import { Button } from "@studio/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { HardwareSetupDialog } from "@studio/components/hardware/HardwareSetupDialog";
 import { useHardwareControl } from "@studio/hooks/use-hardware-control";
 import {
