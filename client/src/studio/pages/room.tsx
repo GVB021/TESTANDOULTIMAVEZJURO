@@ -2017,6 +2017,24 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     setRecordingStatus("idle");
   }, []);
 
+  const handleBack = useCallback(() => {
+    if (recordingStatus === "recording" && !window.confirm("Você tem uma gravação em andamento. Deseja realmente sair?")) return;
+    setLocation(`/hub-dub/studio/${studioId}/dashboard`);
+  }, [recordingStatus, studioId, setLocation]);
+
+  const handleToggleAutoFollow = useCallback(() => {
+    const next = !scriptAutoFollow;
+    setScriptAutoFollow(next);
+    if (next) syncScrollToCurrentVideoTime();
+    logFeatureAudit("room.scroll", "mode_changed", { mode: next ? "automatic" : "manual" });
+  }, [scriptAutoFollow, syncScrollToCurrentVideoTime, logFeatureAudit]);
+
+  const handleToggleCharacterFilter = useCallback(() => {
+    const next = !onlySelectedCharacter;
+    setOnlySelectedCharacter(next);
+    logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
+  }, [onlySelectedCharacter, recordingProfile, logFeatureAudit]);
+
   // Debounce para live updates de texto
   useEffect(() => {
     if (!editingField) return;
@@ -2564,23 +2582,11 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
         setCharSelectorOpen={setCharSelectorOpen}
         charactersList={charactersList || []}
         handleCharacterChange={handleCharacterChange}
-        onBack={() => {
-          if (recordingStatus === 'recording' && !window.confirm('Você tem uma gravação em andamento. Deseja realmente sair?')) return;
-          setLocation(`/hub-dub/studio/${studioId}/dashboard`);
-        }}
+        onBack={handleBack}
         scriptAutoFollow={scriptAutoFollow}
-        onToggleAutoFollow={() => {
-          const next = !scriptAutoFollow;
-          setScriptAutoFollow(next);
-          if (next) syncScrollToCurrentVideoTime();
-          logFeatureAudit("room.scroll", "mode_changed", { mode: next ? "automatic" : "manual" });
-        }}
+        onToggleAutoFollow={handleToggleAutoFollow}
         onlySelectedCharacter={onlySelectedCharacter}
-        onToggleCharacterFilter={() => {
-          const next = !onlySelectedCharacter;
-          setOnlySelectedCharacter(next);
-          logFeatureAudit("room.character_filter", "toggled", { enabled: next, character: recordingProfile?.characterName || null });
-        }}
+        onToggleCharacterFilter={handleToggleCharacterFilter}
         rightSlot={
           <RoomHeaderActions
             isMobile={isMobile}
