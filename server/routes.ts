@@ -2085,6 +2085,72 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // PDF → Script lines parser
+  const pdfUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+  app.post("/api/productions/:productionId/parse-pdf", requireAuth, pdfUpload.single("file"), async (req: any, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pdfParse: (buf: Buffer) => Promise<any> = require("pdf-parse");
+      const data = await pdfParse(req.file.buffer);
+      const rawText: string = data.text || "";
+
+      // Split into non-empty lines and try to detect character + dialogue patterns
+      const rawLines = rawText.split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+
+      interface ScriptEntry { character: string; text: string; start: string; notes: string; }
+      const entries: ScriptEntry[] = [];
+      const tcPattern = /^(\d{1,2}[:;]\d{2}[:;]\d{2}(?:[;:]\d{2})?)\s+(.*)/;
+      const allCapsPattern = /^([A-ZÁÉÍÓÚÀÃÕÂÊÎÔÛÇ\s\-\.]{2,40})\s*$/;
+
+      let pendingChar = "";
+      let pendingTc = "00:00:00";
+
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        const tcMatch = line.match(tcPattern);
+        if (tcMatch) {
+          // Line starts with timecode
+          const rawTc = tcMatch[1].replace(/;/g, ":").split(":").slice(0, 3).join(":");
+          const rest = tcMatch[2].trim();
+          // rest might be "CHARACTER dialogue" or just dialogue
+          const parts = rest.split(/\s{2,}/);
+          if (parts.length >= 2 && allCapsPattern.test(parts[0])) {
+            entries.push({ character: parts[0].trim(), text: parts.slice(1).join(" ").trim(), start: rawTc, notes: "" });
+          } else {
+            entries.push({ character: pendingChar, text: rest, start: rawTc, notes: "" });
+          }
+          pendingTc = rawTc;
+        } else if (allCapsPattern.test(line) && line.length <= 40) {
+          // Looks like a character name in ALL CAPS
+          pendingChar = line.trim();
+        } else if (pendingChar && line.length > 0) {
+          // Dialogue after a character name
+          entries.push({ character: pendingChar, text: line, start: pendingTc, notes: "" });
+          pendingChar = "";
+        } else if (entries.length > 0) {
+          // Continuation of previous dialogue
+          const last = entries[entries.length - 1];
+          if (last && last.text && !allCapsPattern.test(line)) {
+            last.text += " " + line;
+          }
+        }
+      }
+
+      // Fallback: if no entries detected, return each paragraph as a line
+      if (entries.length === 0) {
+        rawLines.forEach((l: string) => {
+          if (l.length > 0) entries.push({ character: "", text: l, start: "00:00:00", notes: "" });
+        });
+      }
+
+      res.json({ lines: entries, pageCount: data.numpages, rawLineCount: rawLines.length });
+    } catch (err: any) {
+      logger.error("[PDF parse] error", { message: err?.message });
+      res.status(500).json({ message: err?.message || "Erro ao processar PDF" });
+    }
+  });
+
   // STAFF
   app.get("/api/studios/:studioId/staff", requireAuth, requireStudioAccess, async (req, res) => {
     const staffList = await storage.getStaff(req.params.studioId);

@@ -11,7 +11,7 @@ import { Textarea } from "@studio/components/ui/textarea";
 import {
   Plus, Film, Search, MoreVertical, Upload, UserPlus,
   Settings2, FileJson, Download, Loader2, Trash2, Save,
-  Clock, MessageSquare, ClipboardPaste
+  Clock, MessageSquare, FileText, ClipboardPaste
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
@@ -254,6 +254,7 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
   const [activeTab, setActiveTab] = useState<"details" | "script" | "characters">("details");
   const [showJsonModal, setShowJsonModal] = useState(false);
   const [jsonPasteText, setJsonPasteText] = useState("");
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
 
   useEffect(() => {
     if (!production) return;
@@ -316,6 +317,42 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
 
   const toTempoEmSegundos = (val: any): number => {
     return parseUniversalTimecodeToSeconds(val ?? "00:00:00", 24);
+  };
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setIsPdfLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await authFetch(`/api/productions/${productionId}/parse-pdf`, {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.message || `Erro ${res.status}`);
+      }
+      const result = await res.json();
+      const lines: ScriptLine[] = (result.lines || []).map((l: any) => ({
+        character: String(l.character || ""),
+        start: String(l.start || "00:00:00"),
+        tempo: String(l.start || "00:00:00"),
+        tempoEmSegundos: toTempoEmSegundos(l.start || "00:00:00"),
+        text: String(l.text || ""),
+        notes: String(l.notes || ""),
+      }));
+      if (lines.length === 0) throw new Error("Nenhuma linha detectada no PDF.");
+      setScriptLines(lines);
+      setScriptDirty(true);
+      toast({ title: `${lines.length} linha${lines.length !== 1 ? "s" : ""} importadas do PDF (${result.pageCount} página${result.pageCount !== 1 ? "s" : ""})` });
+    } catch (err: any) {
+      toast({ title: "Erro ao processar PDF", description: err?.message || "Tente novamente.", variant: "destructive" });
+    } finally {
+      setIsPdfLoading(false);
+    }
   };
 
   const handleScriptUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -577,8 +614,19 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="relative gap-1.5" disabled={isPdfLoading} data-testid="button-upload-pdf">
+                    {isPdfLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
+                    {isPdfLoading ? "Processando..." : "Importar PDF"}
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={handlePdfUpload}
+                      disabled={isPdfLoading}
+                    />
+                  </Button>
                   <Button variant="outline" size="sm" className="relative gap-1.5" data-testid="button-upload-script">
-                    <Upload className="w-3.5 h-3.5" /> Importar arquivo
+                    <Upload className="w-3.5 h-3.5" /> Importar JSON
                     <input
                       type="file"
                       accept=".json"
