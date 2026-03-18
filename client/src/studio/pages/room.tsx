@@ -1256,11 +1256,7 @@ export default function RecordingRoom() {
           await sinkCapable.setSinkId(targetSinkId);
         } catch (error) {
           logAudioStep("sink-apply-error", { message: String((error as any)?.message || error), outputDeviceId: targetSinkId });
-          toast({
-            title: "Saída de áudio não aplicada",
-            description: "Seu navegador não permitiu selecionar este dispositivo de saída.",
-            variant: "destructive",
-          });
+          toast({ title: "Saída de áudio não aplicada", description: "Seu navegador não permitiu selecionar este dispositivo de saída.", variant: "destructive" });
           break;
         }
       }
@@ -1557,11 +1553,7 @@ export default function RecordingRoom() {
     if (isLooping && customLoop) {
       const expectedDuration = customLoop.end - Math.max(0, customLoop.start - 3);
       if (result.durationSeconds + 0.15 < expectedDuration) {
-        toast({
-          title: "Loop incompleto",
-          description: "A última fala do loop não foi gravada por completo.",
-          variant: "destructive",
-        });
+        toast({ title: "Loop incompleto", description: "A última fala do loop não foi gravada por completo.", variant: "destructive" });
         setRecordingStatus("idle");
         return;
       }
