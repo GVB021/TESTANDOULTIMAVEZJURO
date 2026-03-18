@@ -84,7 +84,7 @@ import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 import { MobileMenu, MobileScriptDrawer, MobileFooterControls } from "@studio/components/room/mobile";
-import { DesktopScriptColumn } from "@studio/components/room/script";
+import { DesktopScriptColumn, ScriptLineRow } from "@studio/components/room/script";
 import { DesktopControlsBar } from "@studio/components/room/controls";
 import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
 import { RecordingsPanel } from "@studio/components/room/recordings";
@@ -2750,77 +2750,30 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               renderLine={(i) => {
                 const line = displayedScriptLines.find((l) => l.originalIndex === i);
                 if (!line) return null;
-                const isActive = i === currentLine;
-                const isDone = savedTakes.has(i);
-                const isInLoop = customLoop ? line.start >= customLoop.start && line.end <= customLoop.end : false;
-                const lock = lockedLines[i];
-                const isLockedByOther = lock && lock.userId !== user?.id;
-                const lockingUser = isLockedByOther ? presenceUsers.find(u => u.userId === lock.userId)?.name || "Alguém" : null;
-                const liveText = isLockedByOther && liveDrafts[i] ? liveDrafts[i] : line.text;
                 return (
-                  <div
+                  <ScriptLineRow
                     key={i}
-                    ref={(el) => { lineRefs.current[i] = el; }}
-                    onClick={canTextControl && !isLockedByOther ? (() => handleLineClick(i)) : undefined}
-                    className={cn(
-                      "mb-4 px-5 py-4 rounded-xl transition-all duration-300 relative overflow-hidden",
-                      isActive ? "bg-background/85 shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.22)] backdrop-blur-md" : "bg-transparent",
-                      isInLoop && "shadow-[inset_0_0_0_1px_rgba(129,140,248,0.45)] bg-indigo-500/10",
-                      canTextControl && !isLockedByOther ? "cursor-pointer" : "cursor-default",
-                      isLockedByOther && "opacity-70 border border-amber-500/30 bg-amber-500/5"
-                    )}
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-[13px] font-mono tabular-nums text-muted-foreground">#{i + 1} · {formatLiveTimecode(line.start)}</span>
-                      <span className={cn("text-[16px] font-extrabold uppercase tracking-tight", isActive ? "text-primary" : "text-muted-foreground")}>
-                        {line.character}
-                      </span>
-                      {isDone && <CheckCircle2 className="w-4 h-4 ml-auto text-emerald-500" />}
-                      {isLockedByOther && (
-                        <span className="ml-auto text-[10px] text-amber-500 flex items-center gap-1 font-medium px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          {lockingUser} editando...
-                        </span>
-                      )}
-                    </div>
-                    <p className={cn("leading-relaxed transition-all", isActive ? "text-foreground font-medium" : "text-muted-foreground", isLockedByOther && "italic text-amber-200/80")} style={{ fontSize: `${scriptFontSize}px` }}>
-                      {liveText}
-                    </p>
-                    {canTextControl && !isLockedByOther && (
-                      <div className="mt-3 flex items-center gap-2">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button onClick={(e) => e.stopPropagation()} className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all hover:scale-105 flex items-center justify-center" title="Editar linha">
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start" className="w-40">
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); startInlineEdit(i, "character"); }}>Personagem</DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); startInlineEdit(i, "text"); }}>Fala</DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); startInlineEdit(i, "timecode"); }}>Timecode</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )}
-                    {editingField?.lineIndex === i && (
-                      <div className="mt-3 rounded-lg border border-border/70 bg-muted/30 p-3" onClick={(e) => e.stopPropagation()}>
-                        {editingField.field === "text" ? (
-                          <textarea value={editingDraftValue} onChange={(e) => setEditingDraftValue(e.target.value)} className="w-full min-h-20 rounded-md border border-border/70 bg-background px-3 py-2 text-sm text-foreground outline-none" readOnly={isLockedByOther} disabled={isLockedByOther} />
-                        ) : (
-                          <input value={editingDraftValue} onChange={(e) => setEditingDraftValue(e.target.value)} className="w-full h-9 rounded-md border border-border/70 bg-background px-3 text-sm text-foreground outline-none" readOnly={isLockedByOther} disabled={isLockedByOther} />
-                        )}
-                        <div className="mt-2 flex items-center justify-end gap-2">
-                          <button onClick={cancelInlineEdit} className="h-7 px-2 rounded-md bg-muted/70 text-[11px] text-muted-foreground hover:text-foreground">Cancelar</button>
-                          {!isLockedByOther && <button onClick={saveInlineEdit} className="h-7 px-2 rounded-md bg-primary/20 text-[11px] text-primary hover:bg-primary/30">Salvar</button>}
-                        </div>
-                      </div>
-                    )}
-                    {lineEditHistory[i]?.[0] && (
-                      <div className="mt-2 text-[11px] text-muted-foreground">
-                        Última alteração: {lineEditHistory[i][0].field} por {lineEditHistory[i][0].by}
-                      </div>
-                    )}
-                  </div>
+                    line={line}
+                    currentLine={currentLine}
+                    savedTakes={savedTakes}
+                    customLoop={customLoop}
+                    lockedLines={lockedLines}
+                    liveDrafts={liveDrafts}
+                    presenceUsers={presenceUsers}
+                    userId={user?.id}
+                    canTextControl={canTextControl}
+                    scriptFontSize={scriptFontSize}
+                    formatTimecode={formatLiveTimecode}
+                    editingField={editingField}
+                    editingDraftValue={editingDraftValue}
+                    lineEditHistory={lineEditHistory}
+                    lineRef={(el) => { lineRefs.current[i] = el; }}
+                    onLineClick={handleLineClick}
+                    onEditDraftChange={setEditingDraftValue}
+                    onStartEdit={startInlineEdit}
+                    onCancelEdit={cancelInlineEdit}
+                    onSaveEdit={saveInlineEdit}
+                  />
                 );
               }}
             />
