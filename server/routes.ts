@@ -464,6 +464,68 @@ async function canManageSessionTakes(user: any, sessionId: string, studioId: str
   return participantRole === "diretor" || participantRole === "studio_admin" || participantRole === "platform_owner";
 }
 
+async function canAccessTake(user: any, take: any, sessionId: string, studioId: string): Promise<boolean> {
+  // Platform owner always has access
+  const platformRole = normalizePlatformRole(user?.role);
+  const email = String(user?.email || "").toLowerCase().trim();
+  const isMaster = email === "borbaggabriel@gmail.com";
+  if (platformRole === "platform_owner" || isMaster) return true;
+
+  // Studio admins have access
+  const studioRoles = (await storage.getUserRolesInStudio(user.id, studioId)).map(normalizeStudioRole);
+  if (studioRoles.includes("studio_admin")) return true;
+
+  // Session directors have access
+  const participants = await storage.getSessionParticipants(sessionId);
+  const self = participants.find((p) => String(p.userId || "") === String(user.id || ""));
+  if (!self) return false;
+  const participantRole = normalizeStudioRole(self.role);
+  if (participantRole === "diretor") return true;
+
+  // Take owner (who recorded) has access
+  if (String(take.voiceActorId || "") === String(user.id || "")) return true;
+
+  // Assigned dublador for the character has access
+  if (take.characterId) {
+    const characterAssignments = await storage.getCharacterAssignments(take.characterId);
+    const isAssignedDublador = characterAssignments.some((assignment: any) => 
+      String(assignment.userId || "") === String(user.id || "") && 
+      (normalizeStudioRole(assignment.role) === "dublador" || normalizeStudioRole(assignment.role) === "aluno")
+    );
+    if (isAssignedDublador) return true;
+  }
+
+  return false;
+}
+
+async function downloadTakeAudio(take: any): Promise<Buffer | null> {
+  try {
+    if (!take.audioUrl) return null;
+    
+    // If it's already a Supabase URL, download from there
+    if (take.audioUrl.includes("supabase") || take.audioUrl.includes("/storage/v1/")) {
+      const response = await fetch(take.audioUrl);
+      if (!response.ok) return null;
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    }
+    
+    // If it's a local file, read from disk
+    if (take.audioUrl.startsWith("/uploads/")) {
+      const filename = path.basename(take.audioUrl);
+      const filePath = path.join(uploadsDir, filename);
+      if (fs.existsSync(filePath)) {
+        return fs.readFileSync(filePath);
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    logger.error("[DownloadTakeAudio] Failed to download audio", { takeId: take.id, error: String(error) });
+    return null;
+  }
+}
+
 function studioTimecodeSettingKey(studioId: string): string {
   return `STUDIO_TIMECODE_FORMAT_${studioId}`;
 }
@@ -1432,7 +1494,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         md5: audioMd5 || null,
       });
 
-      if (req.file && storageProvider === "supabase" && isSupabaseConfigured()) {
+      if (req.file && storageProvider === "supabase" && isSupabaseConfigured() && take.isPreferred) {
         try {
           const status = await checkSupabaseConnection(false);
           if (!status.ok) throw new Error(status.reason || "Supabase indisponivel");
@@ -1473,11 +1535,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           const characterToken = normalizeTokenUpper(characterRow?.name || "");
           const filename = `${characterToken}_${actorToken}_${timecodeToken}.wav`;
 
-          const baseFolder = normalizeSegment(String(takesPath || "uploads"));
-          const pathSegments =
-            String(supabaseBucket || "").trim().toLowerCase() === baseFolder
-              ? [studioName, productionName, actorFolder, characterFolder, filename]
-              : [baseFolder, studioName, productionName, actorFolder, characterFolder, filename];
+          const baseFolder = "upload"; // Fixed base folder as requested
+          const pathSegments = [baseFolder, productionName, sessionId, characterFolder, actorFolder, filename];
           const objectPath = pathSegments.filter(Boolean).join("/");
           const uploadJob: PendingTakeUploadJob = {
             takeId: take.id,
@@ -1567,11 +1626,20 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         : takesList.filter(
         (take: any) => String(take.voiceActorId || "") === String(user.id || "") || String(take.userId || "") === String(user.id || "")
       );
+
+      // Apply stricter access control - filter takes user shouldn't have access to
+      const filteredScoped = await Promise.all(
+        scoped.map(async (take: any) => {
+          const hasAccess = await canAccessTake(user, take, req.params.sessionId, session.studioId);
+          return hasAccess ? take : null;
+        })
+      );
+      const finalScoped = filteredScoped.filter(Boolean);
       if (canManage) {
         await storage.createAuditLog({
           userId: user.id,
           action: "recordings.access.privileged",
-          details: JSON.stringify({ sessionId: req.params.sessionId, count: scoped.length }),
+          details: JSON.stringify({ sessionId: req.params.sessionId, count: finalScoped.length }),
         });
       }
       const query = z.object({
@@ -1579,57 +1647,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         pageSize: z.coerce.number().int().min(1).max(20).optional(),
         search: z.string().max(120).optional(),
         userId: z.string().max(120).optional(),
-        from: z.string().optional(),
-        to: z.string().optional(),
-        sortBy: z.enum(["createdAt", "durationSeconds", "lineIndex", "characterName"]).optional(),
-        sortDir: z.enum(["asc", "desc"]).optional(),
-      }).parse(req.query || {});
-      const fromTs = query.from ? new Date(query.from).getTime() : null;
-      const toTs = query.to ? new Date(query.to).getTime() : null;
-      const searchTerm = String(query.search || "").trim().toLowerCase();
-      let filtered = scoped.filter((item: any) => {
-        const createdAt = new Date(String(item.createdAt || 0)).getTime();
-        if (Number.isFinite(fromTs) && fromTs !== null && createdAt < fromTs) return false;
-        if (Number.isFinite(toTs) && toTs !== null && createdAt > toTs) return false;
-        if (query.userId && String(item.voiceActorId || "") !== String(query.userId)) return false;
-        if (searchTerm) {
-          const hay = `${item.characterName || ""} ${item.voiceActorName || ""} ${item.id || ""}`.toLowerCase();
-          if (!hay.includes(searchTerm)) return false;
-        }
-        if (String(item.audioUrl || "").startsWith("discarded://")) return false;
-        return true;
-      });
-      const sortBy = query.sortBy || "createdAt";
-      const sortDir = query.sortDir || "desc";
-      filtered = [...filtered].sort((a: any, b: any) => {
-        const factor = sortDir === "asc" ? 1 : -1;
-        if (sortBy === "durationSeconds") return factor * ((Number(a.durationSeconds || 0) - Number(b.durationSeconds || 0)));
-        if (sortBy === "lineIndex") return factor * (Number(a.lineIndex || 0) - Number(b.lineIndex || 0));
-        if (sortBy === "characterName") return factor * String(a.characterName || "").localeCompare(String(b.characterName || ""));
-        return factor * (new Date(String(a.createdAt || 0)).getTime() - new Date(String(b.createdAt || 0)).getTime());
-      });
-      const pageSize = query.pageSize || 20;
+      }).parse(req.query);
       const page = query.page || 1;
-      const total = filtered.length;
-      const pageCount = Math.max(1, Math.ceil(total / pageSize));
-      const offset = (Math.min(page, pageCount) - 1) * pageSize;
-      const items = filtered.slice(offset, offset + pageSize).map((item: any) => ({
-        ...item,
-        fileName: filenameFromAudioUrl(item.audioUrl, `take_${item.id}.wav`),
-        format: path.extname(filenameFromAudioUrl(item.audioUrl, "")).replace(".", "").toUpperCase() || "WAV",
-      }));
-      logger.info("[Recordings] Scoped list returned", {
-        sessionId: req.params.sessionId,
-        userId: user.id,
-        count: items.length,
-      });
-      res.status(200).json({
-        items,
-        page: Math.min(page, pageCount),
-        pageSize,
-        total,
-        pageCount,
-      });
+      const pageSize = query.pageSize || 10;
+      const search = query.search?.toLowerCase().trim() || "";
+      const filtered = search
+        ? finalScoped.filter((take) =>
+          (take.characterName?.toLowerCase().includes(search) ?? false) ||
+          (take.voiceActorName?.toLowerCase().includes(search) ?? false) ||
+          (take.lineIndex?.toString().includes(search) ?? false)
+        )
+        : finalScoped;
+      const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+      res.status(200).json({ takes: paginated, total: filtered.length, page, pageSize });
     } catch (error: any) {
       logger.error("[Recordings] Database fetch failure", {
         sessionId: req.params.sessionId,
@@ -1650,6 +1680,98 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const canManage = await canManageSessionTakes(user, takeRecord.sessionId, session.studioId);
       if (!canManage) return res.status(403).json({ message: "Somente diretor pode aprovar takes" });
       const take = await storage.setPreferredTake(req.params.id);
+      
+      // Upload approved take to Supabase with correct path structure
+      if (isSupabaseConfigured()) {
+        try {
+          const settings = await storage.getAllSettings();
+          const storageProvider = settings.DEFAULT_STORAGE_PROVIDER || "supabase";
+          const supabaseBucket = settings.SUPABASE_BUCKET || "takes";
+          
+          if (storageProvider === "supabase") {
+            const status = await checkSupabaseConnection(false);
+            if (!status.ok) throw new Error(status.reason || "Supabase indisponivel");
+            
+            // Get session and production info for path structure
+            const sessionInfo = await storage.getSession(take.sessionId);
+            const studioId = String(sessionInfo?.studioId || "");
+            const productionId = String(sessionInfo?.productionId || "");
+            
+            const [[studioRow], [productionRow], [characterRow], [actorRow]] = await Promise.all([
+              studioId
+                ? db.select({ name: studios.name }).from(studios).where(eq(studios.id, studioId))
+                : Promise.resolve([]),
+              productionId
+                ? db.select({ name: productions.name }).from(productions).where(eq(productions.id, productionId))
+                : Promise.resolve([]),
+              db.select({ name: characters.name }).from(characters).where(eq(characters.id, String(take.characterId))),
+              db.select({ artistName: users.artistName, displayName: users.displayName, fullName: users.fullName, firstName: users.firstName, lastName: users.lastName, email: users.email })
+                .from(users)
+                .where(eq(users.id, String(take.voiceActorId))),
+            ]);
+            
+            const studioName = normalizeSegment(studioRow?.name || "");
+            const productionName = normalizeSegment(productionRow?.name || "");
+            const actorNameRaw =
+              actorRow?.artistName ||
+              actorRow?.displayName ||
+              actorRow?.fullName ||
+              `${actorRow?.firstName || ""} ${actorRow?.lastName || ""}`.trim() ||
+              actorRow?.email ||
+              "";
+            const actorFolder = normalizeSegment(actorNameRaw);
+            const characterFolder = normalizeSegment(characterRow?.name || "");
+            
+            const actorToken = normalizeTokenUpper(actorNameRaw);
+            const characterToken = normalizeTokenUpper(characterRow?.name || "");
+            const timecodeToken = secondsToTimecodeToken((take as any).startTimeSeconds || 0);
+            const filename = `${characterToken}_${actorToken}_${timecodeToken}.wav`;
+            
+            // Create path: upload/production/session/character/dublador/take.wav
+            const baseFolder = "upload";
+            const pathSegments = [baseFolder, productionName, take.sessionId, characterFolder, actorFolder, filename];
+            const objectPath = pathSegments.filter(Boolean).join("/");
+            
+            // Download existing audio and upload to Supabase
+            const audioBuffer = await downloadTakeAudio(take);
+            if (audioBuffer) {
+              const uploadJob: PendingTakeUploadJob = {
+                takeId: take.id,
+                bucket: supabaseBucket,
+                objectPath,
+                contentType: "audio/wav",
+                buffer: audioBuffer,
+                md5: checksumMd5(audioBuffer),
+                userId: user.id,
+                sessionId: take.sessionId,
+                attempts: 1,
+                createdAt: Date.now(),
+              };
+              
+              const publicUrl = await uploadTakeJobToSupabase(uploadJob);
+              await storage.updateTakeAudioUrl(take.id, publicUrl);
+              (take as any).audioUrl = publicUrl;
+              
+              await createAudioAuditLog(req, "take.approved.supabase.uploaded", {
+                takeId: take.id,
+                sessionId: take.sessionId,
+                objectPath,
+                bucket: supabaseBucket,
+              });
+              
+              logger.info("[Take Approval] Supabase upload complete", {
+                takeId: take.id,
+                objectPath,
+                bucket: supabaseBucket,
+              });
+            }
+          }
+        } catch (e: any) {
+          logger.error("[Take Approval] Supabase upload failed", { takeId: take.id, message: e?.message });
+          // Don't fail the approval, just log the error
+        }
+      }
+      
       await storage.createAuditLog({
         userId: user.id,
         action: "take.approved",
@@ -1759,9 +1881,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (takeList.length === 0) return res.status(404).json({ message: "Take nao encontrado" });
       const take = takeList[0];
       const user = (req as any).user!;
-      const canManage = await canManageSessionTakes(user, take.sessionId, take.studioId);
-      const isOwner = String(take.voiceActorId || "") === String(user.id || "");
-      if (!canManage && !isOwner) return res.status(403).json({ message: "Acesso negado" });
+      const hasAccess = await canAccessTake(user, take, take.sessionId, take.studioId);
+      if (!hasAccess) return res.status(403).json({ message: "Acesso negado" });
 
       if (!isSupabaseConfigured()) {
         return res.status(503).json({ message: "Supabase não está configurado. Armazenamento indisponível." });
@@ -1816,9 +1937,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (takeList.length === 0) return res.status(404).json({ message: "Take nao encontrado" });
       const take = takeList[0];
       const user = (req as any).user!;
-      const canManage = await canManageSessionTakes(user, take.sessionId, take.studioId);
-      const isOwner = String(take.voiceActorId || "") === String(user.id || "");
-      if (!canManage && !isOwner && !take.isPreferred) return res.status(403).json({ message: "Acesso negado" });
+      const hasAccess = await canAccessTake(user, take, take.sessionId, take.studioId);
+      if (!hasAccess) return res.status(403).json({ message: "Acesso negado" });
 
       if (!isSupabaseConfigured()) {
         return res.status(503).json({ message: "Supabase não está configurado." });

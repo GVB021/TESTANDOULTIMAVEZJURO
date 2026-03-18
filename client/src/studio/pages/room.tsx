@@ -615,7 +615,7 @@ export default function RecordingRoom() {
         } else if (msg.type === "text-control:set-controllers" || msg.type === "text-control:state") {
           const ids = Array.isArray(msg.targetUserIds) ? msg.targetUserIds : msg.controllerUserIds;
           console.log("[Room] text-control state received:", { type: msg.type, ids, myId: user?.id });
-          const nextSet = new Set(Array.from(new Set(ids || [])));
+          const nextSet = new Set(Array.from(new Set(ids || []))) as Set<string>;
           setTextControllerUserIds(nextSet);
           // Log immediately with the new state
           console.log("[Room] After text-control update:", { 

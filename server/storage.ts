@@ -718,6 +718,12 @@ export class DatabaseStorage implements IStorage {
     }));
     return result;
   }
+
+  async getCharacterAssignments(characterId: string): Promise<SessionParticipant[]> {
+    // Filter participants by characterId in memory since it's not a direct column
+    const allParticipants = await db.select().from(sessionParticipants);
+    return allParticipants.filter(p => (p as any).characterId === characterId);
+  }
 }
 
 export const storage = new DatabaseStorage();
