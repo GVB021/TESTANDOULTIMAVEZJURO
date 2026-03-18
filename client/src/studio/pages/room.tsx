@@ -20,7 +20,6 @@ import {
   useCharactersList,
   useTakesList,
   useRecordingsList,
-  type RecordingsQueryParams,
   type RecordingsResponse,
 } from "@studio/hooks/room";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
