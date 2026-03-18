@@ -211,10 +211,8 @@ const [recordingAvailability, setRecordingAvailability] = useState<Record<string
 const [recordingPlayableUrls, setRecordingPlayableUrls] = useState<Record<string, string>>({});
 
   // WebSocket state
-  const [wsConnected, setWsConnected] = useState(false);
   const [roomUsers, setRoomUsers] = useState<any[]>([]);
   const [presenceUsers, setPresenceUsers] = useState<any[]>([]);
-  const [clientAcks, setClientAcks] = useState<Record<string, any>>({});
   const [lockedLines, setLockedLines] = useState<Record<number, any>>({});
   const [liveDrafts, setLiveDrafts] = useState<Record<number, string>>({});
   const [directorConsoleOpen, setDirectorConsoleOpen] = useState(false);
@@ -566,13 +564,6 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
             // Enviar ACK de confirmação
             emitVideoEvent("ack", { command: "pause", userId: user?.id });
           }
-        } else if (msg.type === "video:ack") {
-          if (msg.userId) {
-            setClientAcks(prev => ({
-              ...prev,
-              [msg.userId!]: { lastAck: Date.now(), command: msg.command || "unknown" }
-            }));
-          }
         } else if (msg.type === "text:lock-line") {
           if (typeof msg.lineIndex === "number" && msg.userId) {
             setLockedLines(prev => ({
@@ -717,12 +708,10 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
 
     ws.onopen = () => {
       console.log("[Room] WebSocket connected");
-      setWsConnected(true);
     };
 
     ws.onclose = () => {
       console.log("[Room] WebSocket disconnected");
-      setWsConnected(false);
     };
 
     return () => {
