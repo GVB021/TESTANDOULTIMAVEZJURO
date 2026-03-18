@@ -147,7 +147,6 @@ export interface RecordingProfile {
   voiceActorName: string;
 }
 
-
 export default function RecordingRoom() {
   const { studioId, sessionId } = useParams<{ studioId: string; sessionId: string }>();
   const { role: studioRole, isDirector } = useStudioRole(studioId || "");
@@ -769,7 +768,6 @@ const cachedRecordingBlobUrlsRef = useRef<Record<string, string>>({});
         return line.character.trim().toLowerCase() === selectedCharacter;
       });
   }, [scriptLines, onlySelectedCharacter, recordingProfile?.characterName]);
-
 
   const { data: takesList = [] } = useTakesList(sessionId);
   const {
