@@ -1133,6 +1133,19 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
     },
   ], [canReleaseText, canAccessDashboard, studioId]);
 
+  const loopInfo = useMemo((): string | null => {
+    if (!customLoop && loopSelectionMode === "idle" && !loopPreparing && !loopSilenceActive) return null;
+    if (loopPreparing) return "Preparando loop... (3s)";
+    if (loopSilenceActive) return "Silêncio entre loops... (3s)";
+    if (loopSelectionMode === "selecting-start") return "Loop: selecione a primeira fala";
+    if (loopSelectionMode === "selecting-end") return "Loop: selecione a última fala";
+    if (customLoop) {
+      const range = loopRangeMeta ? ` · Linhas ${loopRangeMeta.startIndex + 1}-${loopRangeMeta.endIndex + 1}` : "";
+      return `Loop ativo ${formatLiveTimecode(customLoop.start)} - ${formatLiveTimecode(customLoop.end)}${range}`;
+    }
+    return null;
+  }, [customLoop, loopSelectionMode, loopPreparing, loopSilenceActive, loopRangeMeta, formatLiveTimecode]);
+
   // Note: applyScriptLinePatch and pushEditHistory moved above to avoid hoisting issues
 
   const rebuildScrollAnchors = useCallback(() => {
@@ -2621,21 +2634,7 @@ const [isWaitingReview, setIsWaitingReview] = useState(false);
               onTouchMove={handleVideoTouchMove}
               countdownValue={countdownValue}
               volumeOverlay={volumeOverlay}
-              loopInfo={
-                (customLoop || loopSelectionMode !== "idle" || loopPreparing || loopSilenceActive)
-                  ? loopPreparing
-                    ? "Preparando loop... (3s)"
-                    : !loopPreparing && loopSilenceActive
-                    ? "Silêncio entre loops... (3s)"
-                    : loopSelectionMode === "selecting-start"
-                    ? "Loop: selecione a primeira fala"
-                    : loopSelectionMode === "selecting-end"
-                    ? "Loop: selecione a última fala"
-                    : customLoop
-                    ? `Loop ativo ${formatLiveTimecode(customLoop.start)} - ${formatLiveTimecode(customLoop.end)}${loopRangeMeta ? ` · Linhas ${loopRangeMeta.startIndex + 1}-${loopRangeMeta.endIndex + 1}` : ""}`
-                    : null
-                  : null
-              }
+              loopInfo={loopInfo}
               className="min-h-[220px]"
               height={isMobile ? undefined : `${desktopVideoTextSplit}%`}
             />
