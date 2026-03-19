@@ -1823,6 +1823,8 @@ export default function RecordingRoom() {
       setCustomLoop(null);
       setLoopRangeMeta(null);
       setLoopAnchorIndex(null);
+      // Broadcast loop cancellation so all clients (dubbers) also stop looping
+      emitVideoEvent("sync-loop", {});
       await logFeatureAudit("room.loop", "cleared");
       return;
     }
@@ -1832,7 +1834,7 @@ export default function RecordingRoom() {
     setLoopAnchorIndex(null);
     await logFeatureAudit("room.loop", "selection_started");
     toast({ title: "Selecione a primeira fala do loop" });
-  }, [loopSelectionMode, customLoop, logFeatureAudit, toast]);
+  }, [canControlVideo, loopSelectionMode, customLoop, emitVideoEvent, logFeatureAudit, toast]);
 
   const handleBack = useCallback(() => {
     if ((recordingStatus === "recording" || recordingStatus === "countdown") && !window.confirm("Você tem uma gravação em andamento. Deseja realmente sair?")) return;
