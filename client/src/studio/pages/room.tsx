@@ -458,12 +458,13 @@ export default function RecordingRoom() {
       ...recordingProfile, 
       characterId: character.id, 
       characterName: character.name,
-      actorName: recordingProfile?.actorName || user?.displayName || user?.fullName || 'Ator',
+      // Preserve whatever actorName the user manually typed — never inject user account data
+      actorName: recordingProfile?.actorName || "",
       voiceActorId: user?.id || '',
-      voiceActorName: user?.displayName || user?.fullName || 'Ator'
+      voiceActorName: recordingProfile?.voiceActorName || "",
     };
     setRecordingProfile(updated);
-    localStorage.setItem(`recording_profile_${sessionId}`, JSON.stringify(updated));
+    localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(updated));
     // Sincronizar via WebSocket
     emitVideoEvent("character-selected", { characterId: character.id, userId: user?.id });
     logAudioStep("character-selected", { characterId: character.id, characterName: character.name });
