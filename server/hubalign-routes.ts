@@ -1,16 +1,92 @@
 import type { Express, Request } from "express";
 import multer from "multer";
+import path from "path";
+import os from "os";
+import { createWriteStream, promises as fs } from "fs";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
 import { randomUUID } from "crypto";
+import { z } from "zod";
 import { requireAuth } from "./middleware/auth";
 import { storage } from "./storage";
 import { logger } from "./lib/logger";
 import {
   checkSupabaseConnection,
+  deleteFromSupabaseStorage,
   downloadFromSupabaseStorage,
+  downloadFromSupabaseStorageUrl,
   listSupabaseStorageObjects,
+  parseSupabaseStorageUrl,
   uploadJsonToSupabaseStorage,
   uploadToSupabaseStorage,
 } from "./lib/supabase";
+import { generateSilenceTrack, mixTracks, type MixTrackInput } from "./lib/audio-mixer";
+
+const START_TIME_CACHE = new Map<string, number[]>();
+
+function parseScriptTimecode(value: unknown): number | null {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, value);
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  if (/^[+-]?\d+(\.\d+)?$/.test(str)) {
+    return Math.max(0, Number(str));
+  }
+  const normalized = str.replace(/\s+/g, "").replace(/;/g, ":");
+  const parts = normalized.split(":");
+  if (parts.length >= 3) {
+    const hh = Number(parts[0]) || 0;
+    const mm = Number(parts[1]) || 0;
+    const ss = Number(parts[2]) || 0;
+    const sub = parts[3] ? Number(parts[3]) || 0 : 0;
+    return Math.max(0, hh * 3600 + mm * 60 + ss + sub / (parts[3]?.length || 1));
+  }
+  if (parts.length === 2) {
+    const mm = Number(parts[0]) || 0;
+    const ss = Number(parts[1]) || 0;
+    return Math.max(0, mm * 60 + ss);
+  }
+  return null;
+}
+
+async function loadScriptLineStarts(productionId: string): Promise<number[]> {
+  const cacheKey = productionId;
+  if (START_TIME_CACHE.has(cacheKey)) return START_TIME_CACHE.get(cacheKey)!;
+  const production = await storage.getProduction(productionId);
+  if (!production) return [];
+  const raw = production.scriptJson;
+  if (!raw) return [];
+  let parsed: any[];
+  if (typeof raw === "string") {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = [];
+    }
+  } else if (Array.isArray(raw)) {
+    parsed = raw;
+  } else if (raw && Array.isArray(raw.lines)) {
+    parsed = raw.lines;
+  } else {
+    parsed = [];
+  }
+  const normalized: number[] = parsed.map((line) => {
+    const candidate =
+      line?.tempoEmSegundos ??
+      line?.start ??
+      line?.tempo ??
+      line?.timecode ??
+      line?.tc ??
+      line?.in ??
+      null;
+    const parsedValue = parseScriptTimecode(candidate);
+    return parsedValue ?? null;
+  });
+  START_TIME_CACHE.set(cacheKey, normalized);
+  return normalized;
+}
 
 export const HUBALIGN_OWNER_USERNAME = "borbaggabriel";
 const upload = multer({ 
@@ -81,6 +157,82 @@ function projectPath(projectId: string, suffix: string) {
   return `hubalign/projects/${safeId}/${suffix}`.replace(/\/+/g, "/");
 }
 
+function productResourcePath(projectId: string, productId: string, suffix: string) {
+  return projectPath(projectId, `products/${encodeURIComponent(productId)}/${suffix}`);
+}
+
+type HubAlignProductTake = {
+  takeId: string;
+  lineIndex: number;
+  startTimeSeconds: number | null;
+  durationSeconds: number; 
+  audioUrl: string;
+  characterName: string;
+  voiceActorName: string;
+};
+
+type HubAlignProductAssignment = {
+  characterId: string;
+  characterName: string;
+  voiceActorId: string;
+  voiceActorName: string;
+  takes: HubAlignProductTake[];
+};
+
+type HubAlignProductManifest = {
+  id: string;
+  projectId: string;
+  name: string;
+  sessionId: string;
+  sessionTitle: string;
+  productionId: string;
+  productionName: string;
+  createdAt: string;
+  status: "pending" | "mixing" | "ready" | "error";
+  metadata: {
+    assignmentCount: number;
+    takeCount: number;
+  };
+  assignments: HubAlignProductAssignment[];
+  timeline: HubAlignProductTake[];
+  meTrackPath?: string | null;
+  finalUrl?: string | null;
+  note?: string | null;
+};
+
+const createProductSchema = z.object({
+  name: z.string().min(1),
+  sessionId: z.string().min(1),
+  sessionTitle: z.string().min(1),
+  productionId: z.string().min(1),
+  productionName: z.string().min(1),
+  assignments: z
+    .array(
+      z.object({
+        characterId: z.string().min(1),
+        characterName: z.string().min(1),
+        voiceActorId: z.string().min(1),
+        voiceActorName: z.string().min(1),
+        takeIds: z.array(z.string().min(1)).min(1),
+      })
+    )
+    .min(1),
+  timeline: z
+    .array(
+      z.object({
+        takeId: z.string().min(1),
+        lineIndex: z.coerce.number().int().min(0),
+        startTimeSeconds: z.number().nullable(),
+        durationSeconds: z.number().min(0),
+        audioUrl: z.string().min(1),
+        characterName: z.string().min(1),
+        voiceActorName: z.string().min(1),
+      })
+    )
+    .min(1),
+  note: z.string().max(500).optional(),
+});
+
 async function saveProjectBackup(bucket: string, projectId: string, data: unknown) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   await uploadJsonToSupabaseStorage({
@@ -88,6 +240,67 @@ async function saveProjectBackup(bucket: string, projectId: string, data: unknow
     path: projectPath(projectId, `backups/${stamp}_${randomUUID()}.json`),
     data,
   });
+}
+
+async function loadProductManifest(bucket: string, projectId: string, productId: string) {
+  try {
+    const path = productResourcePath(projectId, productId, "manifest.json");
+    const response = await downloadFromSupabaseStorage({ bucket, path });
+    if (!response.ok) return null;
+    return (await response.json()) as HubAlignProductManifest;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function saveProductManifest(bucket: string, projectId: string, productId: string, manifest: HubAlignProductManifest) {
+  const path = productResourcePath(projectId, productId, "manifest.json");
+  await uploadJsonToSupabaseStorage({ bucket, path, data: manifest });
+}
+
+function sanitizeTempLabel(value: string) {
+  const cleaned = String(value || "asset").replace(/[^a-zA-Z0-9-_]/g, "_");
+  const timestamp = Date.now().toString(36);
+  return `${cleaned.slice(0, 32)}_${timestamp}`;
+}
+
+function guessExtensionFromUrl(value: string) {
+  const cleaned = value.split("?")[0] || "";
+  const extension = path.extname(cleaned).toLowerCase();
+  if (extension) return extension;
+  return ".wav";
+}
+
+async function downloadAudioUrlToTemp(url: string, bucket: string, tmpDir: string, label: string) {
+  const trimmed = String(url || "").trim();
+  if (!trimmed) throw new Error("URL de áudio inválida");
+
+  const productLabel = sanitizeTempLabel(label);
+  const extension = guessExtensionFromUrl(trimmed);
+  const destination = path.join(tmpDir, `${productLabel}${extension}`);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+
+  let response: Response;
+  const parsed = parseSupabaseStorageUrl(trimmed);
+  if (parsed) {
+    response = await downloadFromSupabaseStorage(parsed);
+  } else if (/^https?:\/\//i.test(trimmed)) {
+    response = await fetch(trimmed);
+  } else {
+    response = await downloadFromSupabaseStorage({ bucket, path: trimmed });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Falha ao baixar ${trimmed}: HTTP ${response.status}`);
+  }
+
+  const body = response.body;
+  if (!body) {
+    throw new Error(`Resposta sem corpo ao baixar ${trimmed}`);
+  }
+
+  await pipeline(Readable.fromWeb(body as any), createWriteStream(destination));
+  return destination;
 }
 
 export function registerHubAlignRoutes(app: Express) {
@@ -166,6 +379,60 @@ export function registerHubAlignRoutes(app: Express) {
     } catch (err: any) {
       logger.error("[HubAlign] Projects list failure:", err);
       return res.status(500).json({ message: err?.message || "Falha ao listar projetos HubAlign" });
+    }
+  });
+
+  app.get("/api/hubalign/sessions", requireAuth, requireHubAlignOwner, async (req, res) => {
+    try {
+      const allTakes = await storage.getAllTakesGrouped();
+      const sessions = new Map<
+        string,
+        {
+          id: string;
+          title: string;
+          productionId: string;
+          productionName: string;
+          characterNames: Set<string>;
+          totalTakeCount: number;
+          preferredTakeCount: number;
+        }
+      >();
+
+      for (const take of allTakes) {
+        if (!take.sessionId) continue;
+        const existing = sessions.get(take.sessionId) ?? {
+          id: take.sessionId,
+          title: take.sessionTitle || "Sessão sem título",
+          productionId: take.productionId || "",
+          productionName: take.productionName || "",
+          characterNames: new Set<string>(),
+          totalTakeCount: 0,
+          preferredTakeCount: 0,
+        };
+        if (take.characterName) existing.characterNames.add(take.characterName);
+        existing.totalTakeCount += 1;
+        if (take.isPreferred) existing.preferredTakeCount += 1;
+        sessions.set(take.sessionId, existing);
+      }
+
+      const items = Array.from(sessions.values())
+        .map((session) => ({
+          id: session.id,
+          title: session.title,
+          productionId: session.productionId,
+          productionName: session.productionName,
+          characterCount: session.characterNames.size,
+          takeCount: session.totalTakeCount,
+          preferredTakeCount: session.preferredTakeCount,
+          totalTakeCount: session.totalTakeCount,
+        }))
+        .sort((a, b) => a.title.localeCompare(b.title));
+
+      await writeHubAlignAudit(req, "HUBALIGN_SESSIONS_LISTED", { count: items.length });
+      return res.status(200).json({ items });
+    } catch (err: any) {
+      logger.error("[HubAlign] Sessions list failure:", err);
+      return res.status(500).json({ message: err?.message || "Falha ao listar sessões do HubAlign" });
     }
   });
 
@@ -275,36 +542,328 @@ export function registerHubAlignRoutes(app: Express) {
     }
   });
 
+  app.post("/api/hubalign/projects/:projectId/products", requireAuth, requireHubAlignOwner, async (req, res) => {
+    try {
+      const projectId = String(req.params.projectId || "").trim();
+      if (!projectId) {
+        return res.status(400).json({ message: "projectId é obrigatório" });
+      }
+      const payload = createProductSchema.parse(req.body);
+      const settings = await storage.getAllSettings();
+      const bucket = resolveHubAlignBucket(settings);
+
+      const timeline = payload.timeline.map((item) => ({ ...item }));
+      const timelineById = new Map<string, HubAlignProductTake>();
+      timeline.forEach((take) => timelineById.set(take.takeId, take));
+
+      const assignments: HubAlignProductAssignment[] = payload.assignments.map((assignment) => {
+        const missing = assignment.takeIds.filter((takeId) => !timelineById.has(takeId));
+        if (missing.length > 0) {
+          throw new Error(`Takes não encontrados na timeline: ${missing.join(", ")}`);
+        }
+        const takes = assignment.takeIds.map((takeId) => timelineById.get(takeId)!);
+        return {
+          characterId: assignment.characterId,
+          characterName: assignment.characterName,
+          voiceActorId: assignment.voiceActorId,
+          voiceActorName: assignment.voiceActorName,
+          takes,
+        };
+      });
+
+      const manifest: HubAlignProductManifest = {
+        id: randomUUID().replace(/-/g, ""),
+        projectId,
+        name: payload.name,
+        sessionId: payload.sessionId,
+        sessionTitle: payload.sessionTitle,
+        productionId: payload.productionId,
+        productionName: payload.productionName,
+        createdAt: new Date().toISOString(),
+        status: "pending",
+        metadata: {
+          assignmentCount: assignments.length,
+          takeCount: timeline.length,
+        },
+        assignments,
+        timeline,
+        meTrackPath: null,
+        finalUrl: null,
+        note: payload.note ?? null,
+      };
+
+      await saveProductManifest(bucket, projectId, manifest.id, manifest);
+      await writeHubAlignAudit(req, "HUBALIGN_PRODUCT_CREATED", { projectId, productId: manifest.id });
+      return res.status(201).json({ manifest });
+    } catch (err: any) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Payload inválido", issues: err.issues });
+      }
+      return res.status(500).json({ message: err?.message || "Falha ao criar produto" });
+    }
+  });
+
+  app.get("/api/hubalign/projects/:projectId/products", requireAuth, requireHubAlignOwner, async (req, res) => {
+    try {
+      const projectId = String(req.params.projectId || "").trim();
+      if (!projectId) {
+        return res.status(400).json({ message: "projectId é obrigatório" });
+      }
+      const settings = await storage.getAllSettings();
+      const bucket = resolveHubAlignBucket(settings);
+      const prefix = projectPath(projectId, "products/");
+      const rows = await listSupabaseStorageObjects({ bucket, prefix, limit: 500 });
+      const manifests: HubAlignProductManifest[] = [];
+      await Promise.all(
+        (rows as any[])
+          .map((row) => String(row?.name || ""))
+          .filter((name) => name.endsWith("manifest.json"))
+          .map(async (relative) => {
+            const normalized = relative.replace(/^\/+/, "");
+            const manifestPath = normalized.startsWith(prefix) ? normalized : `${prefix}${normalized}`;
+            try {
+              const response = await downloadFromSupabaseStorage({ bucket, path: manifestPath });
+              const data = await response.json();
+              manifests.push(data);
+            } catch (err) {
+              logger.warn("[HubAlign] Falha ao carregar manifest de produto", { path: manifestPath, error: (err as any)?.message });
+            }
+          })
+      );
+
+      await writeHubAlignAudit(req, "HUBALIGN_PRODUCTS_LISTED", { projectId, count: manifests.length });
+      return res.status(200).json({ items: manifests });
+    } catch (err: any) {
+      return res.status(500).json({ message: err?.message || "Falha ao listar produtos" });
+    }
+  });
+
+  app.delete("/api/hubalign/projects/:projectId/products/:productId", requireAuth, requireHubAlignOwner, async (req, res) => {
+    try {
+      const projectId = String(req.params.projectId || "").trim();
+      const productId = String(req.params.productId || "").trim();
+      if (!projectId || !productId) {
+        return res.status(400).json({ message: "projectId e productId são obrigatórios" });
+      }
+      const settings = await storage.getAllSettings();
+      const bucket = resolveHubAlignBucket(settings);
+      const manifest = await loadProductManifest(bucket, projectId, productId);
+      if (!manifest) {
+        return res.status(404).json({ message: "Produto não encontrado" });
+      }
+
+      const targets = new Set<string>();
+      targets.add(productResourcePath(projectId, productId, "manifest.json"));
+      if (manifest.finalUrl) targets.add(manifest.finalUrl);
+      if (manifest.meTrackPath) targets.add(manifest.meTrackPath);
+
+      for (const targetPath of targets) {
+        try {
+          await deleteFromSupabaseStorage({ bucket, path: targetPath });
+        } catch (err) {
+          logger.warn("[HubAlign] Falha ao deletar recurso do produto", { path: targetPath, error: (err as any)?.message });
+        }
+      }
+
+      await writeHubAlignAudit(req, "HUBALIGN_PRODUCT_DELETED", { projectId, productId });
+      return res.status(200).json({ message: "Produto removido" });
+    } catch (err: any) {
+      return res.status(500).json({ message: err?.message || "Falha ao deletar produto" });
+    }
+  });
+
+  app.post(
+    "/api/hubalign/projects/:projectId/products/:productId/me-upload",
+    requireAuth,
+    requireHubAlignOwner,
+    upload.single("meTrack"),
+    async (req, res) => {
+      try {
+        const projectId = String(req.params.projectId || "").trim();
+        const productId = String(req.params.productId || "").trim();
+        if (!projectId || !productId) {
+          return res.status(400).json({ message: "projectId e productId são obrigatórios" });
+        }
+        const file = req.file;
+        if (!file) {
+          return res.status(400).json({ message: "Arquivo ausente" });
+        }
+        const mime = String(file.mimetype || "").toLowerCase();
+        if (!ALLOWED_MIME_TYPES.includes(mime)) {
+          return res.status(400).json({ message: "Tipo de arquivo não suportado" });
+        }
+
+        const settings = await storage.getAllSettings();
+        const bucket = resolveHubAlignBucket(settings);
+        const ext = path.extname(String(file.originalname || "").toLowerCase()) || ".wav";
+        const targetPath = productResourcePath(projectId, productId, `me${ext}`);
+        await uploadToSupabaseStorage({ bucket, path: targetPath, buffer: file.buffer, contentType: mime || "audio/wav" });
+
+        const manifest = await loadProductManifest(bucket, projectId, productId);
+        if (!manifest) {
+          return res.status(404).json({ message: "Produto não encontrado" });
+        }
+
+        if (manifest.finalUrl) {
+          try {
+            await deleteFromSupabaseStorage({ bucket, path: manifest.finalUrl });
+          } catch (err) {
+            logger.warn("[HubAlign] Falha ao remover mix anterior", { path: manifest.finalUrl, error: (err as any)?.message });
+          }
+        }
+
+        const updatedManifest: HubAlignProductManifest = {
+          ...manifest,
+          meTrackPath: targetPath,
+          finalUrl: null,
+          status: "pending",
+          note: `M&E atualizada em ${new Date().toISOString()}`,
+        };
+
+        await saveProductManifest(bucket, projectId, productId, updatedManifest);
+        await writeHubAlignAudit(req, "HUBALIGN_PRODUCT_ME_UPLOADED", { projectId, productId, meTrackPath: targetPath });
+        return res.status(200).json({ manifest: updatedManifest });
+      } catch (err: any) {
+        return res.status(500).json({ message: err?.message || "Falha ao fazer upload da M&E" });
+      }
+    }
+  );
+
+  app.post("/api/hubalign/projects/:projectId/products/:productId/mix", requireAuth, requireHubAlignOwner, async (req, res) => {
+    const projectId = String(req.params.projectId || "").trim();
+    const productId = String(req.params.productId || "").trim();
+    if (!projectId || !productId) {
+      return res.status(400).json({ message: "projectId e productId são obrigatórios" });
+    }
+    const settings = await storage.getAllSettings();
+    const bucket = resolveHubAlignBucket(settings);
+    const manifest = await loadProductManifest(bucket, projectId, productId);
+    if (!manifest) {
+      return res.status(404).json({ message: "Produto não encontrado" });
+    }
+    if (!manifest.timeline.length) {
+      return res.status(400).json({ message: "Produto não possui timeline para mixar" });
+    }
+
+    const baseTempDir = path.join(os.tmpdir(), "hubalign", "mixes");
+    await fs.mkdir(baseTempDir, { recursive: true });
+    const tempDir = await fs.mkdtemp(path.join(baseTempDir, `${projectId}-${productId}-`));
+    const manifestMixing: HubAlignProductManifest = {
+      ...manifest,
+      status: "mixing",
+      note: `Mix iniciado em ${new Date().toISOString()}`,
+    };
+    await saveProductManifest(bucket, projectId, productId, manifestMixing);
+
+    let localMeTrack: string | null = null;
+    try {
+      if (manifest.meTrackPath) {
+        localMeTrack = await downloadAudioUrlToTemp(manifest.meTrackPath, bucket, tempDir, "me-track");
+      } else {
+        const totalDuration = Math.max(...manifest.timeline.map((take) => (take.startTimeSeconds ?? 0) + (take.durationSeconds || 0)), 1);
+        const silencePath = path.join(tempDir, "silence.wav");
+        await generateSilenceTrack(silencePath, totalDuration, { sampleRate: 44100, channels: 2 });
+        localMeTrack = silencePath;
+      }
+
+      const downloadedTracks: MixTrackInput[] = [];
+      for (const take of manifest.timeline) {
+        const localPath = await downloadAudioUrlToTemp(take.audioUrl, bucket, tempDir, `take-${take.takeId}`);
+        downloadedTracks.push({
+          id: take.takeId,
+          path: localPath,
+          startTimeSeconds: take.startTimeSeconds ?? 0,
+          durationSeconds: take.durationSeconds,
+        });
+      }
+
+      const outputPath = path.join(tempDir, "final.wav");
+      await mixTracks({
+        tracks: downloadedTracks,
+        meTrackPath: localMeTrack,
+        outputPath,
+        sampleRate: 44100,
+        channels: 2,
+      });
+
+      const buffer = await fs.readFile(outputPath);
+      const finalPath = productResourcePath(projectId, productId, "final.wav");
+      await uploadToSupabaseStorage({ bucket, path: finalPath, buffer, contentType: "audio/wav" });
+
+      const readyManifest: HubAlignProductManifest = {
+        ...manifestMixing,
+        status: "ready",
+        finalUrl: finalPath,
+        note: `Mix concluído em ${new Date().toISOString()}`,
+      };
+      await saveProductManifest(bucket, projectId, productId, readyManifest);
+      await writeHubAlignAudit(req, "HUBALIGN_PRODUCT_MIXED", { projectId, productId, finalPath });
+      return res.status(200).json({ manifest: readyManifest });
+    } catch (err: any) {
+      const errorManifest: HubAlignProductManifest = {
+        ...manifest,
+        status: "error",
+        note: `Falha na mixagem: ${err?.message || "Não especificado"}`,
+      };
+      await saveProductManifest(bucket, projectId, productId, errorManifest);
+      logger.error("[HubAlign] Mixagem falhou", { projectId, productId, error: err?.message });
+      return res.status(500).json({ message: err?.message || "Falha ao mixar produto" });
+    } finally {
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch {}
+    }
+  });
+
   // ROTA DE UPLOAD REMOVIDA CONFORME REQUISITO: "ELIMINAR COMPLETAMENTE todas as funcionalidades de upload"
   
   app.get("/api/hubalign/hubdub-takes", requireAuth, requireHubAlignOwner, async (req, res) => {
     try {
-      const { search, character, studioId } = req.query;
+      const { search, character, studioId, sessionId } = req.query;
+      const includeAllTakes = String(req.query.allTakes || "false").toLowerCase() === "true";
       let allTakes = await storage.getAllTakesGrouped();
-      
-      // Filtros básicos
+
+      if (!includeAllTakes) {
+        allTakes = allTakes.filter((t) => t.isPreferred);
+      }
       if (studioId) {
-        allTakes = allTakes.filter(t => t.studioId === studioId);
+        allTakes = allTakes.filter((t) => t.studioId === studioId);
+      }
+      if (sessionId) {
+        allTakes = allTakes.filter((t) => t.sessionId === sessionId);
       }
       if (character) {
-        allTakes = allTakes.filter(t => 
-          String(t.characterName || "").toLowerCase().includes(String(character).toLowerCase())
-        );
+        const lowercase = String(character).toLowerCase();
+        allTakes = allTakes.filter((t) => String(t.characterName || "").toLowerCase().includes(lowercase));
       }
       if (search) {
         const s = String(search).toLowerCase();
-        allTakes = allTakes.filter(t => 
-          String(t.productionName || "").toLowerCase().includes(s) ||
-          String(t.sessionTitle || "").toLowerCase().includes(s) ||
-          String(t.voiceActorName || "").toLowerCase().includes(s)
+        allTakes = allTakes.filter(
+          (t) =>
+            String(t.productionName || "").toLowerCase().includes(s) ||
+            String(t.sessionTitle || "").toLowerCase().includes(s) ||
+            String(t.voiceActorName || "").toLowerCase().includes(s)
         );
       }
 
-      // Adicionar streamUrl para o HubAlign
-      const items = allTakes.map(t => ({
-        ...t,
-        streamUrl: `/api/hubalign/files/stream?path=${encodeURIComponent(t.audioUrl)}`
-      }));
+      const uniqueProductions = Array.from(new Set(allTakes.map((t) => t.productionId).filter(Boolean)));
+      const startTable = new Map<string, number[]>();
+      await Promise.all(
+        uniqueProductions.map(async (productionId) => {
+          const starts = await loadScriptLineStarts(productionId);
+          startTable.set(productionId, starts);
+        })
+      );
+
+      const items = allTakes.map((t) => {
+        const starts = startTable.get(t.productionId) || [];
+        const startSeconds = Number.isFinite(starts[t.lineIndex] as number) ? starts[t.lineIndex] : null;
+        return {
+          ...t,
+          startTimeSeconds: startSeconds,
+          streamUrl: `/api/hubalign/files/stream?path=${encodeURIComponent(t.audioUrl)}`,
+        };
+      });
 
       await writeHubAlignAudit(req, "HUBALIGN_HUBDUB_TAKES_LISTED", { count: items.length });
       return res.status(200).json({ items });

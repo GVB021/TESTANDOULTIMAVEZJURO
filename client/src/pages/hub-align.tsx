@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef, type ChangeEvent } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Pause, Play, ChevronRight, FileAudio, Check, Download, Trash2, GripVertical, Search, AlertCircle } from "lucide-react";
+import { Loader2, Pause, Play, ChevronRight, FileAudio, Check, Download, Trash2, Search, AlertCircle, UploadCloud, Music3, Zap } from "lucide-react";
 import { AppHeader } from "@/components/nav/AppHeader";
 import { authFetch } from "@/lib/auth-fetch";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,13 +37,20 @@ type HubAlignProject = {
 
 type HubAlignTake = {
   id: string;
+  characterId: string | null;
   characterName: string;
+  productionId: string;
   productionName: string;
+  voiceActorId: string | null;
   voiceActorName: string;
+  sessionId: string;
   sessionTitle: string;
+  startTimeSeconds: number | null;
+  lineIndex: number;
   durationSeconds: number;
   audioUrl: string;
   streamUrl: string;
+  isPreferred: boolean;
 };
 
 type TrackRow = {
@@ -54,6 +61,101 @@ type TrackRow = {
   startSeconds: number;
   durationSeconds: number;
   characterName: string;
+};
+
+type HubAlignSession = {
+  id: string;
+  title: string;
+  productionId: string;
+  productionName: string;
+  characterCount: number;
+  takeCount: number;
+  preferredTakeCount: number;
+  totalTakeCount: number;
+};
+
+type HubAlignProductTake = {
+  takeId: string;
+  lineIndex: number;
+  startTimeSeconds: number | null;
+  durationSeconds: number;
+  audioUrl: string;
+  characterName: string;
+  voiceActorName: string;
+};
+
+type HubAlignProductAssignment = {
+  characterId: string;
+  characterName: string;
+  voiceActorId: string;
+  voiceActorName: string;
+  takeIds: string[];
+};
+
+type HubAlignProductManifest = {
+  id: string;
+  name: string;
+  sessionId: string;
+  sessionTitle: string;
+  productionId: string;
+  productionName: string;
+  status: "pending" | "mixing" | "ready" | "error";
+  metadata: {
+    assignmentCount: number;
+    takeCount: number;
+  };
+  assignments: {
+    characterId: string;
+    characterName: string;
+    voiceActorId: string;
+    voiceActorName: string;
+    takes: HubAlignProductTake[];
+  }[];
+  timeline: HubAlignProductTake[];
+  meTrackPath?: string | null;
+  finalUrl?: string | null;
+  note?: string | null;
+  createdAt?: string;
+};
+
+const STATUS_BADGE_CLASSES: Record<HubAlignProductManifest["status"], string> = {
+  pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  mixing: "bg-orange-100 text-orange-700 border-orange-200",
+  ready: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  error: "bg-destructive/10 text-destructive border-destructive/20",
+};
+
+const normalizeTake = (take: HubAlignTake): HubAlignProductTake => ({
+  takeId: take.id,
+  lineIndex: take.lineIndex,
+  startTimeSeconds: take.startTimeSeconds,
+  durationSeconds: take.durationSeconds,
+  audioUrl: take.audioUrl,
+  characterName: take.characterName,
+  voiceActorName: take.voiceActorName,
+});
+
+type BuilderVoiceActor = {
+  key: string;
+  id: string;
+  name: string;
+  takes: HubAlignTake[];
+  takeCount: number;
+};
+
+type BuilderCharacter = {
+  key: string;
+  characterId: string;
+  characterName: string;
+  voiceActors: BuilderVoiceActor[];
+};
+
+const slugifyKey = (value: string) => {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "unnamed";
 };
 
 function formatSize(input: number) {
@@ -82,6 +184,14 @@ export default function HubAlignPage() {
   const [trackReady, setTrackReady] = useState(false);
   const [lastDebug, setLastDebug] = useState<string[]>([]);
   const [showStatus, setShowStatus] = useState(false);
+  const [builderSessionId, setBuilderSessionId] = useState("");
+  const [builderProductName, setBuilderProductName] = useState("");
+  const [builderNote, setBuilderNote] = useState("");
+  const [assignmentMap, setAssignmentMap] = useState<Record<string, string>>({});
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
+  const [currentMixingProductId, setCurrentMixingProductId] = useState<string | null>(null);
+  const [uploadingMeProductId, setUploadingMeProductId] = useState<string | null>(null);
+  const meInputRef = useRef<HTMLInputElement>(null);
 
   const accessQuery = useQuery<HubAlignAccess>({
     queryKey: ["/api/hubalign/access"],
@@ -90,6 +200,18 @@ export default function HubAlignPage() {
     retry: false,
   });
 
+  const handleMeUploadClick = (productId: string) => {
+    setUploadingMeProductId(productId);
+    meInputRef.current?.click();
+  };
+
+  const handleMeFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedProjectId || !uploadingMeProductId) return;
+    uploadMeMutation.mutate({ projectId: selectedProjectId, productId: uploadingMeProductId, file });
+    event.target.value = "";
+  };
+
   const projectsQuery = useQuery<{ items: HubAlignProject[] }>({
     queryKey: ["/api/hubalign/projects"],
     queryFn: () => authFetch("/api/hubalign/projects"),
@@ -97,9 +219,244 @@ export default function HubAlignPage() {
   });
 
   const hubDubTakesQuery = useQuery<{ items: HubAlignTake[] }>({
-    queryKey: ["/api/hubalign/hubdub-takes", hubDubSearch],
-    queryFn: () => authFetch(`/api/hubalign/hubdub-takes?search=${encodeURIComponent(hubDubSearch)}`),
+    queryKey: ["/api/hubalign/hubdub-takes", hubDubSearch, "all"],
+    queryFn: () => authFetch(`/api/hubalign/hubdub-takes?allTakes=true&search=${encodeURIComponent(hubDubSearch)}`),
     enabled: Boolean(accessQuery.data?.allowed),
+  });
+
+  const sessionsQuery = useQuery<{ items: HubAlignSession[] }>({
+    queryKey: ["/api/hubalign/sessions"],
+    queryFn: () => authFetch("/api/hubalign/sessions"),
+    enabled: Boolean(accessQuery.data?.allowed),
+  });
+
+  const productsQuery = useQuery<{ items: HubAlignProductManifest[] }>({
+    queryKey: ["/api/hubalign/projects", selectedProjectId, "products"],
+    queryFn: () => authFetch(`/api/hubalign/projects/${selectedProjectId}/products`),
+    enabled: Boolean(accessQuery.data?.allowed && selectedProjectId),
+    keepPreviousData: true,
+  });
+
+  const sessionsOptions = sessionsQuery.data?.items || [];
+  const currentSession = sessionsOptions.find((session) => session.id === builderSessionId);
+
+  const builderSessionTakes = useMemo(() => {
+    if (!builderSessionId || !hubDubTakesQuery.data?.items) return [];
+    return hubDubTakesQuery.data.items.filter((take) => take.sessionId === builderSessionId);
+  }, [builderSessionId, hubDubTakesQuery.data]);
+
+  const builderCharacters = useMemo(() => {
+    const map = new Map<string, BuilderCharacter & { voiceActorMap: Map<string, BuilderVoiceActor> }>();
+    for (const take of builderSessionTakes) {
+      const characterId = take.characterId || slugifyKey(take.characterName || `char-${take.id}`);
+      const characterName = take.characterName || "Sem personagem";
+      const actorId = take.voiceActorId || slugifyKey(take.voiceActorName || `actor-${take.id}`);
+      const actorName = take.voiceActorName || "Sem dublador";
+      const charEntry = map.get(characterId) ?? {
+        key: characterId,
+        characterId,
+        characterName,
+        voiceActors: [],
+        voiceActorMap: new Map<string, BuilderVoiceActor>(),
+      };
+      const actorEntry = charEntry.voiceActorMap.get(actorId) ?? {
+        key: actorId,
+        id: actorId,
+        name: actorName,
+        takes: [],
+        takeCount: 0,
+      };
+      actorEntry.takes.push(take);
+      actorEntry.takeCount = actorEntry.takes.length;
+      charEntry.voiceActorMap.set(actorId, actorEntry);
+      map.set(characterId, charEntry);
+    }
+    return Array.from(map.values())
+      .map((charEntry) => ({
+        key: charEntry.key,
+        characterId: charEntry.characterId,
+        characterName: charEntry.characterName,
+        voiceActors: Array.from(charEntry.voiceActorMap.values()),
+      }))
+      .sort((a, b) => a.characterName.localeCompare(b.characterName));
+  }, [builderSessionTakes]);
+
+  const [takeSelectionMap, setTakeSelectionMap] = useState<Record<string, Set<string>>>({});
+
+  useEffect(() => {
+    if (!builderSessionId) {
+      setAssignmentMap({});
+      setTakeSelectionMap({});
+      return;
+    }
+    setAssignmentMap((prev) => {
+      const next: Record<string, string> = {};
+      builderCharacters.forEach((character) => {
+        const preferred = prev[character.characterId];
+        const hasPreferred = character.voiceActors.some((actor) => actor.id === preferred);
+        const fallback = character.voiceActors[0]?.id || "";
+        next[character.characterId] = hasPreferred ? preferred : fallback;
+      });
+      return next;
+    });
+    // Default: select preferred takes per character
+    setTakeSelectionMap(() => {
+      const next: Record<string, Set<string>> = {};
+      for (const take of builderSessionTakes) {
+        const characterId = take.characterId || slugifyKey(take.characterName || `char-${take.id}`);
+        if (!next[characterId]) next[characterId] = new Set();
+        if (take.isPreferred) next[characterId].add(take.id);
+      }
+      return next;
+    });
+  }, [builderSessionId, builderCharacters]);
+
+  const toggleTakeInSelection = (characterId: string, takeId: string) => {
+    setTakeSelectionMap((prev) => {
+      const next = { ...prev };
+      const set = new Set(next[characterId] || []);
+      if (set.has(takeId)) set.delete(takeId);
+      else set.add(takeId);
+      next[characterId] = set;
+      return next;
+    });
+  };
+
+  const selectAllTakesForCharacter = (characterId: string, takeIds: string[]) => {
+    setTakeSelectionMap((prev) => ({ ...prev, [characterId]: new Set(takeIds) }));
+  };
+
+  const clearTakesForCharacter = (characterId: string) => {
+    setTakeSelectionMap((prev) => ({ ...prev, [characterId]: new Set() }));
+  };
+
+  const builderAssignments = useMemo(() => {
+    return builderCharacters.map((character) => {
+      const actorId = assignmentMap[character.characterId];
+      const actor = character.voiceActors.find((item) => item.id === actorId) || character.voiceActors[0];
+      const selectedIds = takeSelectionMap[character.characterId] || new Set<string>();
+      const filteredTakes = (actor?.takes || []).filter((take) => selectedIds.has(take.id));
+      const normalizedTakes = filteredTakes.map((take) => normalizeTake(take));
+      return {
+        characterId: character.characterId,
+        characterName: character.characterName,
+        voiceActorId: actor?.id || "",
+        voiceActorName: actor?.name || "",
+        takes: normalizedTakes,
+      };
+    });
+  }, [builderCharacters, assignmentMap, takeSelectionMap]);
+
+  const builderTimeline = useMemo(() => {
+    const timeline = builderAssignments.flatMap((assignment) => assignment.takes);
+    return [...timeline].sort((a, b) => (a.startTimeSeconds ?? 0) - (b.startTimeSeconds ?? 0));
+  }, [builderAssignments]);
+
+  const builderTimelineDuration = builderTimeline.reduce((acc, take) => acc + take.durationSeconds, 0);
+  const builderAssignmentsComplete = builderAssignments.length > 0 && builderAssignments.every((assignment) => assignment.voiceActorId && assignment.takes.length > 0);
+  const canCreateProduct = Boolean(
+    selectedProjectId &&
+      builderSessionId &&
+      builderProductName.trim() &&
+      builderAssignmentsComplete
+  );
+
+  const handleAssignmentChange = (characterId: string, voiceActorId: string) => {
+    setAssignmentMap((prev) => ({ ...prev, [characterId]: voiceActorId }));
+  };
+
+  const handleCreateProduct = () => {
+    if (!canCreateProduct || !selectedProjectId) return;
+    const sessionTitle = sessionsOptions.find((session) => session.id === builderSessionId)?.title || builderSessionId;
+    const productionId = sessionsOptions.find((session) => session.id === builderSessionId)?.productionId || "";
+    const productionName = sessionsOptions.find((session) => session.id === builderSessionId)?.productionName || "";
+    const payload = {
+      name: builderProductName.trim(),
+      sessionId: builderSessionId,
+      sessionTitle,
+      productionId,
+      productionName,
+      assignments: builderAssignments.map((assignment) => ({
+        characterId: assignment.characterId,
+        characterName: assignment.characterName,
+        voiceActorId: assignment.voiceActorId,
+        voiceActorName: assignment.voiceActorName,
+        takeIds: assignment.takes.map((take) => take.takeId),
+      })),
+      timeline: builderTimeline,
+      note: builderNote.trim() || undefined,
+    };
+    setIsCreatingProduct(true);
+    createProductMutation.mutate(payload);
+  };
+
+  useEffect(() => {
+    if (sessionsOptions.length > 0 && !builderSessionId) {
+      setBuilderSessionId(sessionsOptions[0].id);
+    }
+  }, [sessionsOptions, builderSessionId]);
+
+  const createProductMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      authFetch(`/api/hubalign/projects/${selectedProjectId}/products`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      toast({ title: "Produto salvo", description: "Manifest do produto armazenado." });
+      setBuilderProductName("");
+      setBuilderNote("");
+      setIsCreatingProduct(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/hubalign/projects", selectedProjectId, "products"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err.message || "Falha ao criar produto", variant: "destructive" });
+    },
+    onSettled: () => {
+      setIsCreatingProduct(false);
+    },
+  });
+
+  const mixProductMutation = useMutation({
+    mutationFn: ({ projectId, productId }: { projectId: string; productId: string }) =>
+      authFetch(`/api/hubalign/projects/${projectId}/products/${productId}/mix`, { method: "POST" }),
+    onSettled: () => {
+      setCurrentMixingProductId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/hubalign/projects", selectedProjectId, "products"] });
+    },
+    onSuccess: () => {
+      toast({ title: "Mix concluída", description: "Áudio final gerado." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err.message || "Falha ao mixar", variant: "destructive" });
+    },
+  });
+
+  const handleMixProduct = (productId: string) => {
+    if (!selectedProjectId) return;
+    setCurrentMixingProductId(productId);
+    mixProductMutation.mutate({ projectId: selectedProjectId, productId });
+  };
+
+  const uploadMeMutation = useMutation({
+    mutationFn: ({ projectId, productId, file }: { projectId: string; productId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("meTrack", file);
+      return authFetch(`/api/hubalign/projects/${projectId}/products/${productId}/me-upload`, {
+        method: "POST",
+        body: formData,
+      });
+    },
+    onSettled: () => {
+      setUploadingMeProductId(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/hubalign/projects", selectedProjectId, "products"] });
+    },
+    onSuccess: () => {
+      toast({ title: "M&E atualizada", description: "Arquivo enviado para o produto." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err.message || "Falha ao enviar M&E", variant: "destructive" });
+    },
   });
 
   const statusQuery = useQuery<{
@@ -589,6 +946,274 @@ export default function HubAlignPage() {
           </div>
         </section>
 
+        <section className="rounded-2xl border border-border bg-gradient-to-br from-background/80 via-background to-background/90 p-6 space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground">Selecionar sessão</p>
+              <h2 className="text-xl font-bold">Montar produto HubAlign</h2>
+            </div>
+            <div className="grid gap-2">
+              <p className="text-xs text-muted-foreground">Sessão ({sessionsOptions.length} disponíveis)</p>
+              <select
+                value={builderSessionId}
+                onChange={(event) => setBuilderSessionId(event.target.value)}
+                className="h-11 rounded-xl border border-border bg-background px-3 text-sm min-w-[260px]"
+              >
+                {sessionsOptions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.title} — {session.productionName} ({session.preferredTakeCount}/{session.totalTakeCount})
+                  </option>
+                ))}
+              </select>
+              {currentSession && (
+                <p className="text-[11px] text-muted-foreground">
+                  {currentSession.preferredTakeCount} takes preferidos · {currentSession.totalTakeCount} takes no total · {currentSession.characterCount} personagens
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Mode 1 — Checkboxes per character */}
+          <div className="rounded-xl border border-border bg-card/70 p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm font-semibold">Personagens e seleção de takes</p>
+              <span className="text-xs text-muted-foreground">{builderCharacters.length} personagens · {builderTimeline.length} takes selecionados</span>
+            </div>
+            <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
+              {builderCharacters.map((character) => {
+                const actorId = assignmentMap[character.characterId] || character.voiceActors[0]?.id || "";
+                const actor = character.voiceActors.find((a) => a.id === actorId) || character.voiceActors[0];
+                const selectedIds = takeSelectionMap[character.characterId] || new Set<string>();
+                const allTakeIds = (actor?.takes || []).map((t) => t.id);
+                return (
+                  <div key={character.key} className="rounded-xl border border-border/70 bg-background/70 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">{character.characterName}</p>
+                        <p className="text-[11px] text-muted-foreground">{selectedIds.size}/{allTakeIds.length} takes selecionados</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={actorId}
+                          onChange={(event) => handleAssignmentChange(character.characterId, event.target.value)}
+                          className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+                        >
+                          {character.voiceActors.map((a) => (
+                            <option key={a.key} value={a.id}>{a.name} ({a.takeCount})</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => selectAllTakesForCharacter(character.characterId, allTakeIds)}
+                          className="px-2 py-1 text-[10px] rounded border border-border hover:bg-muted font-bold uppercase"
+                          title="Selecionar todos"
+                        >Todos</button>
+                        <button
+                          onClick={() => clearTakesForCharacter(character.characterId)}
+                          className="px-2 py-1 text-[10px] rounded border border-border hover:bg-muted font-bold uppercase"
+                          title="Desmarcar todos"
+                        >Nenhum</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 pl-1">
+                      {(actor?.takes || []).map((take) => (
+                        <label key={take.id} className="flex items-center gap-2 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(take.id)}
+                            onChange={() => toggleTakeInSelection(character.characterId, take.id)}
+                            className="w-3.5 h-3.5 rounded border-border text-primary"
+                          />
+                          <span className="text-xs flex-1 truncate">
+                            {take.isPreferred && <span className="mr-1 text-primary font-bold">★</span>}
+                            Take #{take.lineIndex + 1} · {take.durationSeconds.toFixed(1)}s
+                            {take.startTimeSeconds != null && ` · @${take.startTimeSeconds.toFixed(1)}s`}
+                          </span>
+                          <button
+                            type="button"
+                            className="opacity-0 group-hover:opacity-100 h-5 w-5 flex items-center justify-center rounded border border-border hover:bg-muted"
+                            onClick={() => setSelectedPreview(take.streamUrl)}
+                            title="Pré-visualizar"
+                          >
+                            <Play className="w-2.5 h-2.5" />
+                          </button>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {!builderCharacters.length && (
+                <p className="text-sm text-muted-foreground">Selecione uma sessão para carregar os takes disponíveis.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Mode 2 — Global takes list */}
+          {builderSessionTakes.length > 0 && (
+            <details className="rounded-xl border border-border bg-card/50">
+              <summary className="px-4 py-3 cursor-pointer text-sm font-semibold select-none list-none flex items-center justify-between">
+                <span>Lista global de takes da sessão</span>
+                <span className="text-xs text-muted-foreground font-normal">{builderSessionTakes.length} takes disponíveis — clique para expandir</span>
+              </summary>
+              <div className="px-4 pb-4 space-y-2">
+                <div className="text-[11px] text-muted-foreground pb-1">Marque ou desmarque takes diretamente. ★ = take preferido.</div>
+                <div className="max-h-[320px] overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+                  {builderSessionTakes
+                    .slice()
+                    .sort((a, b) => (a.startTimeSeconds ?? 0) - (b.startTimeSeconds ?? 0))
+                    .map((take) => {
+                      const characterId = take.characterId || slugifyKey(take.characterName || `char-${take.id}`);
+                      const selectedIds = takeSelectionMap[characterId] || new Set<string>();
+                      return (
+                        <label key={take.id} className="flex items-center gap-3 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-muted/30">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(take.id)}
+                            onChange={() => toggleTakeInSelection(characterId, take.id)}
+                            className="w-3.5 h-3.5 rounded border-border text-primary flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">
+                              {take.isPreferred && <span className="text-primary mr-1">★</span>}
+                              {take.characterName} — {take.voiceActorName}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Take #{take.lineIndex + 1} · {take.durationSeconds.toFixed(1)}s
+                              {take.startTimeSeconds != null && ` · @${take.startTimeSeconds.toFixed(1)}s`}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="h-6 w-6 flex items-center justify-center rounded border border-border hover:bg-muted flex-shrink-0"
+                            onClick={(e) => { e.preventDefault(); setSelectedPreview(take.streamUrl); }}
+                            title="Pré-visualizar"
+                          >
+                            <Play className="w-3 h-3" />
+                          </button>
+                        </label>
+                      );
+                    })}
+                </div>
+              </div>
+            </details>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+              <p className="text-[10px] text-muted-foreground uppercase">Duração estimada</p>
+              <p className="text-2xl font-semibold">{builderTimelineDuration.toFixed(1)}s</p>
+              <p className="text-[11px] text-muted-foreground">Timeline composta por {builderTimeline.length} takes</p>
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4 space-y-2">
+              <p className="text-[10px] text-muted-foreground uppercase">Nome do produto</p>
+              <input
+                value={builderProductName}
+                onChange={(event) => setBuilderProductName(event.target.value)}
+                placeholder="Ex: Episódio 7 - V1"
+                className="h-10 w-full rounded-md border border-border px-3 bg-background text-sm"
+              />
+              <textarea
+                value={builderNote}
+                onChange={(event) => setBuilderNote(event.target.value)}
+                placeholder="Observações (opcional, max 500 caracteres)"
+                className="w-full rounded-md border border-border px-3 py-2 bg-background text-sm"
+                rows={3}
+              />
+            </div>
+            <div className="rounded-xl border border-border bg-card p-4 flex flex-col justify-between gap-3">
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase">Resumo da sessão</p>
+                <p className="text-sm font-semibold">{currentSession?.title || "Sem sessão selecionada"}</p>
+                <p className="text-[11px] text-muted-foreground">{currentSession?.preferredTakeCount || 0} pref · {currentSession?.totalTakeCount || 0} total · {currentSession?.characterCount || 0} personagens</p>
+              </div>
+              <button
+                className="w-full rounded-xl bg-primary text-primary-foreground font-semibold h-12 disabled:opacity-40 flex items-center justify-center gap-2"
+                disabled={!canCreateProduct || isCreatingProduct}
+                onClick={handleCreateProduct}
+              >
+                {isCreatingProduct ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Criando produto...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-4 h-4" />
+                    Criar produto
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border bg-card p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Produtos do projeto</h2>
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{(productsQuery.data?.items?.length || 0)} manifestos</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {(productsQuery.data?.items || []).map((product) => (
+              <div key={product.id} className="rounded-2xl border border-border/70 bg-background/70 p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-base font-semibold">{product.name}</p>
+                    <p className="text-xs text-muted-foreground">{product.sessionTitle} • {product.productionName}</p>
+                  </div>
+                  <span className={`px-3 py-1 text-[11px] font-bold uppercase tracking-[0.3em] rounded-full border ${STATUS_BADGE_CLASSES[product.status]}`}>
+                    {product.status}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span>{product.metadata.takeCount} takes</span>
+                  <span>{product.metadata.assignmentCount} personagens</span>
+                  <span>Atualizado em {new Date(product.createdAt || Date.now()).toLocaleDateString()}</span>
+                </div>
+                {product.note && <p className="text-sm text-muted-foreground">{product.note}</p>}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="px-3 py-2 rounded-xl border border-border text-sm font-semibold flex items-center gap-2"
+                    onClick={() => handleMixProduct(product.id)}
+                    disabled={product.status === "mixing" || currentMixingProductId === product.id}
+                  >
+                    {currentMixingProductId === product.id ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Mixando...</>
+                    ) : (
+                      <Music3 className="w-4 h-4" />
+                    )}
+                    Misturar
+                  </button>
+                  <button
+                    className="px-3 py-2 rounded-xl border border-border text-sm font-semibold flex items-center gap-2"
+                    onClick={() => handleMeUploadClick(product.id)}
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    {product.meTrackPath ? "Atualizar M&E" : "Enviar M&E"}
+                  </button>
+                  {product.finalUrl && (
+                    <a
+                      href={`/api/hubalign/files/stream?path=${encodeURIComponent(product.finalUrl)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="px-3 py-2 rounded-xl border border-border text-sm font-semibold flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" /> Baixar mix final
+                    </a>
+                  )}
+                </div>
+                {product.meTrackPath && (
+                  <p className="text-[11px] text-foreground/70">M&E carregada • {product.meTrackPath.split("/").pop()}</p>
+                )}
+              </div>
+            ))}
+            {(!productsQuery.data?.items || productsQuery.data.items.length === 0) && (
+              <p className="text-sm text-muted-foreground">Selecione um projeto e crie um produto para vê-lo listado aqui.</p>
+            )}
+          </div>
+        </section>
+
         <section className="rounded-xl border border-border bg-card p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">Montagem de tracks e timeline</h2>
@@ -660,6 +1285,14 @@ export default function HubAlignPage() {
             )}
           </div>
         </section>
+
+        <input
+          ref={meInputRef}
+          type="file"
+          accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/mp4,audio/x-m4a,audio/m4a"
+          className="hidden"
+          onChange={handleMeFileChange}
+        />
 
         <section className="rounded-xl border border-border bg-card p-5 space-y-4">
           <h2 className="text-lg font-semibold">Playback de pré-visualização</h2>
