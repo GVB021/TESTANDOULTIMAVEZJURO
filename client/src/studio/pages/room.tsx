@@ -1462,6 +1462,7 @@ export default function RecordingRoom() {
     formData.append("lineText", lineText.slice(0, 200));
     formData.append("characterId", effectiveProfile.characterId);
     formData.append("voiceActorId", user?.id || effectiveProfile.voiceActorId || "");
+    formData.append("voiceActorName", effectiveProfile.actorName || effectiveProfile.voiceActorName || "");
     formData.append("lineIndex", String(input.lineIndex));
     formData.append("durationSeconds", String(input.durationSeconds));
     formData.append("startTimeSeconds", String(input.startTimeSeconds));

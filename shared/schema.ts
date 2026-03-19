@@ -175,6 +175,7 @@ export const takes = pgTable("takes", {
   isPreferred: boolean("is_preferred").default(false),
   qualityScore: real("quality_score"),
   aiRecommended: boolean("ai_recommended").default(false),
+  voiceActorName: varchar("voice_actor_name"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => {
   return {

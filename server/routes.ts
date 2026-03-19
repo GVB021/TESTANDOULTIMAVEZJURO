@@ -1380,6 +1380,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         startTimeSeconds: z.coerce.number().min(0).optional(),
         isPreferred: z.coerce.boolean().optional(),
         lineText: z.string().max(500).optional(),
+        voiceActorName: z.string().max(200).optional(),
       }).parse(req.body);
 
       const sessionCheck = await verifySessionAccess(req, res, sessionId);
@@ -1447,6 +1448,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         durationSeconds: body.durationSeconds ?? 0,
         qualityScore: body.qualityScore ?? null,
         isPreferred: Boolean(body.isPreferred),
+        voiceActorName: body.voiceActorName || null,
       });
       const take = await storage.createTake(takeInput);
       logger.info("[Take Upload] DB row created", {
