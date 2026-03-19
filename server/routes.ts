@@ -1387,9 +1387,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!sessionCheck) return;
 
       const settings = await storage.getAllSettings();
-      const storageProvider = (sessionCheck as any).storageProvider || settings.DEFAULT_STORAGE_PROVIDER || "supabase";
+      // Always use supabase when configured — ignore DB setting that may be stale/local
+      const storageProvider = isSupabaseConfigured() ? "supabase" : ((sessionCheck as any).storageProvider || settings.DEFAULT_STORAGE_PROVIDER || "local");
       const takesPath = (sessionCheck as any).takesPath || settings.DEFAULT_TAKES_PATH || "uploads";
-      const supabaseBucket = settings.SUPABASE_BUCKET || "takes";
+      const supabaseBucket = settings.SUPABASE_BUCKET || "uploads";
 
       let audioUrl = body.audioUrl || "";
       let contentType = "audio/wav";
@@ -1503,30 +1504,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
               .where(eq(users.id, String(body.voiceActorId))),
           ]);
 
-          const studioName = normalizeSegment(studioRow?.name || "");
           const productionName = normalizeSegment(productionRow?.name || "");
-          const actorNameRaw =
+          const sessionTitle = normalizeSegment((sessionCheck as any).title || sessionId);
+
+          // Prefer artistic name sent from client, fall back to account data
+          const actorNameRaw = (body.voiceActorName?.trim()) ||
             actorRow?.artistName ||
             actorRow?.displayName ||
             actorRow?.fullName ||
             `${actorRow?.firstName || ""} ${actorRow?.lastName || ""}`.trim() ||
             actorRow?.email ||
             "";
-          const actorFolder = normalizeSegment(actorNameRaw);
+          // Use only the first name for folder and filename token
+          const actorFirstName = actorNameRaw.trim().split(/\s+/)[0] || "ator";
+          const actorFolder = normalizeSegment(actorFirstName);
           const characterFolder = normalizeSegment(characterRow?.name || "");
 
-          const actorToken = normalizeTokenUpper(actorNameRaw);
+          const actorToken = normalizeTokenUpper(actorFirstName);
           const characterToken = normalizeTokenUpper(characterRow?.name || "");
-          const rawLineText = String(body.lineText || "");
-          const lineTextToken = rawLineText
-            ? rawLineText.replace(/[^\w\sáéíóúàèìòùâêîôûãõç]/gi, "").trim().slice(0, 40).replace(/\s+/g, "_").toUpperCase()
-            : "";
-          const filename = lineTextToken
-            ? `${characterToken}_${lineTextToken}_${timecodeToken}.wav`
-            : `${characterToken}_${actorToken}_${timecodeToken}.wav`;
+          // Filename: PERSONAGEM_PRIMEIRONOME_TIMECODE.wav (always consistent)
+          const filename = `${characterToken}_${actorToken}_${timecodeToken}.wav`;
 
-          const baseFolder = "upload"; // Fixed base folder as requested
-          const pathSegments = [baseFolder, productionName, sessionId, characterFolder, actorFolder, filename];
+          const pathSegments = [productionName, sessionTitle, characterFolder, actorFolder, filename];
           const objectPath = pathSegments.filter(Boolean).join("/");
           const uploadJob: PendingTakeUploadJob = {
             takeId: take.id,
@@ -1562,7 +1561,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
             enqueueTakeUploadRetry({
               takeId: take.id,
               bucket: supabaseBucket,
-              objectPath: `${normalizeSegment(String(takesPath || "uploads"))}/${path.basename(localFilePath || audioUrl)}`,
+              objectPath,
               contentType,
               buffer: req.file.buffer,
               md5: audioMd5 || checksumMd5(req.file.buffer),
