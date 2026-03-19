@@ -1568,39 +1568,36 @@ export default function RecordingRoom() {
 
   const handleDirectorApprove = useCallback(async () => {
     if (!reviewingTake) return;
+    const takeId = reviewingTake.takeId;
     try {
       setIsSaving(true);
-      // Opcional: Marcar como preferred no backend se necessário
-      await authFetch(`/api/takes/${reviewingTake.takeId}/prefer`, { method: "POST" });
-      
-      emitVideoEvent("take-decision", { takeId: reviewingTake.takeId, decision: "approved", userId: user?.id });
-      
+      await authFetch(`/api/takes/${takeId}/prefer`, { method: "POST" });
+      emitVideoEvent("take-decision", { takeId, decision: "approved", userId: user?.id });
       toast({ title: "Take Aprovado", description: "O dublador foi notificado." });
-      setReviewingTake(null);
     } catch (err) {
       toast({ title: "Erro ao aprovar", variant: "destructive" });
     } finally {
       setIsSaving(false);
+      setReviewingTake(null);
     }
   }, [reviewingTake, emitVideoEvent, user?.id, toast]);
 
   const handleDirectorReject = useCallback(async () => {
     if (!reviewingTake) return;
+    const takeId = reviewingTake.takeId;
     try {
       setIsSaving(true);
-      await authFetch(`/api/takes/${reviewingTake.takeId}/discard`, {
+      await authFetch(`/api/takes/${takeId}/discard`, {
         method: "POST",
         body: JSON.stringify({ confirm: true }),
       });
-      
-      emitVideoEvent("take-decision", { takeId: reviewingTake.takeId, decision: "rejected", userId: user?.id });
-      
+      emitVideoEvent("take-decision", { takeId, decision: "rejected", userId: user?.id });
       toast({ title: "Take Rejeitado", description: "O dublador foi notificado para regravar." });
-      setReviewingTake(null);
     } catch (err) {
       toast({ title: "Erro ao rejeitar", variant: "destructive" });
     } finally {
       setIsSaving(false);
+      setReviewingTake(null);
     }
   }, [reviewingTake, emitVideoEvent, user?.id, toast]);
 
