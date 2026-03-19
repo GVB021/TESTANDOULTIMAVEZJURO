@@ -345,6 +345,11 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
         notes: String(l.notes || ""),
       }));
       if (lines.length === 0) throw new Error("Nenhuma linha detectada no PDF.");
+      
+      // Extract characters and auto-sync to production
+      const extractedCharacters = extractCharactersFromScript(lines);
+      await syncCharactersToProduction(extractedCharacters);
+      
       setScriptLines(lines);
       setScriptDirty(true);
       toast({ title: `${lines.length} linha${lines.length !== 1 ? "s" : ""} importadas do PDF (${result.pageCount} página${result.pageCount !== 1 ? "s" : ""})` });
@@ -359,7 +364,7 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
         let rawLines: any[];
@@ -398,6 +403,11 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
             notes: String(line?.notes || line?.notas || line?.note || ""),
           });
         }
+        
+        // Extract characters and auto-sync to production
+        const extractedCharacters = extractCharactersFromScript(normalized);
+        await syncCharactersToProduction(extractedCharacters);
+        
         setScriptLines(normalized);
         setScriptDirty(true);
         toast({ title: `${normalized.length} linha${normalized.length !== 1 ? "s" : ""} carregada${normalized.length !== 1 ? "s" : ""} do arquivo` });
@@ -427,7 +437,62 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
       };
     });
 
-  const handleJsonPaste = () => {
+  // Function to extract unique character names from script lines
+  const extractCharactersFromScript = (lines: ScriptLine[]): string[] => {
+    const characterNames = new Set<string>();
+    
+    lines.forEach(line => {
+      const charName = line.character?.trim();
+      if (charName && charName.length > 0 && charName !== "") {
+        // Clean up character name (remove extra spaces, normalize case)
+        const cleanName = charName.replace(/\s+/g, ' ').trim();
+        if (cleanName && cleanName !== "") {
+          characterNames.add(cleanName);
+        }
+      }
+    });
+    
+    return Array.from(characterNames).sort();
+  };
+
+  // Function to automatically add missing characters to production
+  const syncCharactersToProduction = async (characterNames: string[]) => {
+    if (!characterNames || characterNames.length === 0) return;
+    
+    // Get existing character names
+    const existingCharNames = new Set(
+      characters?.map((char: { name: string }) => char.name.toLowerCase()) || []
+    );
+    
+    // Find characters that don't exist yet
+    const missingCharacters = characterNames.filter(
+      name => !existingCharNames.has(name.toLowerCase())
+    );
+    
+    if (missingCharacters.length === 0) return;
+    
+    // Add missing characters to production
+    try {
+      const promises = missingCharacters.map(charName => 
+        createChar.mutateAsync({ name: charName.trim(), voiceActorId: null })
+      );
+      
+      await Promise.all(promises);
+      
+      toast({ 
+        title: "Personagens adicionados automaticamente", 
+        description: `${missingCharacters.length} novo${missingCharacters.length !== 1 ? "s" : ""} personagem${missingCharacters.length !== 1 ? "s" : ""} adicionado${missingCharacters.length !== 1 ? "s" : ""}` 
+      });
+    } catch (err: any) {
+      toast({ 
+        title: "Erro ao adicionar personagens", 
+        description: err?.message || "Tente adicionar manualmente.", 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const handleJsonPaste = async () => {
     const raw = jsonPasteText.trim();
     if (!raw) return;
     let json: any;
@@ -449,6 +514,11 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
       return;
     }
     const normalized = parseRawLines(rawLines);
+    
+    // Extract characters and auto-sync to production
+    const extractedCharacters = extractCharactersFromScript(normalized);
+    await syncCharactersToProduction(extractedCharacters);
+    
     setScriptLines(normalized);
     setScriptDirty(true);
     setShowJsonModal(false);
@@ -474,22 +544,21 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
     setScriptDirty(true);
   };
 
-  const updateScriptLine = (idx: number, field: keyof ScriptLine, value: string) => {
+  const updateScriptLine = async (idx: number, field: keyof ScriptLine, value: string) => {
     setScriptLines(prev => {
       const updated = [...prev];
-      const next = { ...updated[idx], [field]: value } as ScriptLine;
-      if (field === "start") {
-        next.tempo = value;
-        try {
-          next.tempoEmSegundos = toTempoEmSegundos(value);
-        } catch {
-          next.tempoEmSegundos = undefined;
-        }
-      }
-      updated[idx] = next;
+      updated[idx] = { ...updated[idx], [field]: value };
       return updated;
     });
     setScriptDirty(true);
+    
+    // If updating character field, sync characters
+    if (field === "character" && value.trim()) {
+      const updatedLines = [...scriptLines];
+      updatedLines[idx] = { ...updatedLines[idx], [field]: value };
+      const allCharacters = extractCharactersFromScript(updatedLines);
+      await syncCharactersToProduction(allCharacters);
+    }
   };
 
   const removeScriptLine = (idx: number) => {
