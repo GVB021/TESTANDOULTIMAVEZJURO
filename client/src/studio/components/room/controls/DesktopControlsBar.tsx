@@ -1,4 +1,4 @@
-import { Mic, Play, Pause, RotateCcw, Square, Repeat, Loader2 } from "lucide-react";
+import { Mic, Play, Pause, RotateCcw, RotateCw, Square, Repeat, Loader2 } from "lucide-react";
 import { cn } from "@studio/lib/utils";
 import { type RecordingStatus } from "@studio/pages/room";
 
@@ -76,7 +76,7 @@ export function DesktopControlsBar({
           className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 transition-all", canControlVideo ? "text-muted-foreground hover:text-foreground" : "opacity-30 cursor-not-allowed")}
           title={canControlVideo ? "Avançar 2s" : "Sem permissão"}
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCw className="w-4 h-4" />
         </button>
       </div>
 

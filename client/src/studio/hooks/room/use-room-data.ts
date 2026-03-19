@@ -31,7 +31,7 @@ export function useTakesList(sessionId: string) {
     queryKey: ["/api/sessions", sessionId, "takes"],
     queryFn: () => authFetch(`/api/sessions/${sessionId}/takes`),
     enabled: Boolean(sessionId),
-    refetchInterval: 5000,
+    refetchInterval: 20000,
   });
 }
 
@@ -88,7 +88,7 @@ export function useRecordingsList(sessionId: string, params: RecordingsQueryPara
       }
     },
     enabled: Boolean(sessionId),
-    refetchInterval: 5000,
+    refetchInterval: 20000,
     initialData: () => {
       try {
         const raw = localStorage.getItem(cacheKey);

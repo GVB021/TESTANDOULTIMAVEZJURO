@@ -16,6 +16,17 @@ export interface MicrophoneState {
 
 let currentState: MicrophoneState | null = null;
 
+async function resumeIfSuspended(ctx: AudioContext): Promise<void> {
+  if (ctx.state === "suspended") {
+    try {
+      await ctx.resume();
+      console.log("[Mic] AudioContext resumed from suspended");
+    } catch (e) {
+      console.warn("[Mic] Failed to resume AudioContext:", e);
+    }
+  }
+}
+
 export async function requestMicrophone(
   mode: VoiceCaptureMode = "original",
   deviceId?: string
@@ -82,19 +93,7 @@ export async function requestMicrophone(
     latencyHint: "interactive"
   });
   
-  if (isHighFidelity) {
-    try {
-      await audioContext.audioWorklet.addModule("/audio-processor.js");
-      console.log("[Mic] AudioWorklet module loaded");
-    } catch (e) {
-      console.error("[Mic] Failed to load AudioWorklet", e);
-    }
-  }
-
-  if (audioContext.state === "suspended") {
-    await audioContext.resume();
-    console.log("[Mic] AudioContext resumed from suspended state");
-  }
+  await resumeIfSuspended(audioContext);
 
   const sourceNode = audioContext.createMediaStreamSource(stream);
   const gainNode = audioContext.createGain();

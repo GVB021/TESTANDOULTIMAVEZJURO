@@ -73,14 +73,17 @@ export function MobileFooterControls({
         </button>
         <button
           onClick={onRecordOrStop}
+          disabled={isSaving}
           className={cn(
             "w-14 h-14 room-rounded-full flex items-center justify-center transition-all",
-            isRecording
+            isSaving
+              ? "opacity-50 cursor-not-allowed bg-white/5 border border-white/10 text-white/30"
+              : isRecording
               ? "room-status-recording animate-pulse shadow-[0_0_30px_rgba(239,68,68,0.6)] hover:scale-110 active:scale-95"
               : "room-button-primary hover:scale-105 active:scale-95"
           )}
         >
-          {isRecording ? <Square className="w-7 h-7 text-white fill-white" /> : <Mic className="w-7 h-7" />}
+          {isSaving ? <Loader2 className="w-7 h-7 animate-spin" /> : isRecording ? <Square className="w-7 h-7 text-white fill-white" /> : <Mic className="w-7 h-7" />}
         </button>
         <button
           onClick={onPlayPause}
@@ -171,11 +174,12 @@ export function MobileFooterControls({
         )}
       </div>
 
-      {/* Auto-save toast */}
-      {recordingStatus === "recorded" && (
+      {/* Upload indicator */}
+      {isSaving && (
         <div className="absolute bottom-full left-0 right-0 mb-4 px-6 pointer-events-none">
-          <div className="max-w-md mx-auto h-12 rounded-2xl room-bg-elevated border border-border shadow-2xl flex items-center justify-between px-4 text-xs room-text-primary pointer-events-auto backdrop-blur-xl">
-            <span>Take salvo automaticamente.</span>
+          <div className="max-w-md mx-auto h-12 rounded-2xl room-bg-elevated border border-border shadow-2xl flex items-center gap-3 px-4 text-xs room-text-primary pointer-events-none backdrop-blur-xl">
+            <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+            <span>Enviando take para o diretor...</span>
           </div>
         </div>
       )}

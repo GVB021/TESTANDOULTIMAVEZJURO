@@ -22,7 +22,7 @@ let scriptProcessorNode: ScriptProcessorNode | null = null;
 let recordedChunks: Float32Array[] = [];
 let totalSamples = 0;
 
-export function startCapture(micState: MicrophoneState): void {
+export async function startCapture(micState: MicrophoneState): Promise<void> {
   recordedChunks = [];
   totalSamples = 0;
   console.info("[AudioPipeline][Capture] start", {
@@ -32,9 +32,12 @@ export function startCapture(micState: MicrophoneState): void {
   });
 
   if (micState.audioContext.state === "suspended") {
-    micState.audioContext.resume().then(() => {
+    try {
+      await micState.audioContext.resume();
       console.log("[RecEngine] AudioContext resumed before capture");
-    });
+    } catch (e) {
+      console.warn("[RecEngine] Failed to resume AudioContext:", e);
+    }
   }
 
   // Use AudioWorklet if in high-fidelity mode and module is loaded
@@ -81,7 +84,7 @@ export function startCapture(micState: MicrophoneState): void {
   });
 }
 
-export function stopCapture(micState: MicrophoneState): RecordingResult {
+export async function stopCapture(micState: MicrophoneState): Promise<RecordingResult> {
   console.info("[AudioPipeline][Capture] stopping", {
     chunksCount: recordedChunks.length,
     totalSamples,

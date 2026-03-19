@@ -647,8 +647,8 @@ export default function RecordingRoom() {
               characterName: msg.character || "Desconhecido",
               startTimeSeconds: msg.start || 0,
             });
-            
-            toast({
+            // M1: Don't show review toast to the dubber who just recorded
+            if (!msg.userId || msg.userId !== user?.id) { toast({
               title: "Novo Take para Revisão",
               description: `${msg.character || "Desconhecido"} enviou uma gravação.`,
               action: (
@@ -665,7 +665,7 @@ export default function RecordingRoom() {
                 </button>
               ),
               duration: 10000,
-            });
+            }); }
           }
         } else if (msg.type === "video:take-decision") {
           // Se a decisão for sobre um take meu
@@ -741,8 +741,10 @@ export default function RecordingRoom() {
       wsIntentionalClose.current = true;
       if (wsReconnectTimeout.current) clearTimeout(wsReconnectTimeout.current);
       ws.close();
+      // M4: Clear loop selection state on intentional disconnect
+      setLoopSelectionMode("idle");
     };
-  }, [sessionId, studioId, micState, user?.id, toast, applyScriptLinePatch, pushEditHistory, canApproveTake, lastUploadedTakeId, reviewingTake]);
+  }, [sessionId, studioId, micState, user?.id, toast, applyScriptLinePatch, pushEditHistory, lastUploadedTakeId]);
 
   const baseScriptLines: ScriptLine[] = useMemo(() => {
     if (!production?.scriptJson) return [];
@@ -1048,7 +1050,10 @@ export default function RecordingRoom() {
     const map = new Map<string, any>();
     presenceUsers.forEach((presence) => {
       if (!presence?.userId) return;
-      map.set(String(presence.userId), presence);
+      map.set(String(presence.userId), {
+        ...presence,
+        name: presence.displayName || presence.fullName || presence.name || presence.userId,
+      });
     });
     return Array.from(map.values());
   }, [presenceUsers, canViewOnlineUsers]);
@@ -1508,9 +1513,9 @@ export default function RecordingRoom() {
     
     // Audio starts at second 1 of preroll (1s after preroll begins)
     const captureDelay = prerollStart < currentLineTime ? 1000 : 0;
-    const captureTimeout = window.setTimeout(() => {
+    const captureTimeout = window.setTimeout(async () => {
       if (micState) {
-        startCapture(micState);
+        await startCapture(micState);
         setRecordingStatus("recording");
       } else {
         console.warn("Iniciando gravação sem micState - pode não funcionar");
@@ -1538,7 +1543,7 @@ export default function RecordingRoom() {
     
     // Store timeout so we can cancel it if recording is stopped early
     (countdownTimerRef as any)._captureTimeout = captureTimeout;
-  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, recordingProfile, currentLine, scriptLines, mySessionRole]);
+  }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, recordingProfile, currentLine, scriptLines, mySessionRole, toast]);
 
   const handleDirectorApprove = useCallback(async () => {
     if (!reviewingTake) return;
@@ -1591,7 +1596,7 @@ export default function RecordingRoom() {
     }
     setCountdownValue(0);
     logAudioStep("stop-requested", { state: micState });
-    const result = await stopCapture(micState as any);
+    const result = await stopCapture(micState);
     if (!result.samples.length) {
       toast({ title: "Sem áudio capturado", description: "Nenhum sample foi registrado. Verifique microfone e ganho.", variant: "destructive" });
       setRecordingStatus("idle");
@@ -1644,9 +1649,8 @@ export default function RecordingRoom() {
 
       emitVideoEvent("take-ready-for-review", { takeId: uploadedTake.id, audioUrl: uploadedTake.audioUrl, duration: result.durationSeconds, metrics, lineIndex: currentLine, userId: user?.id, character: recordingProfile?.characterName || "Personagem", start: Number(videoRef.current?.currentTime || 0) });
       
-      // Auto-reset so the record button re-enables immediately after upload
-      if (pendingTake?.url) URL.revokeObjectURL(pendingTake.url);
-      setPendingTake(null);
+      // A2: Auto-reset using functional update to safely revoke URL
+      setPendingTake((prev: any) => { if (prev?.url) URL.revokeObjectURL(prev.url); return null; });
       setRecordingStatus("idle");
       setIsWaitingReview(false);
       toast({ title: "Gravação enviada", description: "Take enviado para o diretor." });
@@ -1657,7 +1661,7 @@ export default function RecordingRoom() {
     } finally {
       setIsSaving(false);
     }
-  }, [recordingStatus, micState, emitVideoEvent, logAudioStep, toast, isLooping, customLoop, currentLine, uploadTakeForDirector, user?.id, recordingProfile]);
+  }, [recordingStatus, micState, emitVideoEvent, logAudioStep, toast, isLooping, customLoop, currentLine, uploadTakeForDirector, user?.id, recordingProfile, pendingTake]);
 
   const handleApproveTake = useCallback(async () => {
     if (!pendingTake) return;

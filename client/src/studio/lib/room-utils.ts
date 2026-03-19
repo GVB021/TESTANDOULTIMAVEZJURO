@@ -41,7 +41,6 @@ export function normalizeRoomRole(role: unknown) {
     value === "director" ||
     value === "diretor" ||
     value === "studio_admin" ||
-    value === "engenheiro_audio" ||
     value === "platform_owner" ||
     value === "master"
   )
