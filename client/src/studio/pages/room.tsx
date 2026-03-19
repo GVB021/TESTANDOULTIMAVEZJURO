@@ -628,8 +628,8 @@ export default function RecordingRoom() {
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
         } else if (msg.type === "video:take-ready-for-review") {
-          // Se eu sou aprovador, recebo o take para revisar
-          if (canApproveTake && msg.takeId && msg.audioUrl) {
+          // Se eu sou aprovador E diretor, recebo o take para revisar
+          if (canApproveTake && studioRole === "diretor" && msg.takeId && msg.audioUrl) {
             setReviewingTake({
               takeId: msg.takeId,
               audioUrl: msg.audioUrl,
