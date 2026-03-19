@@ -266,11 +266,13 @@ export default function RecordingRoom() {
   const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(null);
   
   // Carregar perfil persistido ao iniciar — key unificada: vhub_rec_profile_${sessionId}
+  // actorName é sempre resetado para "" — o dublador deve digitar o nome manualmente em cada sessão
   useEffect(() => {
     const saved = localStorage.getItem(`vhub_rec_profile_${sessionId}`);
     if (saved) {
       try {
-        setRecordingProfile(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        setRecordingProfile({ ...parsed, actorName: "", voiceActorName: "" });
       } catch (e) {
         console.warn("Failed to load saved recording profile");
       }
