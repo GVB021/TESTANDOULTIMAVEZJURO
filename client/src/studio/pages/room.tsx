@@ -265,9 +265,9 @@ export default function RecordingRoom() {
   // Recording state
   const [recordingProfile, setRecordingProfile] = useState<RecordingProfile | null>(null);
   
-  // Carregar perfil persistido ao iniciar
+  // Carregar perfil persistido ao iniciar — key unificada: vhub_rec_profile_${sessionId}
   useEffect(() => {
-    const saved = localStorage.getItem(`recording_profile_${sessionId}`);
+    const saved = localStorage.getItem(`vhub_rec_profile_${sessionId}`);
     if (saved) {
       try {
         setRecordingProfile(JSON.parse(saved));
@@ -1437,13 +1437,18 @@ export default function RecordingRoom() {
     lineIndex: number;
     startTimeSeconds: number;
   }) => {
-    if (!recordingProfile) {
-      throw new Error("Perfil de gravação não configurado.");
-    }
+    // Use configured profile or fall back to minimal user data so upload never hard-fails
+    const effectiveProfile = recordingProfile ?? {
+      actorName: user?.displayName || user?.fullName || "Ator",
+      characterId: "",
+      characterName: "Sem Personagem",
+      voiceActorId: user?.id || "",
+      voiceActorName: user?.displayName || user?.fullName || "Ator",
+    };
     logAudioStep("upload-started", { lineIndex: input.lineIndex, durationSeconds: input.durationSeconds, autoApprove: input.autoApprove });
     const lineText = scriptLines[input.lineIndex]?.text || "";
-    const charName = (recordingProfile.characterName || "personagem").replace(/\s+/g, "_");
-    const actorFirstName = (recordingProfile.actorName || recordingProfile.voiceActorName || "ator").trim().split(/\s+/)[0];
+    const charName = (effectiveProfile.characterName || "personagem").replace(/\s+/g, "_");
+    const actorFirstName = (effectiveProfile.actorName || effectiveProfile.voiceActorName || "ator").trim().split(/\s+/)[0];
     const videoSecs = Math.round(input.startTimeSeconds);
     const hh = String(Math.floor(videoSecs / 3600)).padStart(2, "0");
     const mm = String(Math.floor((videoSecs % 3600) / 60)).padStart(2, "0");
@@ -1452,8 +1457,8 @@ export default function RecordingRoom() {
     const formData = new FormData();
     formData.append("audio", input.wavBlob, filename);
     formData.append("lineText", lineText.slice(0, 200));
-    formData.append("characterId", recordingProfile.characterId);
-    formData.append("voiceActorId", user?.id || recordingProfile.voiceActorId || "");
+    formData.append("characterId", effectiveProfile.characterId);
+    formData.append("voiceActorId", user?.id || effectiveProfile.voiceActorId || "");
     formData.append("lineIndex", String(input.lineIndex));
     formData.append("durationSeconds", String(input.durationSeconds));
     formData.append("startTimeSeconds", String(input.startTimeSeconds));
@@ -1669,6 +1674,8 @@ export default function RecordingRoom() {
       console.error("Auto-upload failed:", error);
       toast({ title: "Falha no envio automático", description: "Tente enviar manualmente.", variant: "destructive" });
       setIsWaitingReview(false);
+      // Reset status so the record button re-enables even on upload failure
+      setRecordingStatus("idle");
     } finally {
       setIsSaving(false);
     }
@@ -2602,7 +2609,7 @@ export default function RecordingRoom() {
 
         {/* 🎙️ Popup de Revisão do Diretor — apenas diretor vê */}
         <AnimatePresence>
-          {reviewingTake && isDirector && (
+          {reviewingTake && (isDirector || canApproveTake) && (
             <DirectorReview
               mode="director"
               take={reviewingTake}
