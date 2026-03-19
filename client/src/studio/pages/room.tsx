@@ -633,7 +633,11 @@ export default function RecordingRoom() {
             willHaveTextControl: hasUiPermission(resolveUiRole(studioRole, nextSet.has(String(user?.id ?? ""))), "text_control")
           });
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
-          setPresenceUsers(msg.users);
+          // B1: Deduplicate by userId to prevent duplicates in TextControlPopup
+          const deduped = Array.isArray(msg.users)
+            ? Array.from(new Map(msg.users.map((u: any) => [String(u?.userId ?? u?.id ?? ""), u])).values())
+            : [];
+          setPresenceUsers(deduped);
         } else if (msg.type === "video:take-ready-for-review") {
           // Always store the take; render guard (canApproveTake) controls visibility
           if (msg.takeId && msg.audioUrl) {
@@ -1058,18 +1062,25 @@ export default function RecordingRoom() {
     return Array.from(map.values());
   }, [presenceUsers, canViewOnlineUsers]);
   const textControlCandidates = useMemo(() => {
-    // Try to get candidates from presence users first
-    let candidates = presenceUsers.length > 0 
+    // Try to get candidates from presence users first (already deduped at source)
+    let candidates = presenceUsers.length > 0
       ? presenceUsers.filter((presence: any) => canReceiveTextControl(presence?.role))
       : [];
     
     // If no presence users, fall back to room users
     if (candidates.length === 0 && roomUsers.length > 0) {
-      candidates = roomUsers.filter((user: any) => canReceiveTextControl(user?.role));
+      candidates = roomUsers.filter((u: any) => canReceiveTextControl(u?.role));
     }
     
-    return candidates;
-  }, [presenceUsers, roomUsers, user]);
+    // Extra safety dedup by userId
+    const seen = new Set<string>();
+    return candidates.filter((c: any) => {
+      const id = String(c?.userId ?? c?.id ?? "");
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [presenceUsers, roomUsers]);
 
   const mobileMenuItems = useMemo(() => [
     {
@@ -2591,7 +2602,7 @@ export default function RecordingRoom() {
 
         {/* 🎙️ Popup de Revisão do Diretor — apenas diretor vê */}
         <AnimatePresence>
-          {reviewingTake && canApproveTake && (
+          {reviewingTake && isDirector && (
             <DirectorReview
               mode="director"
               take={reviewingTake}

@@ -73,6 +73,10 @@ export function RoomHeader({
             data-testid="button-character-selector"
           >
             <User className="w-3.5 h-3.5" />
+            {recordingProfile?.actorName && (
+              <span className="max-w-[100px] truncate text-primary/80 font-medium">{recordingProfile.actorName}</span>
+            )}
+            {recordingProfile?.actorName && <ChevronRight className="w-2.5 h-2.5 text-muted-foreground/60" />}
             <span className="max-w-[140px] truncate">{recordingProfile?.characterName || "Personagem"}</span>
             <ChevronRight className={cn("w-3 h-3 transition-transform", charSelectorOpen && "rotate-90")} />
           </button>
