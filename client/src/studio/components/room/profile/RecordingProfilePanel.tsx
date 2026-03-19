@@ -29,7 +29,7 @@ export function RecordingProfilePanel({
   existingProfile,
 }: RecordingProfilePanelProps) {
   const [actorName, setActorName] = useState(
-    existingProfile?.actorName || user?.fullName || user?.displayName || ""
+    existingProfile?.actorName || ""
   );
   const [selectedCharId, setSelectedCharId] = useState(existingProfile?.characterId || "");
   const [freeCharName, setFreeCharName] = useState(existingProfile?.characterName || "");
