@@ -309,6 +309,7 @@ export default function RecordingRoom() {
     monitorVolume: 1.0,
   });
   const [dailyMeetOpen, setDailyMeetOpen] = useState(false);
+  const [dailyStatus, setDailyStatus] = useState<"conectando" | "conectado" | "desconectado">("desconectado");
   const [loopRangeMeta, setLoopRangeMeta] = useState<{ startIndex: number; endIndex: number } | null>(null);
 
   // Shortcuts
@@ -2455,6 +2456,9 @@ export default function RecordingRoom() {
         onToggleAutoFollow={handleToggleAutoFollow}
         onlySelectedCharacter={onlySelectedCharacter}
         onToggleCharacterFilter={handleToggleCharacterFilter}
+        dailyStatus={dailyStatus}
+        onDailyToggle={() => setDailyMeetOpen(v => !v)}
+        onMobileMenuOpen={isMobile ? () => setMobileMenuOpen(true) : undefined}
         rightSlot={
           <div className="flex items-center gap-2">
             <span
@@ -2487,17 +2491,127 @@ export default function RecordingRoom() {
           zIndexBase={UI_LAYER_BASE.chatPanel}
           open={dailyMeetOpen}
           onOpenChange={setDailyMeetOpen}
+          onStatusChange={setDailyStatus}
           mode="floating"
         />
       )}
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div 
-          className={cn(
-            "flex-1 grid overflow-hidden transition-[grid-template-columns] duration-75",
-            isMobile ? "grid-cols-1" : "lg:grid-cols-[1fr_auto]"
-          )}
-          style={isMobile ? undefined : { gridTemplateColumns: `1fr ${sideScriptWidth}px` }}
+        {/* ── MOBILE LAYOUT ── portrait: video → controls → script strip */}
+        {isMobile && (
+          <div className="flex-1 flex flex-col overflow-hidden landscape:flex-row">
+            {/* Video */}
+            <div className="shrink-0 bg-black landscape:flex-1">
+              <VideoPlayer
+                ref={videoRef}
+                src={production?.videoUrl}
+                isMuted={isMuted}
+                onMuteToggle={() => setIsMuted((m) => !m)}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onTimeUpdate={setVideoTime}
+                onDurationChange={setVideoDuration}
+                countdownValue={countdownValue}
+                volumeOverlay={null}
+                loopInfo={loopInfo}
+                className="w-full aspect-video"
+              />
+            </div>
+
+            {/* Controls bar — between video and script on portrait */}
+            <div className="shrink-0 landscape:hidden">
+              <MobileFooterControls
+                controlsVisible={true}
+                isLooping={isLooping}
+                isPlaying={isPlaying}
+                recordingStatus={recordingStatus}
+                micReady={micReady}
+                isSaving={isSaving}
+                loopSelectionMode={loopSelectionMode}
+                customLoop={customLoop}
+                videoTime={videoTime}
+                videoDuration={videoDuration}
+                formatTimecode={formatLiveTimecode}
+                onVisibilityChange={setControlsVisible}
+                onSeekBack={() => seek(-2)}
+                onRecordOrStop={handleRecordOrStop}
+                onPlayPause={handlePlayPause}
+                onScrub={scrub}
+                onLoop={handleLoopButton}
+                onRecord={startCountdown}
+                onStopRecord={handleStopRecording}
+              />
+            </div>
+
+            {/* Inline script strip (portrait) + landscape right column */}
+            <div className="flex-1 overflow-y-auto landscape:w-[40%] landscape:shrink-0 landscape:border-l landscape:border-border/40" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
+              {displayedScriptLines.map((line) => {
+                const i = line.originalIndex;
+                const isActive = i === currentLine;
+                const isDone = savedTakes.has(i);
+                return (
+                  <div
+                    key={i}
+                    data-line-index={i}
+                    onClick={() => { if (canControlVideo) { setCurrentLine(i); emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); } }}
+                    className={cn(
+                      "px-4 py-3 border-b border-border/20 transition-colors",
+                      isActive ? "bg-primary/10 border-l-2 border-l-primary" : "active:bg-muted/30",
+                      isDone && "opacity-70"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[10px] font-mono text-muted-foreground/60">#{i + 1}</span>
+                      <span className={cn("text-[11px] font-bold uppercase tracking-widest", isActive ? "text-primary" : "text-muted-foreground")}>
+                        {line.character}
+                      </span>
+                      {isDone && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                    </div>
+                    <p
+                      className={cn("leading-snug text-sm", isActive ? "text-foreground font-medium" : "text-muted-foreground")}
+                      style={{ fontSize: `${scriptFontSize}px` }}
+                    >
+                      {liveDrafts[i] || line.text}
+                    </p>
+                  </div>
+                );
+              })}
+              {displayedScriptLines.length === 0 && (
+                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Nenhuma linha no roteiro</div>
+              )}
+            </div>
+
+            {/* Landscape: controls overlay at bottom of video column */}
+            <div className="hidden landscape:flex landscape:absolute landscape:bottom-0 landscape:left-0 landscape:right-[40%] landscape:z-20">
+              <MobileFooterControls
+                controlsVisible={controlsVisible}
+                isLooping={isLooping}
+                isPlaying={isPlaying}
+                recordingStatus={recordingStatus}
+                micReady={micReady}
+                isSaving={isSaving}
+                loopSelectionMode={loopSelectionMode}
+                customLoop={customLoop}
+                videoTime={videoTime}
+                videoDuration={videoDuration}
+                formatTimecode={formatLiveTimecode}
+                onVisibilityChange={setControlsVisible}
+                onSeekBack={() => seek(-2)}
+                onRecordOrStop={handleRecordOrStop}
+                onPlayPause={handlePlayPause}
+                onScrub={scrub}
+                onLoop={handleLoopButton}
+                onRecord={startCountdown}
+                onStopRecord={handleStopRecording}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── DESKTOP LAYOUT ── */}
+        {!isMobile && <div 
+          className="flex-1 grid overflow-hidden transition-[grid-template-columns] duration-75"
+          style={{ gridTemplateColumns: `1fr ${sideScriptWidth}px` }}
         >
           {/* Coluna Principal: Video + Texto Sincronizado */}
           <div ref={desktopVideoTextContainerRef} className="flex flex-col min-h-0 relative bg-black/40">
@@ -2514,7 +2628,7 @@ export default function RecordingRoom() {
               volumeOverlay={null}
               loopInfo={loopInfo}
               className="min-h-[220px]"
-              height={isMobile ? undefined : `${desktopVideoTextSplit}%`}
+              height={`${desktopVideoTextSplit}%`}
             />
 
             {!isMobile && (
@@ -2620,7 +2734,7 @@ export default function RecordingRoom() {
               }}
             />
           )}
-        </div>
+        </div>}
 
         {/* 🎙️ Popup de Revisão do Diretor — apenas diretor vê */}
         <AnimatePresence>
@@ -2660,30 +2774,6 @@ export default function RecordingRoom() {
           )}
         </AnimatePresence>
 
-        {/* Rodapé de Controles (Apenas Mobile) */}
-        {isMobile && (
-          <MobileFooterControls
-            controlsVisible={controlsVisible}
-            isLooping={isLooping}
-            isPlaying={isPlaying}
-            recordingStatus={recordingStatus}
-            micReady={micReady}
-            isSaving={isSaving}
-            loopSelectionMode={loopSelectionMode}
-            customLoop={customLoop}
-            videoTime={videoTime}
-            videoDuration={videoDuration}
-            formatTimecode={formatLiveTimecode}
-            onVisibilityChange={setControlsVisible}
-            onSeekBack={() => seek(-2)}
-            onRecordOrStop={handleRecordOrStop}
-            onPlayPause={handlePlayPause}
-            onScrub={scrub}
-            onLoop={handleLoopButton}
-            onRecord={startCountdown}
-            onStopRecord={handleStopRecording}
-          />
-        )}
         </div>
 
       <AnimatePresence>

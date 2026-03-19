@@ -10,9 +10,10 @@ interface DailyMeetPanelProps {
   open?: boolean;
   onOpenChange?: (next: boolean) => void;
   mode?: "floating" | "embedded";
+  onStatusChange?: (status: "conectando" | "conectado" | "desconectado") => void;
 }
 
-export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChange, mode = "floating" }: DailyMeetPanelProps) {
+export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChange, mode = "floating", onStatusChange }: DailyMeetPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const callRef = useRef<any>(null);
@@ -102,10 +103,10 @@ export function DailyMeetPanel({ sessionId, zIndexBase = 1150, open, onOpenChang
         });
         callRef.current = frame;
 
-        frame.on("joined-meeting", () => setStatus("conectado"));
-        frame.on("left-meeting", () => setStatus("desconectado"));
+        frame.on("joined-meeting", () => { setStatus("conectado"); onStatusChange?.("conectado"); });
+        frame.on("left-meeting", () => { setStatus("desconectado"); onStatusChange?.("desconectado"); });
         frame.on("error", (ev: any) => {
-          setStatus("desconectado");
+          setStatus("desconectado"); onStatusChange?.("desconectado");
           setErrorMsg(ev?.errorMsg || "Falha na conexão Daily");
           if (reconnectTimeoutRef.current) window.clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = window.setTimeout(() => {

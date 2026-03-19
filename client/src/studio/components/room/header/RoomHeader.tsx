@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from "react";
-import { ArrowLeft, User, ChevronRight, ArrowUpDown, UserCheck, Pencil } from "lucide-react";
+import { ArrowLeft, User, ChevronRight, ArrowUpDown, UserCheck, Pencil, Video, Menu } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@studio/lib/utils";
 
@@ -21,6 +21,9 @@ interface RoomHeaderProps {
   onlySelectedCharacter?: boolean;
   onToggleCharacterFilter?: () => void;
   rightSlot?: ReactNode;
+  dailyStatus?: "conectando" | "conectado" | "desconectado";
+  onDailyToggle?: () => void;
+  onMobileMenuOpen?: () => void;
 }
 
 export function RoomHeader({
@@ -40,22 +43,114 @@ export function RoomHeader({
   onlySelectedCharacter = false,
   onToggleCharacterFilter,
   rightSlot,
+  dailyStatus = "desconectado",
+  onDailyToggle,
+  onMobileMenuOpen,
 }: RoomHeaderProps) {
   const [actorInput, setActorInput] = useState(recordingProfile?.actorName || "");
+  const [actorPopoverOpen, setActorPopoverOpen] = useState(false);
 
   const handleActorNameBlur = () => {
     onActorNameChange?.(actorInput.trim());
   };
 
+  const dailyDot = dailyStatus === "conectado"
+    ? "bg-emerald-500"
+    : dailyStatus === "conectando"
+    ? "bg-amber-400 animate-pulse"
+    : "bg-red-500";
+
+  if (isMobile) {
+    return (
+      <header className="shrink-0 flex items-center justify-between px-3 h-14 relative z-20 bg-background/70 backdrop-blur-xl border-b border-border/60 shadow-sm" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+        {/* Left: back + title */}
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <button
+            onClick={onBack}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground active:bg-muted/70 transition-colors shrink-0"
+            aria-label="Voltar"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <div className="flex flex-col min-w-0 flex-1">
+            <span className="font-bold text-xs truncate text-foreground leading-tight">{productionName}</span>
+            {recordingProfile?.actorName && (
+              <span className="text-[10px] text-primary/70 truncate leading-tight">{recordingProfile.actorName}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Right: actor pencil, Daily icon, hamburger */}
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Actor name popover */}
+          <div className="relative">
+            <button
+              onClick={() => setActorPopoverOpen(v => !v)}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground active:bg-muted/70 transition-colors"
+              aria-label="Nome artístico"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <AnimatePresence>
+              {actorPopoverOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.96 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute top-full right-0 mt-2 w-56 rounded-xl bg-popover/98 backdrop-blur-xl border border-border shadow-2xl p-3 z-[1200]"
+                >
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Nome Artístico</p>
+                  <input
+                    type="text"
+                    value={actorInput}
+                    autoFocus
+                    onChange={(e) => setActorInput(e.target.value)}
+                    onBlur={() => { handleActorNameBlur(); setActorPopoverOpen(false); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
+                    placeholder="Seu nome artístico"
+                    className="w-full h-10 rounded-lg px-3 text-sm bg-muted/50 border border-border text-foreground focus:border-primary outline-none transition-all"
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Daily.co icon */}
+          {onDailyToggle && (
+            <button
+              onClick={onDailyToggle}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground active:bg-muted/70 transition-colors relative"
+              aria-label="Vídeo & Voz"
+            >
+              <Video className="w-4 h-4" />
+              <span className={cn("absolute top-1.5 right-1.5 w-2 h-2 rounded-full border border-background", dailyDot)} />
+            </button>
+          )}
+
+          {/* Hamburger */}
+          {onMobileMenuOpen && (
+            <button
+              onClick={onMobileMenuOpen}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground active:bg-muted/70 transition-colors"
+              aria-label="Menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header
       className={cn(
         "shrink-0 flex items-center px-4 h-16 relative z-20 transition-[grid-template-columns] duration-75",
-        "bg-background/70 backdrop-blur-xl border-b border-border/60 shadow-sm",
-        !isMobile ? "grid" : "justify-between"
+        "bg-background/70 backdrop-blur-xl border-b border-border/60 shadow-sm grid"
       )}
       style={{
-        gridTemplateColumns: !isMobile ? "1fr auto" : undefined,
+        gridTemplateColumns: "1fr auto",
       }}
     >
       {/* Left: back, title, character selector, script toggles */}
