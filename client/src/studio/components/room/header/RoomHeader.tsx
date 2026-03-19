@@ -1,5 +1,5 @@
-import { type ReactNode } from "react";
-import { ArrowLeft, User, ChevronRight, ArrowUpDown, UserCheck } from "lucide-react";
+import { type ReactNode, useState } from "react";
+import { ArrowLeft, User, ChevronRight, ArrowUpDown, UserCheck, Pencil } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@studio/lib/utils";
 
@@ -14,6 +14,7 @@ interface RoomHeaderProps {
   setCharSelectorOpen: (open: boolean) => void;
   charactersList: any[];
   handleCharacterChange: (char: any) => void;
+  onActorNameChange?: (name: string) => void;
   onBack: () => void;
   scriptAutoFollow?: boolean;
   onToggleAutoFollow?: () => void;
@@ -32,6 +33,7 @@ export function RoomHeader({
   setCharSelectorOpen,
   charactersList,
   handleCharacterChange,
+  onActorNameChange,
   onBack,
   scriptAutoFollow = false,
   onToggleAutoFollow,
@@ -39,6 +41,12 @@ export function RoomHeader({
   onToggleCharacterFilter,
   rightSlot,
 }: RoomHeaderProps) {
+  const [actorInput, setActorInput] = useState(recordingProfile?.actorName || "");
+
+  const handleActorNameBlur = () => {
+    onActorNameChange?.(actorInput.trim());
+  };
+
   return (
     <header
       className={cn(
@@ -65,8 +73,23 @@ export function RoomHeader({
           <span className="text-[10px] text-muted-foreground truncate">{sessionTitle}</span>
         </div>
 
+        {/* Actor name input */}
+        <div className="relative ml-2 flex items-center h-7 rounded-md bg-muted/40 border border-border/60 px-2 gap-1.5 focus-within:border-primary/60 transition-colors">
+          <Pencil className="w-3 h-3 text-muted-foreground shrink-0" />
+          <input
+            type="text"
+            value={actorInput}
+            onChange={(e) => setActorInput(e.target.value)}
+            onBlur={handleActorNameBlur}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.currentTarget.blur(); } }}
+            placeholder="Seu nome artístico"
+            className="w-28 bg-transparent text-[11px] text-foreground placeholder:text-muted-foreground/60 outline-none"
+            data-testid="input-header-actor-name"
+          />
+        </div>
+
         {/* Character selector */}
-        <div className="relative ml-2">
+        <div className="relative ml-1">
           <button
             onClick={() => setCharSelectorOpen(!charSelectorOpen)}
             className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1.5"

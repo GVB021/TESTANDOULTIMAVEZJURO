@@ -2217,6 +2217,14 @@ export default function RecordingRoom() {
     setRecordingsPlayerOpenId(null);
   }, []);
 
+  const handleActorNameChange = useCallback((name: string) => {
+    setRecordingProfile((prev: any) => {
+      const updated = { ...(prev || {}), actorName: name, voiceActorName: name };
+      localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(updated));
+      return updated;
+    });
+  }, [sessionId]);
+
   const handleSaveProfile = useCallback((profile: RecordingProfile) => {
     setRecordingProfile(profile);
     localStorage.setItem(`vhub_rec_profile_${sessionId}`, JSON.stringify(profile));
@@ -2440,6 +2448,7 @@ export default function RecordingRoom() {
         setCharSelectorOpen={setCharSelectorOpen}
         charactersList={charactersList || []}
         handleCharacterChange={handleCharacterChange}
+        onActorNameChange={handleActorNameChange}
         onBack={handleBack}
         scriptAutoFollow={scriptAutoFollow}
         onToggleAutoFollow={handleToggleAutoFollow}
