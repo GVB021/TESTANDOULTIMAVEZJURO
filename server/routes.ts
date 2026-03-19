@@ -1388,6 +1388,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         timecode: z.string().optional(),
         startTimeSeconds: z.coerce.number().min(0).optional(),
         isPreferred: z.coerce.boolean().optional(),
+        lineText: z.string().max(500).optional(),
       }).parse(req.body);
 
       const sessionCheck = await verifySessionAccess(req, res, sessionId);
@@ -1523,7 +1524,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
           const actorToken = normalizeTokenUpper(actorNameRaw);
           const characterToken = normalizeTokenUpper(characterRow?.name || "");
-          const filename = `${characterToken}_${actorToken}_${timecodeToken}.wav`;
+          const rawLineText = String(body.lineText || "");
+          const lineTextToken = rawLineText
+            ? rawLineText.replace(/[^\w\sáéíóúàèìòùâêîôûãõç]/gi, "").trim().slice(0, 40).replace(/\s+/g, "_").toUpperCase()
+            : "";
+          const filename = lineTextToken
+            ? `${characterToken}_${lineTextToken}_${timecodeToken}.wav`
+            : `${characterToken}_${actorToken}_${timecodeToken}.wav`;
 
           const baseFolder = "upload"; // Fixed base folder as requested
           const pathSegments = [baseFolder, productionName, sessionId, characterFolder, actorFolder, filename];

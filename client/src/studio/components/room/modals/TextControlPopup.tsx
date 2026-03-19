@@ -34,7 +34,7 @@ export function TextControlPopup({
       <div className="rounded-2xl w-[calc(100vw-32px)] max-w-[620px] overflow-hidden border border-border/70 bg-card/95 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-border/70">
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-foreground">Liberar Texto</span>
+            <span className="text-sm font-semibold text-foreground">Permitir Controle</span>
             <span className="text-[10px] px-2 py-1 rounded-full border bg-muted/60 text-muted-foreground">
               {authorizedCount} autorizados
             </span>
@@ -85,7 +85,7 @@ export function TextControlPopup({
                       )}
                       data-testid={`button-toggle-text-control-${uid}`}
                     >
-                      {allowed ? "Revogar" : "Liberar"}
+                      {allowed ? "Revogar Controle" : "Permitir Controle"}
                     </button>
                   </div>
                 </div>

@@ -1086,8 +1086,8 @@ export default function RecordingRoom() {
     {
       icon: <Edit3 className="w-5 h-5" />,
       iconBg: "bg-indigo-500/10 text-indigo-300",
-      title: "Liberar Texto",
-      subtitle: "Permissões em tempo real",
+      title: "Permitir Controle",
+      subtitle: "Controle de texto e vídeo",
       onClick: () => { setTextControlPopupOpen(true); setMobileMenuOpen(false); },
       visible: canTextControl,
     },
@@ -1256,10 +1256,12 @@ export default function RecordingRoom() {
           loopSilenceTimeoutRef.current = window.setTimeout(() => {
             const node = videoRef.current;
             if (!node) return;
-            node.currentTime = range.start;
-            emitVideoEvent("seek", { currentTime: range.start });
+            // Restart 2s before the loop start for preroll
+            const restartAt = Math.max(0, range.start - 2);
+            node.currentTime = restartAt;
+            emitVideoEvent("seek", { currentTime: restartAt });
             node.play().catch(() => {});
-            emitVideoEvent("play", { currentTime: range.start });
+            emitVideoEvent("play", { currentTime: restartAt });
             setLoopSilenceActive(false);
             loopSilenceLockRef.current = false;
           }, 3000);
@@ -1418,8 +1420,13 @@ export default function RecordingRoom() {
       throw new Error("Perfil de gravação não configurado.");
     }
     logAudioStep("upload-started", { lineIndex: input.lineIndex, durationSeconds: input.durationSeconds, autoApprove: input.autoApprove });
+    const lineText = scriptLines[input.lineIndex]?.text || "";
+    const charName = recordingProfile.characterName || "personagem";
+    const cleanText = lineText.replace(/[^\w\sáéíóúàèìòùâêîôûãõç]/gi, "").trim().slice(0, 40).replace(/\s+/g, "_");
+    const filename = `${charName}_${cleanText || `linha${input.lineIndex}`}_${Date.now()}.wav`;
     const formData = new FormData();
-    formData.append("audio", input.wavBlob, `take_${sessionId}_${Date.now()}.wav`);
+    formData.append("audio", input.wavBlob, filename);
+    formData.append("lineText", lineText.slice(0, 200));
     formData.append("characterId", recordingProfile.characterId);
     formData.append("voiceActorId", user?.id || recordingProfile.voiceActorId || "");
     formData.append("lineIndex", String(input.lineIndex));
@@ -1466,7 +1473,7 @@ export default function RecordingRoom() {
     }
     setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "available" }));
     return take;
-  }, [recordingProfile, sessionId, user?.id, user?.displayName, user?.fullName, queryClient, logAudioStep]);
+  }, [recordingProfile, sessionId, scriptLines, user?.id, user?.displayName, user?.fullName, queryClient, logAudioStep]);
 
   const startCountdown = useCallback(() => {
     if (recordingStatus !== "idle") {
@@ -1491,30 +1498,37 @@ export default function RecordingRoom() {
     }
     
     const currentLineTime = scriptLines[currentLine]?.start || 0;
+    // 2-second preroll: seek 2s before the line
+    const prerollSeconds = 2;
+    const prerollStart = Math.max(0, currentLineTime - prerollSeconds);
     
-    video.currentTime = currentLineTime;
-    emitVideoEvent("seek", { currentTime: currentLineTime });
-    logAudioStep("countdown-started", { initiatorUserId: user?.id, startTime: currentLineTime });
+    video.currentTime = prerollStart;
+    emitVideoEvent("seek", { currentTime: prerollStart });
+    logAudioStep("countdown-started", { initiatorUserId: user?.id, startTime: prerollStart, lineTime: currentLineTime });
     
-    // Iniciar countdown e gravação IMEDIATAMENTE
+    // Start UI countdown and play video
     setCountdownValue(3);
     setRecordingStatus("recording");
-    
-    if (micState) {
-      startCapture(micState);
-    } else {
-      console.warn("Iniciando gravação sem micState - pode não funcionar");
-    }
     
     video.play().catch((error) => {
       console.error("Erro ao reproduzir vídeo", error);
       toast({ title: "Erro na reprodução", description: "Não foi possível reproduzir o vídeo.", variant: "destructive" });
     });
     
-    emitVideoEvent("play", { currentTime: video.currentTime });
+    emitVideoEvent("play", { currentTime: prerollStart });
     emitVideoEvent("countdown-start", { initiatorUserId: user?.id, count: 3 });
     
     if (micState?.audioContext) playCountdownBeep(micState.audioContext);
+    
+    // Audio starts at second 1 of preroll (1s after preroll begins)
+    const captureDelay = prerollStart < currentLineTime ? 1000 : 0;
+    const captureTimeout = window.setTimeout(() => {
+      if (micState) {
+        startCapture(micState);
+      } else {
+        console.warn("Iniciando gravação sem micState - pode não funcionar");
+      }
+    }, captureDelay);
     
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     let count = 3;
@@ -1533,6 +1547,9 @@ export default function RecordingRoom() {
         countdownTimerRef.current = null;
       }
     }, 1000);
+    
+    // Store timeout so we can cancel it if recording is stopped early
+    (countdownTimerRef as any)._captureTimeout = captureTimeout;
   }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, recordingProfile, currentLine, scriptLines, mySessionRole]);
 
   const handleDirectorApprove = useCallback(async () => {
@@ -1681,7 +1698,9 @@ export default function RecordingRoom() {
     if (!video) return;
     if (video.paused) {
       if (isLooping && customLoop) {
-        const loopStart = Math.max(0, customLoop.start);
+        // Play 2 seconds before the loop start timecode (preroll)
+        const loopPrerollSeconds = 2;
+        const loopStart = Math.max(0, customLoop.start - loopPrerollSeconds);
         video.pause();
         video.currentTime = loopStart;
         emitVideoEvent("seek", { currentTime: loopStart });

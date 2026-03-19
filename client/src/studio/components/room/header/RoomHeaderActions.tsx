@@ -100,7 +100,7 @@ export function RoomHeaderActions({
               data-testid="button-room-release-text"
             >
               <Edit3 className="w-3.5 h-3.5" />
-              Liberar Texto
+              Permitir Controle
             </button>
           )}
 
