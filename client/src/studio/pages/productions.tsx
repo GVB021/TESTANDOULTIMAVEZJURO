@@ -346,10 +346,6 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
       }));
       if (lines.length === 0) throw new Error("Nenhuma linha detectada no PDF.");
       
-      // Extract characters and auto-sync to production
-      const extractedCharacters = extractCharactersFromScript(lines);
-      await syncCharactersToProduction(extractedCharacters);
-      
       setScriptLines(lines);
       setScriptDirty(true);
       toast({ title: `${lines.length} linha${lines.length !== 1 ? "s" : ""} importadas do PDF (${result.pageCount} página${result.pageCount !== 1 ? "s" : ""})` });
@@ -403,10 +399,6 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
             notes: String(line?.notes || line?.notas || line?.note || ""),
           });
         }
-        
-        // Extract characters and auto-sync to production
-        const extractedCharacters = extractCharactersFromScript(normalized);
-        await syncCharactersToProduction(extractedCharacters);
         
         setScriptLines(normalized);
         setScriptDirty(true);
@@ -515,10 +507,6 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
     }
     const normalized = parseRawLines(rawLines);
     
-    // Extract characters and auto-sync to production
-    const extractedCharacters = extractCharactersFromScript(normalized);
-    await syncCharactersToProduction(extractedCharacters);
-    
     setScriptLines(normalized);
     setScriptDirty(true);
     setShowJsonModal(false);
@@ -528,6 +516,10 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
 
   const handleSaveScript = async () => {
     try {
+      // Extract and sync characters before saving
+      const extractedCharacters = extractCharactersFromScript(scriptLines);
+      await syncCharactersToProduction(extractedCharacters);
+      
       const json = JSON.stringify({ lines: scriptLines });
       await updateProd.mutateAsync({ scriptJson: json });
       setScriptDirty(false);
@@ -552,13 +544,6 @@ function ManageProductionDialog({ productionId, studioId, open, onOpenChange }: 
     });
     setScriptDirty(true);
     
-    // If updating character field, sync characters
-    if (field === "character" && value.trim()) {
-      const updatedLines = [...scriptLines];
-      updatedLines[idx] = { ...updatedLines[idx], [field]: value };
-      const allCharacters = extractCharactersFromScript(updatedLines);
-      await syncCharactersToProduction(allCharacters);
-    }
   };
 
   const removeScriptLine = (idx: number) => {

@@ -336,6 +336,8 @@ export default function RecordingRoom() {
   const canManageAudio = hasUiPermission(uiRole, "audio_control");
   const canApproveTake = hasUiPermission(uiRole, "approve_take");
   const canViewOnlineUsers = hasUiPermission(uiRole, "presence_view");
+  // Only director or text_controller (dubber with text released) can control video
+  const canControlVideo = isDirector || uiRole === "text_controller";
 
   // Mobile detection
   useEffect(() => {
@@ -347,6 +349,10 @@ export default function RecordingRoom() {
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null);
+  const wsIntentionalClose = useRef(false);
+  const wsReconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsReconnectAttempts = useRef(0);
+  const [wsConnected, setWsConnected] = useState(false);
 
   // Session access verification
   const checkSessionAccess = useCallback(async () => {
@@ -494,6 +500,7 @@ export default function RecordingRoom() {
   // WebSocket connection
   useEffect(() => {
     if (!sessionId || !studioId) return;
+    wsIntentionalClose.current = false;
 
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
@@ -628,8 +635,8 @@ export default function RecordingRoom() {
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
         } else if (msg.type === "video:take-ready-for-review") {
-          // Se eu sou aprovador E diretor, recebo o take para revisar
-          if (canApproveTake && studioRole === "diretor" && msg.takeId && msg.audioUrl) {
+          // Se eu sou aprovador, recebo o take para revisar
+          if (canApproveTake && msg.takeId && msg.audioUrl) {
             setReviewingTake({
               takeId: msg.takeId,
               audioUrl: msg.audioUrl,
@@ -694,13 +701,40 @@ export default function RecordingRoom() {
 
     ws.onopen = () => {
       console.log("[Room] WebSocket connected");
+      setWsConnected(true);
+      wsReconnectAttempts.current = 0;
     };
 
     ws.onclose = () => {
+      setWsConnected(false);
       console.log("[Room] WebSocket disconnected");
+      if (wsIntentionalClose.current) return;
+      // Auto-reconnect with exponential backoff
+      const attempt = wsReconnectAttempts.current;
+      const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
+      wsReconnectAttempts.current = attempt + 1;
+      console.log(`[Room] Reconnecting in ${delay}ms (attempt ${attempt + 1})`);
+      wsReconnectTimeout.current = setTimeout(() => {
+        if (!wsIntentionalClose.current && sessionId && studioId) {
+          const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+          const host = window.location.host;
+          const newWs = new WebSocket(`${protocol}//${host}/ws/video-sync?studioId=${encodeURIComponent(studioId)}&sessionId=${encodeURIComponent(sessionId)}`);
+          wsRef.current = newWs;
+          newWs.onopen = ws.onopen;
+          newWs.onmessage = ws.onmessage;
+          newWs.onerror = ws.onerror;
+          newWs.onclose = ws.onclose;
+        }
+      }, delay);
+    };
+
+    ws.onerror = (err) => {
+      console.error("[Room] WebSocket error", err);
     };
 
     return () => {
+      wsIntentionalClose.current = true;
+      if (wsReconnectTimeout.current) clearTimeout(wsReconnectTimeout.current);
       ws.close();
     };
   }, [sessionId, studioId, micState, user?.id, toast, applyScriptLinePatch, pushEditHistory, canApproveTake, lastUploadedTakeId, reviewingTake]);
@@ -1642,6 +1676,7 @@ export default function RecordingRoom() {
   }, [pendingTake, uploadTakeForDirector, toast, logFeatureAudit, enqueuePendingUpload, blobToBase64, recordingProfile, user?.id, hasApproverPresent, isPrivileged, logAudioStep]);
 
   const handlePlayPause = useCallback(() => {
+    if (!canControlVideo) return;
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
@@ -1670,23 +1705,25 @@ export default function RecordingRoom() {
       video.pause();
       emitVideoEvent("pause", { currentTime: video.currentTime });
     }
-  }, [emitVideoEvent, isLooping, customLoop]);
+  }, [canControlVideo, emitVideoEvent, isLooping, customLoop]);
 
   const handleStopPlayback = useCallback(() => {
+    if (!canControlVideo) return;
     const video = videoRef.current;
     if (!video) return;
     video.pause();
     video.currentTime = currentScriptLine?.start || 0;
     emitVideoEvent("pause", { currentTime: video.currentTime });
-  }, [currentScriptLine, emitVideoEvent]);
+  }, [canControlVideo, currentScriptLine, emitVideoEvent]);
 
   const seek = useCallback((delta: number) => {
+    if (!canControlVideo) return;
     const video = videoRef.current;
     if (!video) return;
     const next = Math.max(0, Math.min(video.duration, video.currentTime + delta));
     video.currentTime = next;
     emitVideoEvent("seek", { currentTime: next });
-  }, [emitVideoEvent]);
+  }, [canControlVideo, emitVideoEvent]);
 
   const scrub = useCallback((percent: number) => {
     const video = videoRef.current;
@@ -1738,6 +1775,7 @@ export default function RecordingRoom() {
   }, [canTextControl, scriptLines, loopSelectionMode, toast, emitVideoEvent, loopAnchorIndex, logFeatureAudit]);
 
   const handleLoopButton = useCallback(async () => {
+    if (!canControlVideo) return;
     if (loopSelectionMode !== "idle" || customLoop) {
       setLoopSelectionMode("idle");
       setIsLooping(false);
@@ -2363,22 +2401,28 @@ export default function RecordingRoom() {
         onlySelectedCharacter={onlySelectedCharacter}
         onToggleCharacterFilter={handleToggleCharacterFilter}
         rightSlot={
-          <RoomHeaderActions
-            isMobile={isMobile}
-            recordingStatus={recordingStatus}
-            canViewOnlineUsers={canViewOnlineUsers}
-            canTextControl={canTextControl}
-            canAccessDashboard={canAccessDashboard}
-            roomUsers={roomUsers}
-            studioId={studioId}
-            onRecordOrStop={handleRecordOrStop}
-            onOpenMenu={() => setMobileMenuOpen(true)}
-            onOpenRecordings={() => setRecordingsOpen(true)}
-            onOpenTextControl={() => setTextControlPopupOpen(true)}
-            onOpenDeviceSettings={() => setDeviceSettingsOpen(true)}
-            onOpenShortcuts={() => setIsCustomizing(true)}
-            onPanelClick={() => logFeatureAudit("room.panel", "redirect", { studioId })}
-          />
+          <div className="flex items-center gap-2">
+            <span
+              title={wsConnected ? "Conectado" : "Reconectando..."}
+              className={cn("w-2 h-2 rounded-full shrink-0 transition-colors", wsConnected ? "bg-green-500" : "bg-yellow-400 animate-pulse")}
+            />
+            <RoomHeaderActions
+              isMobile={isMobile}
+              recordingStatus={recordingStatus}
+              canViewOnlineUsers={canViewOnlineUsers}
+              canTextControl={canTextControl}
+              canAccessDashboard={canAccessDashboard}
+              roomUsers={roomUsers}
+              studioId={studioId}
+              onRecordOrStop={handleRecordOrStop}
+              onOpenMenu={() => setMobileMenuOpen(true)}
+              onOpenRecordings={() => setRecordingsOpen(true)}
+              onOpenTextControl={() => setTextControlPopupOpen(true)}
+              onOpenDeviceSettings={() => setDeviceSettingsOpen(true)}
+              onOpenShortcuts={() => setIsCustomizing(true)}
+              onPanelClick={() => logFeatureAudit("room.panel", "redirect", { studioId })}
+            />
+          </div>
         }
       />
 
@@ -2436,6 +2480,7 @@ export default function RecordingRoom() {
                 onLoop={handleLoopButton}
                 onRecord={startCountdown}
                 onStopRecord={handleStopRecording}
+                canControlVideo={canControlVideo}
               />
             )}
 
@@ -2522,17 +2567,16 @@ export default function RecordingRoom() {
           )}
         </div>
 
-        {/* 🎙️ Popup de Revisão do Diretor */}
+        {/* 🎙️ Popup de Revisão do Diretor — apenas diretor vê */}
         <AnimatePresence>
-          {(pendingTake || reviewingTake) && (
+          {reviewingTake && canApproveTake && (
             <DirectorReview
-              mode={reviewingTake ? "director" : "dubber"}
-              take={reviewingTake ?? pendingTake}
+              mode="director"
+              take={reviewingTake}
               isSaving={isSaving}
               isWaitingReview={isWaitingReview}
-              onApprove={reviewingTake ? handleDirectorApprove : handleApproveTake}
+              onApprove={handleDirectorApprove}
               onReject={handleDirectorReject}
-              onDiscard={pendingTake ? () => handleDiscardTake(pendingTake) : undefined}
             />
           )}
         </AnimatePresence>

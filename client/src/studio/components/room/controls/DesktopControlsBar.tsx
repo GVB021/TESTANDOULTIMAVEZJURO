@@ -19,6 +19,7 @@ interface DesktopControlsBarProps {
   onLoop: () => void;
   onRecord: () => void;
   onStopRecord: () => void;
+  canControlVideo?: boolean;
 }
 
 export function DesktopControlsBar({
@@ -38,6 +39,7 @@ export function DesktopControlsBar({
   onLoop,
   onRecord,
   onStopRecord,
+  canControlVideo = true,
 }: DesktopControlsBarProps) {
   const isRecording = recordingStatus === "recording";
   const canRecord = recordingStatus === "idle" || recordingStatus === "recorded";
@@ -47,27 +49,32 @@ export function DesktopControlsBar({
       <div className="flex items-center gap-2">
         <button
           onClick={onSeekBack}
-          className="w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-all"
-          title="Recuar 2s"
+          disabled={!canControlVideo}
+          className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 transition-all", canControlVideo ? "text-muted-foreground hover:text-foreground" : "opacity-30 cursor-not-allowed")}
+          title={canControlVideo ? "Recuar 2s" : "Sem permissão"}
         >
           <RotateCcw className="w-4 h-4" />
         </button>
         <button
           onClick={onPlayPause}
+          disabled={!canControlVideo}
           className={cn(
             "w-11 h-11 rounded-xl flex items-center justify-center transition-all",
-            isPlaying
+            !canControlVideo
+              ? "bg-muted/20 border border-border/40 text-muted-foreground/30 cursor-not-allowed"
+              : isPlaying
               ? "bg-primary text-primary-foreground hover:brightness-110"
               : "bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground"
           )}
-          title={isPlaying ? "Pausar" : "Reproduzir"}
+          title={canControlVideo ? (isPlaying ? "Pausar" : "Reproduzir") : "Sem permissão"}
         >
           {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
         </button>
         <button
           onClick={onSeekForward}
-          className="w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-all"
-          title="Avançar 2s"
+          disabled={!canControlVideo}
+          className={cn("w-9 h-9 rounded-xl flex items-center justify-center bg-muted/40 border border-border/60 transition-all", canControlVideo ? "text-muted-foreground hover:text-foreground" : "opacity-30 cursor-not-allowed")}
+          title={canControlVideo ? "Avançar 2s" : "Sem permissão"}
         >
           <RotateCcw className="w-4 h-4" />
         </button>
@@ -95,13 +102,16 @@ export function DesktopControlsBar({
       <div className="flex items-center gap-3">
         <button
           onClick={onLoop}
+          disabled={!canControlVideo}
           className={cn(
             "w-9 h-9 rounded-xl flex items-center justify-center border transition-all",
-            isLooping
+            !canControlVideo
+              ? "opacity-30 cursor-not-allowed bg-muted/40 border-border/60"
+              : isLooping
               ? "bg-primary/10 border-primary/20 text-primary"
               : "bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground"
           )}
-          title="Configurar Loop"
+          title={canControlVideo ? "Configurar Loop" : "Sem permissão"}
         >
           <Repeat className="w-4 h-4" />
         </button>

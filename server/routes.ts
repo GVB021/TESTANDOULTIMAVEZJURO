@@ -475,25 +475,17 @@ async function canAccessTake(user: any, take: any, sessionId: string, studioId: 
   const studioRoles = (await storage.getUserRolesInStudio(user.id, studioId)).map(normalizeStudioRole);
   if (studioRoles.includes("studio_admin")) return true;
 
-  // Get session participants to check user role
+  // Session directors have access
   const participants = await storage.getSessionParticipants(sessionId);
   const self = participants.find((p) => String(p.userId || "") === String(user.id || ""));
   if (!self) return false;
   const participantRole = normalizeStudioRole(self.role);
-  
-  // EXPLICIT BLOCK: Dublador and Aluno cannot access takes
-  if (participantRole === "dublador" || participantRole === "aluno") {
-    return false;
-  }
-
-  // Session directors have access
   if (participantRole === "diretor") return true;
 
   // Take owner (who recorded) has access
   if (String(take.voiceActorId || "") === String(user.id || "")) return true;
 
-  // All other roles (engenheiro_audio, staff, etc.) have access
-  return true;
+  return false;
 }
 
 async function downloadTakeAudio(take: any): Promise<Buffer | null> {
