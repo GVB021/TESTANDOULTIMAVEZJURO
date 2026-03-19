@@ -1669,98 +1669,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const canManage = await canManageSessionTakes(user, takeRecord.sessionId, session.studioId);
       if (!canManage) return res.status(403).json({ message: "Somente diretor pode aprovar takes" });
       const take = await storage.setPreferredTake(req.params.id);
-      
-      // Upload approved take to Supabase with correct path structure
-      if (isSupabaseConfigured()) {
-        try {
-          const settings = await storage.getAllSettings();
-          const storageProvider = settings.DEFAULT_STORAGE_PROVIDER || "supabase";
-          const supabaseBucket = settings.SUPABASE_BUCKET || "takes";
-          
-          if (storageProvider === "supabase") {
-            const status = await checkSupabaseConnection(false);
-            if (!status.ok) throw new Error(status.reason || "Supabase indisponivel");
-            
-            // Get session and production info for path structure
-            const sessionInfo = await storage.getSession(take.sessionId);
-            const studioId = String(sessionInfo?.studioId || "");
-            const productionId = String(sessionInfo?.productionId || "");
-            
-            const [[studioRow], [productionRow], [characterRow], [actorRow]] = await Promise.all([
-              studioId
-                ? db.select({ name: studios.name }).from(studios).where(eq(studios.id, studioId))
-                : Promise.resolve([]),
-              productionId
-                ? db.select({ name: productions.name }).from(productions).where(eq(productions.id, productionId))
-                : Promise.resolve([]),
-              db.select({ name: characters.name }).from(characters).where(eq(characters.id, String(take.characterId))),
-              db.select({ artistName: users.artistName, displayName: users.displayName, fullName: users.fullName, firstName: users.firstName, lastName: users.lastName, email: users.email })
-                .from(users)
-                .where(eq(users.id, String(take.voiceActorId))),
-            ]);
-            
-            const studioName = normalizeSegment(studioRow?.name || "");
-            const productionName = normalizeSegment(productionRow?.name || "");
-            const actorNameRaw =
-              actorRow?.artistName ||
-              actorRow?.displayName ||
-              actorRow?.fullName ||
-              `${actorRow?.firstName || ""} ${actorRow?.lastName || ""}`.trim() ||
-              actorRow?.email ||
-              "";
-            const actorFolder = normalizeSegment(actorNameRaw);
-            const characterFolder = normalizeSegment(characterRow?.name || "");
-            
-            const actorToken = normalizeTokenUpper(actorNameRaw);
-            const characterToken = normalizeTokenUpper(characterRow?.name || "");
-            const timecodeToken = secondsToTimecodeToken((take as any).startTimeSeconds || 0);
-            const filename = `${characterToken}_${actorToken}_${timecodeToken}.wav`;
-            
-            // Create path: upload/production/session/character/dublador/take.wav
-            const baseFolder = "upload";
-            const pathSegments = [baseFolder, productionName, take.sessionId, characterFolder, actorFolder, filename];
-            const objectPath = pathSegments.filter(Boolean).join("/");
-            
-            // Download existing audio and upload to Supabase
-            const audioBuffer = await downloadTakeAudio(take);
-            if (audioBuffer) {
-              const uploadJob: PendingTakeUploadJob = {
-                takeId: take.id,
-                bucket: supabaseBucket,
-                objectPath,
-                contentType: "audio/wav",
-                buffer: audioBuffer,
-                md5: checksumMd5(audioBuffer),
-                userId: user.id,
-                sessionId: take.sessionId,
-                attempts: 1,
-                createdAt: Date.now(),
-              };
-              
-              const publicUrl = await uploadTakeJobToSupabase(uploadJob);
-              await storage.updateTakeAudioUrl(take.id, publicUrl);
-              (take as any).audioUrl = publicUrl;
-              
-              await createAudioAuditLog(req, "take.approved.supabase.uploaded", {
-                takeId: take.id,
-                sessionId: take.sessionId,
-                objectPath,
-                bucket: supabaseBucket,
-              });
-              
-              logger.info("[Take Approval] Supabase upload complete", {
-                takeId: take.id,
-                objectPath,
-                bucket: supabaseBucket,
-              });
-            }
-          }
-        } catch (e: any) {
-          logger.error("[Take Approval] Supabase upload failed", { takeId: take.id, message: e?.message });
-          // Don't fail the approval, just log the error
-        }
-      }
-      
+
       await storage.createAuditLog({
         userId: user.id,
         action: "take.approved",
@@ -1771,7 +1680,92 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
           approvedAt: new Date().toISOString(),
         }),
       });
+
+      // Respond immediately — client should not wait for the Supabase upload
       res.status(200).json(take);
+
+      // Fire-and-forget: upload approved take to Supabase in background
+      if (isSupabaseConfigured()) {
+        (async () => {
+          try {
+            const settings = await storage.getAllSettings();
+            const storageProvider = settings.DEFAULT_STORAGE_PROVIDER || "supabase";
+            const supabaseBucket = settings.SUPABASE_BUCKET || "takes";
+
+            if (storageProvider === "supabase") {
+              const status = await checkSupabaseConnection(false);
+              if (!status.ok) throw new Error(status.reason || "Supabase indisponivel");
+
+              const sessionInfo = await storage.getSession(take.sessionId);
+              const studioId = String(sessionInfo?.studioId || "");
+              const productionId = String(sessionInfo?.productionId || "");
+
+              const [[studioRow], [productionRow], [characterRow], [actorRow]] = await Promise.all([
+                studioId
+                  ? db.select({ name: studios.name }).from(studios).where(eq(studios.id, studioId))
+                  : Promise.resolve([]),
+                productionId
+                  ? db.select({ name: productions.name }).from(productions).where(eq(productions.id, productionId))
+                  : Promise.resolve([]),
+                db.select({ name: characters.name }).from(characters).where(eq(characters.id, String(take.characterId))),
+                db.select({ artistName: users.artistName, displayName: users.displayName, fullName: users.fullName, firstName: users.firstName, lastName: users.lastName, email: users.email })
+                  .from(users)
+                  .where(eq(users.id, String(take.voiceActorId))),
+              ]);
+
+              const productionName = normalizeSegment(productionRow?.name || "");
+              const actorNameRaw =
+                actorRow?.artistName ||
+                actorRow?.displayName ||
+                actorRow?.fullName ||
+                `${actorRow?.firstName || ""} ${actorRow?.lastName || ""}`.trim() ||
+                actorRow?.email ||
+                "";
+              const actorFolder = normalizeSegment(actorNameRaw);
+              const characterFolder = normalizeSegment(characterRow?.name || "");
+
+              const actorToken = normalizeTokenUpper(actorNameRaw);
+              const characterToken = normalizeTokenUpper(characterRow?.name || "");
+              const timecodeToken = secondsToTimecodeToken((take as any).startTimeSeconds || 0);
+              const filename = `${characterToken}_${actorToken}_${timecodeToken}.wav`;
+
+              const baseFolder = "upload";
+              const pathSegments = [baseFolder, productionName, take.sessionId, characterFolder, actorFolder, filename];
+              const objectPath = pathSegments.filter(Boolean).join("/");
+
+              const audioBuffer = await downloadTakeAudio(take);
+              if (audioBuffer) {
+                const uploadJob: PendingTakeUploadJob = {
+                  takeId: take.id,
+                  bucket: supabaseBucket,
+                  objectPath,
+                  contentType: "audio/wav",
+                  buffer: audioBuffer,
+                  md5: checksumMd5(audioBuffer),
+                  userId: user.id,
+                  sessionId: take.sessionId,
+                  attempts: 1,
+                  createdAt: Date.now(),
+                };
+
+                const publicUrl = await uploadTakeJobToSupabase(uploadJob);
+                await storage.updateTakeAudioUrl(take.id, publicUrl);
+
+                await createAudioAuditLog(req, "take.approved.supabase.uploaded", {
+                  takeId: take.id,
+                  sessionId: take.sessionId,
+                  objectPath,
+                  bucket: supabaseBucket,
+                });
+
+                logger.info("[Take Approval] Supabase upload complete", { takeId: take.id, objectPath });
+              }
+            }
+          } catch (e: any) {
+            logger.error("[Take Approval] Background Supabase upload failed", { takeId: take.id, message: e?.message });
+          }
+        })();
+      }
     } catch (err) {
       res.status(404).json({ message: "Take nao encontrado" });
     }

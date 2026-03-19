@@ -284,6 +284,7 @@ export default function RecordingRoom() {
   const [recordingStatus, setRecordingStatus] = useState<"idle" | "countdown" | "recording" | "stopped" | "recorded">("idle");
   const [countdownValue, setCountdownValue] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirectorSaving, setIsDirectorSaving] = useState(false);
   const [pendingTake, setPendingTake] = useState<any>(null);
   const [reviewingTake, setReviewingTake] = useState<any>(null);
   const [recordingsIsLoading, setRecordingsIsLoading] = useState<Set<string>>(new Set());
@@ -1569,24 +1570,27 @@ export default function RecordingRoom() {
   const handleDirectorApprove = useCallback(async () => {
     if (!reviewingTake) return;
     const takeId = reviewingTake.takeId;
+    // Close popup immediately — server responds fast now (Supabase upload is background)
+    setReviewingTake(null);
     try {
-      setIsSaving(true);
+      setIsDirectorSaving(true);
       await authFetch(`/api/takes/${takeId}/prefer`, { method: "POST" });
       emitVideoEvent("take-decision", { takeId, decision: "approved", userId: user?.id });
       toast({ title: "Take Aprovado", description: "O dublador foi notificado." });
     } catch (err) {
       toast({ title: "Erro ao aprovar", variant: "destructive" });
     } finally {
-      setIsSaving(false);
-      setReviewingTake(null);
+      setIsDirectorSaving(false);
     }
   }, [reviewingTake, emitVideoEvent, user?.id, toast]);
 
   const handleDirectorReject = useCallback(async () => {
     if (!reviewingTake) return;
     const takeId = reviewingTake.takeId;
+    // Close popup immediately
+    setReviewingTake(null);
     try {
-      setIsSaving(true);
+      setIsDirectorSaving(true);
       await authFetch(`/api/takes/${takeId}/discard`, {
         method: "POST",
         body: JSON.stringify({ confirm: true }),
@@ -1596,8 +1600,7 @@ export default function RecordingRoom() {
     } catch (err) {
       toast({ title: "Erro ao rejeitar", variant: "destructive" });
     } finally {
-      setIsSaving(false);
-      setReviewingTake(null);
+      setIsDirectorSaving(false);
     }
   }, [reviewingTake, emitVideoEvent, user?.id, toast]);
 
@@ -2739,7 +2742,7 @@ export default function RecordingRoom() {
             <DirectorReview
               mode="director"
               take={reviewingTake}
-              isSaving={isSaving}
+              isSaving={isDirectorSaving}
               isWaitingReview={isWaitingReview}
               onApprove={handleDirectorApprove}
               onReject={handleDirectorReject}
