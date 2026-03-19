@@ -74,11 +74,11 @@ export function useRecordingsList(sessionId: string, params: RecordingsQueryPara
         const normalized: RecordingsResponse = Array.isArray(data)
           ? { items: data, page: 1, pageSize: data.length || 20, total: data.length || 0, pageCount: 1 }
           : {
-              items: Array.isArray(data?.items) ? data.items : [],
+              items: Array.isArray(data?.items) ? data.items : Array.isArray(data?.takes) ? data.takes : [],
               page: Number(data?.page || 1),
               pageSize: Number(data?.pageSize || 20),
               total: Number(data?.total || 0),
-              pageCount: Number(data?.pageCount || 1),
+              pageCount: Number(data?.pageCount || Math.ceil((data?.total || 0) / (data?.pageSize || 20)) || 1),
             };
         console.debug("[Room][Recordings] takes carregados", { sessionId, total: normalized.total });
         return normalized;

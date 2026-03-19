@@ -62,8 +62,8 @@ const StudioMain = memo(function StudioMain({ studioId }: { studioId: string }) 
 
   // Hooks personalizados
   const { config: hardwareConfig, updateHardwareConfig, isLoading: hardwareLoading } = useHardwareConfig(studioId);
-  const { logs, isLoading: logsLoading } = useMonitoringLogs(studioId);
-  const { events, isConnected } = useStudioEvents(studioId);
+  const { logs, isLoading: logsLoading, refetch: refetchLogs } = useMonitoringLogs(studioId);
+  const { events, isConnected, clearEvents } = useStudioEvents(studioId);
 
   const tabs: { key: AdminTab; label: string; icon: typeof BarChart3; count?: number }[] = [
     { key: "sessions", label: "Sessões", icon: Calendar, count: sessions?.length || 0 },
@@ -149,6 +149,7 @@ const StudioMain = memo(function StudioMain({ studioId }: { studioId: string }) 
             studioId={studioId}
             logs={logs || []}
             isLoading={logsLoading}
+            refetch={refetchLogs}
           />
         </TabsContent>
 
@@ -158,6 +159,7 @@ const StudioMain = memo(function StudioMain({ studioId }: { studioId: string }) 
             studioId={studioId}
             events={events}
             isConnected={isConnected}
+            clearEvents={clearEvents}
           />
         </TabsContent>
       </Tabs>

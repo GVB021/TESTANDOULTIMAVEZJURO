@@ -20,9 +20,10 @@ interface MonitorPanelProps {
   studioId: string;
   logs: SimpleLog[] | null;
   isLoading: boolean;
+  refetch?: () => void;
 }
 
-const MonitorPanel = memo(function MonitorPanel({ logs, isLoading }: MonitorPanelProps) {
+const MonitorPanel = memo(function MonitorPanel({ logs, isLoading, refetch }: MonitorPanelProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterTime, setFilterTime] = useState<string>("today");
@@ -203,7 +204,7 @@ const MonitorPanel = memo(function MonitorPanel({ logs, isLoading }: MonitorPane
                 <SelectItem value="month">30 dias</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon">
+            <Button variant="outline" size="icon" onClick={() => refetch?.()}>
               <RefreshCw className="w-4 h-4" />
             </Button>
           </div>
@@ -218,7 +219,26 @@ const MonitorPanel = memo(function MonitorPanel({ logs, isLoading }: MonitorPane
               <Monitor className="w-5 h-5" />
               Logs do Sistema ({filteredLogs.length})
             </span>
-            <Button variant="outline" size="sm" className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => {
+                const rows = [
+                  ["timestamp", "type", "userName", "message"].join(","),
+                  ...filteredLogs.map(l =>
+                    [new Date(l.timestamp).toISOString(), l.type, `"${l.userName}"`, `"${l.message}"`].join(",")
+                  ),
+                ].join("\n");
+                const blob = new Blob([rows], { type: "text/csv" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `monitoring-logs-${Date.now()}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
               <Download className="w-4 h-4" />
               Exportar
             </Button>

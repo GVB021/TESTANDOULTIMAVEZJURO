@@ -8,7 +8,7 @@ interface DirectorReviewProps {
   isSaving?: boolean;
   isWaitingReview?: boolean;
   onApprove: () => void;
-  onReject: () => void;
+  onReject?: () => void;
   onDiscard?: () => void;
 }
 
@@ -77,14 +77,16 @@ export function DirectorReview({
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Aprovar
               </button>
-              <button
-                onClick={onReject}
-                disabled={isSaving}
-                className="flex-1 h-10 room-button-secondary room-text-primary border border-destructive room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition hover:bg-destructive/10"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                Rejeitar
-              </button>
+              {onReject && (
+                <button
+                  onClick={onReject}
+                  disabled={isSaving}
+                  className="flex-1 h-10 room-button-secondary room-text-primary border border-destructive room-rounded-lg font-medium flex items-center justify-center gap-2 disabled:opacity-50 room-transition hover:bg-destructive/10"
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                  Rejeitar
+                </button>
+              )}
             </>
           ) : (
             <>

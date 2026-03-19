@@ -37,7 +37,7 @@ export function RoomHeaderActions({
   onOpenShortcuts,
   onPanelClick,
 }: RoomHeaderActionsProps) {
-  const isRecording = recordingStatus === "recording";
+  const isRecording = recordingStatus === "recording" || recordingStatus === "countdown";
 
   return (
     <>

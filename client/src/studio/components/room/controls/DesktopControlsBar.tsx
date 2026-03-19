@@ -41,7 +41,7 @@ export function DesktopControlsBar({
   onStopRecord,
   canControlVideo = true,
 }: DesktopControlsBarProps) {
-  const isRecording = recordingStatus === "recording";
+  const isRecording = recordingStatus === "recording" || recordingStatus === "countdown";
   const canRecord = recordingStatus === "idle" || recordingStatus === "recorded";
 
   return (

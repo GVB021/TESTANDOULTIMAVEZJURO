@@ -1089,11 +1089,6 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ message: "Caminho de salvamento invalido" });
       }
 
-      const status = await checkSupabaseConnection(false);
-      if (!isSupabaseConfigured() || !status.ok) {
-        return res.status(400).json({ message: "Supabase indisponivel" });
-      }
-
       const input = insertSessionSchema.parse({
         title: req.body.title,
         productionId: req.body.productionId,
@@ -1216,11 +1211,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const studioLogs = auditLogs.filter(log => {
         try {
           const details = JSON.parse(log.details || '{}');
-          return details.studioId === req.params.studioId || 
-                 log.action?.includes('studio') ||
-                 log.action?.includes('take') ||
-                 log.action?.includes('recording') ||
-                 log.action?.includes('upload');
+          return details.studioId === req.params.studioId;
         } catch {
           return false;
         }
@@ -1485,7 +1476,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         md5: audioMd5 || null,
       });
 
-      if (req.file && storageProvider === "supabase" && isSupabaseConfigured() && take.isPreferred) {
+      if (req.file && storageProvider === "supabase" && isSupabaseConfigured()) {
         try {
           const status = await checkSupabaseConnection(false);
           if (!status.ok) throw new Error(status.reason || "Supabase indisponivel");

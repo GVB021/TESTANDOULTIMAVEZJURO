@@ -507,7 +507,7 @@ export default function RecordingRoom() {
     const ws = new WebSocket(`${protocol}//${host}/ws/video-sync?studioId=${encodeURIComponent(studioId)}&sessionId=${encodeURIComponent(sessionId)}`);
     wsRef.current = ws;
 
-    ws.onmessage = (e) => {
+    const handleWsMessage = (e: MessageEvent) => {
         try {
           const msg = JSON.parse(e.data);
           console.log("[Room] WS message received:", msg.type, msg);
@@ -699,13 +699,24 @@ export default function RecordingRoom() {
       }
     };
 
-    ws.onopen = () => {
+    const handleWsOpen = () => {
       console.log("[Room] WebSocket connected");
       setWsConnected(true);
       wsReconnectAttempts.current = 0;
     };
 
-    ws.onclose = () => {
+    const handleWsError = (err: Event) => {
+      console.error("[Room] WebSocket error", err);
+    };
+
+    const setupHandlers = (wsTarget: WebSocket) => {
+      wsTarget.onopen = handleWsOpen;
+      wsTarget.onmessage = handleWsMessage;
+      wsTarget.onerror = handleWsError;
+      wsTarget.onclose = handleWsClose;
+    };
+
+    function handleWsClose() {
       setWsConnected(false);
       console.log("[Room] WebSocket disconnected");
       if (wsIntentionalClose.current) return;
@@ -720,17 +731,12 @@ export default function RecordingRoom() {
           const host = window.location.host;
           const newWs = new WebSocket(`${protocol}//${host}/ws/video-sync?studioId=${encodeURIComponent(studioId)}&sessionId=${encodeURIComponent(sessionId)}`);
           wsRef.current = newWs;
-          newWs.onopen = ws.onopen;
-          newWs.onmessage = ws.onmessage;
-          newWs.onerror = ws.onerror;
-          newWs.onclose = ws.onclose;
+          setupHandlers(newWs);
         }
       }, delay);
-    };
+    }
 
-    ws.onerror = (err) => {
-      console.error("[Room] WebSocket error", err);
-    };
+    setupHandlers(ws);
 
     return () => {
       wsIntentionalClose.current = true;
@@ -1508,7 +1514,7 @@ export default function RecordingRoom() {
     
     // Start UI countdown and play video
     setCountdownValue(3);
-    setRecordingStatus("recording");
+    setRecordingStatus("countdown");
     
     video.play().catch((error) => {
       console.error("Erro ao reproduzir vídeo", error);
@@ -1525,8 +1531,10 @@ export default function RecordingRoom() {
     const captureTimeout = window.setTimeout(() => {
       if (micState) {
         startCapture(micState);
+        setRecordingStatus("recording");
       } else {
         console.warn("Iniciando gravação sem micState - pode não funcionar");
+        setRecordingStatus("idle");
       }
     }, captureDelay);
     
@@ -1557,7 +1565,7 @@ export default function RecordingRoom() {
     try {
       setIsSaving(true);
       // Opcional: Marcar como preferred no backend se necessário
-      await authFetch(`/api/takes/${reviewingTake.takeId}/preferred`, { method: "PUT" });
+      await authFetch(`/api/takes/${reviewingTake.takeId}/prefer`, { method: "POST" });
       
       emitVideoEvent("take-decision", { takeId: reviewingTake.takeId, decision: "approved", userId: user?.id });
       
@@ -1574,11 +1582,14 @@ export default function RecordingRoom() {
     if (!reviewingTake) return;
     try {
       setIsSaving(true);
-      await authFetch(`/api/takes/${reviewingTake.takeId}`, { method: "DELETE" });
+      await authFetch(`/api/takes/${reviewingTake.takeId}/discard`, {
+        method: "POST",
+        body: JSON.stringify({ confirm: true }),
+      });
       
       emitVideoEvent("take-decision", { takeId: reviewingTake.takeId, decision: "rejected", userId: user?.id });
       
-      toast({ title: "Take Rejeitado", description: "O take foi excluído." });
+      toast({ title: "Take Rejeitado", description: "O dublador foi notificado para regravar." });
       setReviewingTake(null);
     } catch (err) {
       toast({ title: "Erro ao rejeitar", variant: "destructive" });
@@ -1588,10 +1599,15 @@ export default function RecordingRoom() {
   }, [reviewingTake, emitVideoEvent, user?.id, toast]);
 
   const handleStopRecording = useCallback(async () => {
-    if (recordingStatus !== "recording" || !micState) return;
+    if ((recordingStatus !== "recording" && recordingStatus !== "countdown") || !micState) return;
     if (countdownTimerRef.current) {
       window.clearInterval(countdownTimerRef.current);
       countdownTimerRef.current = null;
+    }
+    const pendingCapture = (countdownTimerRef as any)._captureTimeout;
+    if (pendingCapture) {
+      window.clearTimeout(pendingCapture);
+      (countdownTimerRef as any)._captureTimeout = null;
     }
     setCountdownValue(0);
     logAudioStep("stop-requested", { state: micState });
@@ -1813,7 +1829,7 @@ export default function RecordingRoom() {
   }, [loopSelectionMode, customLoop, logFeatureAudit, toast]);
 
   const handleBack = useCallback(() => {
-    if (recordingStatus === "recording" && !window.confirm("Você tem uma gravação em andamento. Deseja realmente sair?")) return;
+    if ((recordingStatus === "recording" || recordingStatus === "countdown") && !window.confirm("Você tem uma gravação em andamento. Deseja realmente sair?")) return;
     setLocation(`/hub-dub/studio/${studioId}/dashboard`);
   }, [recordingStatus, studioId, setLocation]);
 
@@ -1850,7 +1866,7 @@ export default function RecordingRoom() {
   }, [shortcuts]);
 
   const handleRecordOrStop = useCallback(() => {
-    if (recordingStatus === "recording") handleStopRecording();
+    if (recordingStatus === "recording" || recordingStatus === "countdown") handleStopRecording();
     else startCountdown();
   }, [recordingStatus, handleStopRecording, startCountdown]);
 
@@ -2140,7 +2156,7 @@ export default function RecordingRoom() {
     }
     try {
       setRecordingsIsLoading((prev) => new Set(prev).add(takeId));
-      const streamUrl = await getTakeStreamUrl(take.id);
+      const streamUrl = await getTakeStreamUrl(take);
       if (streamUrl) {
         audio.src = streamUrl;
         await audio.play();
@@ -2168,7 +2184,6 @@ export default function RecordingRoom() {
       toast({ title: "Erro ao baixar", description: "Não foi possível baixar a gravação.", variant: "destructive" });
     } finally {
       setRecordingsIsLoading((prev) => { const next = new Set(prev); next.delete(takeId); return next; });
-      setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "error" }));
     }
   }, [handleDownloadTake, toast]);
 
@@ -2204,7 +2219,7 @@ export default function RecordingRoom() {
       const code = e.code;
       if (code === shortcuts.playPause) { e.preventDefault(); handlePlayPause(); }
       else if (code === shortcuts.record) { e.preventDefault(); if (recordingStatus === "idle") startCountdown(); }
-      else if (code === shortcuts.stop) { e.preventDefault(); if (recordingStatus === "recording") handleStopRecording(); else handleStopPlayback(); }
+      else if (code === shortcuts.stop) { e.preventDefault(); if (recordingStatus === "recording" || recordingStatus === "countdown") handleStopRecording(); else handleStopPlayback(); }
       else if (code === shortcuts.back) { e.preventDefault(); seek(-2); }
       else if (code === shortcuts.forward) { e.preventDefault(); seek(2); }
       else if (code === shortcuts.loop) { e.preventDefault(); void handleLoopButton(); }
@@ -2596,6 +2611,30 @@ export default function RecordingRoom() {
               isWaitingReview={isWaitingReview}
               onApprove={handleDirectorApprove}
               onReject={handleDirectorReject}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* 🎙️ Preview do Dublador — apenas dublador vê após gravar */}
+        <AnimatePresence>
+          {pendingTake && !canApproveTake && (
+            <DirectorReview
+              mode="dubber"
+              take={{
+                audioUrl: pendingTake.url,
+                duration: pendingTake.durationSeconds,
+                durationSeconds: pendingTake.durationSeconds,
+                metrics: pendingTake.metrics,
+              }}
+              isSaving={isSaving}
+              isWaitingReview={isWaitingReview}
+              onApprove={handleApproveTake}
+              onDiscard={() => {
+                if (pendingTake?.url) URL.revokeObjectURL(pendingTake.url);
+                setPendingTake(null);
+                setRecordingStatus("idle");
+                setIsWaitingReview(false);
+              }}
             />
           )}
         </AnimatePresence>

@@ -17,9 +17,10 @@ interface EventFeedProps {
   studioId: string;
   events: StudioEvent[] | null;
   isConnected: boolean;
+  clearEvents?: () => void;
 }
 
-const EventFeed = memo(function EventFeed({ events, isConnected }: EventFeedProps) {
+const EventFeed = memo(function EventFeed({ events, isConnected, clearEvents }: EventFeedProps) {
   const eventsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,10 +88,6 @@ const EventFeed = memo(function EventFeed({ events, isConnected }: EventFeedProp
     }
   };
 
-  const clearEvents = () => {
-    // TODO: Implement clear events functionality
-    console.log('Clear events');
-  };
 
   return (
     <div className="space-y-6">

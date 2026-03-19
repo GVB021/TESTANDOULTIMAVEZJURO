@@ -50,7 +50,7 @@ export function MobileFooterControls({
   onRecord,
   onStopRecord,
 }: MobileFooterControlsProps) {
-  const isRecording = recordingStatus === "recording";
+  const isRecording = recordingStatus === "recording" || recordingStatus === "countdown";
   const canRecord = recordingStatus === "idle" || recordingStatus === "recorded";
 
   return (

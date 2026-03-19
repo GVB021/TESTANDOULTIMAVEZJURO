@@ -8,6 +8,7 @@ export type RecordingStatus =
   | "countdown"
   | "recording"
   | "recorded"
+  | "stopped"
   | "previewing";
 
 export interface RecordingResult {

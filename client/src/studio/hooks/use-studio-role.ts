@@ -6,9 +6,9 @@ export type StudioRole = "platform_owner" | "studio_admin" | "diretor" | "engenh
 
 const ROLE_HIERARCHY: Record<string, number> = {
   platform_owner: 100,
-  studio_admin: 100,
-  diretor: 100,
-  engenheiro_audio: 100,
+  studio_admin: 80,
+  diretor: 60,
+  engenheiro_audio: 40,
   dublador: 10,
   aluno: 10,
 };

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, count, sql } from "drizzle-orm";
 import {
   studios,
   users,
@@ -138,7 +138,7 @@ export interface IStorage {
   setUserStudioRoles(membershipId: string, roles: string[]): Promise<UserStudioRole[]>;
   verifyUserStudioAccess(userId: string, studioId: string): Promise<boolean>;
   getActiveStudiosPublic(): Promise<{ id: string; name: string }[]>;
-  getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number }>;
+  getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number; onlineUsers: number; takesToday: number }>;
   getPendingMembersForStudio(studioId: string): Promise<(StudioMembership & { user?: User })[]>;
 
   getUserProfile(userId: string): Promise<any>;
@@ -694,18 +694,35 @@ export class DatabaseStorage implements IStorage {
       .where(eq(studios.isActive, true));
   }
 
-  async getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number }> {
-    const allMemberships = await db.select().from(studioMemberships).where(eq(studioMemberships.studioId, studioId));
-    const membersCount = allMemberships.filter(m => m.status === "approved").length;
-    const pendingCount = allMemberships.filter(m => m.status === "pending").length;
-    const prods = await db.select().from(productions).where(eq(productions.studioId, studioId));
-    const sess = await db.select().from(sessions).where(eq(sessions.studioId, studioId));
-    let takesCount = 0;
-    for (const s of sess) {
-      const t = await db.select().from(takes).where(eq(takes.sessionId, s.id));
-      takesCount += t.length;
-    }
-    return { members: membersCount, productions: prods.length, sessions: sess.length, takes: takesCount, pendingMembers: pendingCount };
+  async getStudioStats(studioId: string): Promise<{ members: number; productions: number; sessions: number; takes: number; pendingMembers: number; onlineUsers: number; takesToday: number }> {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [membershipsResult, prodsResult, sessResult, takesResult, onlineResult, todayResult] = await Promise.all([
+      db.select({ status: studioMemberships.status }).from(studioMemberships).where(eq(studioMemberships.studioId, studioId)),
+      db.select({ cnt: count() }).from(productions).where(eq(productions.studioId, studioId)),
+      db.select({ cnt: count() }).from(sessions).where(eq(sessions.studioId, studioId)),
+      db.select({ cnt: count() }).from(takes)
+        .innerJoin(sessions, eq(takes.sessionId, sessions.id))
+        .where(eq(sessions.studioId, studioId)),
+      db.selectDistinct({ userId: sessionParticipants.userId }).from(sessionParticipants)
+        .innerJoin(sessions, eq(sessionParticipants.sessionId, sessions.id))
+        .where(and(eq(sessions.studioId, studioId), eq(sessions.status, "in_progress"))),
+      db.select({ cnt: count() }).from(takes)
+        .innerJoin(sessions, eq(takes.sessionId, sessions.id))
+        .where(and(eq(sessions.studioId, studioId), sql`${takes.createdAt} >= ${startOfToday}`)),
+    ]);
+    const membersCount = membershipsResult.filter(m => m.status === "approved").length;
+    const pendingCount = membershipsResult.filter(m => m.status === "pending").length;
+    return {
+      members: membersCount,
+      productions: Number(prodsResult[0]?.cnt ?? 0),
+      sessions: Number(sessResult[0]?.cnt ?? 0),
+      takes: Number(takesResult[0]?.cnt ?? 0),
+      pendingMembers: pendingCount,
+      onlineUsers: onlineResult.length,
+      takesToday: Number(todayResult[0]?.cnt ?? 0),
+    };
   }
 
   async getPendingMembersForStudio(studioId: string): Promise<(StudioMembership & { user?: User })[]> {
