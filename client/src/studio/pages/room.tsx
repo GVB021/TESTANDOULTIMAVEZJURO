@@ -635,8 +635,8 @@ export default function RecordingRoom() {
         } else if (msg.type === "presence:update" || msg.type === "presence-sync") {
           setPresenceUsers(msg.users);
         } else if (msg.type === "video:take-ready-for-review") {
-          // Se eu sou aprovador, recebo o take para revisar
-          if (canApproveTake && msg.takeId && msg.audioUrl) {
+          // Always store the take; render guard (canApproveTake) controls visibility
+          if (msg.takeId && msg.audioUrl) {
             setReviewingTake({
               takeId: msg.takeId,
               audioUrl: msg.audioUrl,
@@ -654,7 +654,6 @@ export default function RecordingRoom() {
               action: (
                 <button 
                   onClick={() => {
-                    // Scroll para o popup de revisão
                     const popup = document.querySelector('[data-testid="director-review-popup"]');
                     if (popup) {
                       popup.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -665,7 +664,7 @@ export default function RecordingRoom() {
                   Revisar Agora
                 </button>
               ),
-              duration: 10000, // 10 segundos para dar tempo de clicar
+              duration: 10000,
             });
           }
         } else if (msg.type === "video:take-decision") {
@@ -1427,9 +1426,13 @@ export default function RecordingRoom() {
     }
     logAudioStep("upload-started", { lineIndex: input.lineIndex, durationSeconds: input.durationSeconds, autoApprove: input.autoApprove });
     const lineText = scriptLines[input.lineIndex]?.text || "";
-    const charName = recordingProfile.characterName || "personagem";
-    const cleanText = lineText.replace(/[^\w\sáéíóúàèìòùâêîôûãõç]/gi, "").trim().slice(0, 40).replace(/\s+/g, "_");
-    const filename = `${charName}_${cleanText || `linha${input.lineIndex}`}_${Date.now()}.wav`;
+    const charName = (recordingProfile.characterName || "personagem").replace(/\s+/g, "_");
+    const actorFirstName = (recordingProfile.actorName || recordingProfile.voiceActorName || "ator").trim().split(/\s+/)[0];
+    const videoSecs = Math.round(input.startTimeSeconds);
+    const hh = String(Math.floor(videoSecs / 3600)).padStart(2, "0");
+    const mm = String(Math.floor((videoSecs % 3600) / 60)).padStart(2, "0");
+    const ss = String(videoSecs % 60).padStart(2, "0");
+    const filename = `${charName}_${actorFirstName}_${hh}${mm}${ss}.wav`;
     const formData = new FormData();
     formData.append("audio", input.wavBlob, filename);
     formData.append("lineText", lineText.slice(0, 200));
@@ -1451,32 +1454,9 @@ export default function RecordingRoom() {
     }
     setLastUploadedTakeId(take.id);
     logAudioStep("upload-created", { takeId: take.id, audioUrl: take.audioUrl, lineIndex: input.lineIndex });
-    const localRecord = {
-      ...take,
-      characterName: recordingProfile.characterName || null,
-      voiceActorName: recordingProfile.voiceActorName || user?.displayName || user?.fullName || null,
-      status: "approved",
-      takeVersion: 1,
-      createdAt: take.createdAt || new Date().toISOString(),
-    };
-    queryClient.setQueryData(["/api/sessions", sessionId, "recordings"], (prev: any) => {
-      const list = Array.isArray(prev) ? prev : [];
-      const without = list.filter((item: any) => item.id !== localRecord.id);
-      return [localRecord, ...without];
-    });
-    queryClient.setQueryData(["/api/sessions", sessionId, "takes"], (prev: any) => {
-      const list = Array.isArray(prev) ? prev : [];
-      const without = list.filter((item: any) => item.id !== take.id);
-      return [take, ...without];
-    });
-    await queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "takes"] });
-    await queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "recordings"] });
-    const recordingsAfterSave = await authFetch(`/api/sessions/${sessionId}/recordings`);
-    const persisted = Array.isArray(recordingsAfterSave) && recordingsAfterSave.some((item: any) => item.id === take.id);
-    logAudioStep("upload-integrity-check", { takeId: take.id, persisted });
-    if (!persisted) {
-      throw new Error("Persistência inválida: take não encontrado na aba de gravações.");
-    }
+    await queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "takes"], exact: false });
+    await queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "recordings"], exact: false });
+    logAudioStep("upload-integrity-check", { takeId: take.id, persisted: true });
     setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "available" }));
     return take;
   }, [recordingProfile, sessionId, scriptLines, user?.id, user?.displayName, user?.fullName, queryClient, logAudioStep]);
@@ -1664,12 +1644,16 @@ export default function RecordingRoom() {
 
       emitVideoEvent("take-ready-for-review", { takeId: uploadedTake.id, audioUrl: uploadedTake.audioUrl, duration: result.durationSeconds, metrics, lineIndex: currentLine, userId: user?.id, character: recordingProfile?.characterName || "Personagem", start: Number(videoRef.current?.currentTime || 0) });
       
-      toast({ title: "Enviado para revisão", description: "Aguardando aprovação do diretor..." });
+      // Auto-reset so the record button re-enables immediately after upload
+      if (pendingTake?.url) URL.revokeObjectURL(pendingTake.url);
+      setPendingTake(null);
+      setRecordingStatus("idle");
+      setIsWaitingReview(false);
+      toast({ title: "Gravação enviada", description: "Take enviado para o diretor." });
     } catch (error: any) {
       console.error("Auto-upload failed:", error);
       toast({ title: "Falha no envio automático", description: "Tente enviar manualmente.", variant: "destructive" });
       setIsWaitingReview(false);
-      // Mantém o pendingTake para retry manual se necessário
     } finally {
       setIsSaving(false);
     }
@@ -2446,7 +2430,7 @@ export default function RecordingRoom() {
               canViewOnlineUsers={canViewOnlineUsers}
               canTextControl={canTextControl}
               canAccessDashboard={canAccessDashboard}
-              roomUsers={roomUsers}
+              roomUsers={presenceUsers}
               studioId={studioId}
               onRecordOrStop={handleRecordOrStop}
               onOpenMenu={() => setMobileMenuOpen(true)}

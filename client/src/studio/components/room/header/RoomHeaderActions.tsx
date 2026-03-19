@@ -10,7 +10,7 @@ interface RoomHeaderActionsProps {
   canViewOnlineUsers: boolean;
   canTextControl: boolean;
   canAccessDashboard: boolean;
-  roomUsers: Array<{ displayName?: string; fullName?: string; name?: string; userId: string }>;
+  roomUsers: Array<{ displayName?: string; fullName?: string; name?: string; userId: string; [key: string]: any }>;
   studioId: string;
   onRecordOrStop: () => void;
   onOpenMenu: () => void;
