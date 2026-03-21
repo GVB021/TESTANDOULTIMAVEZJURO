@@ -232,12 +232,15 @@ export function HardwareSetupDialog({ open, onOpenChange, sessionId }: HardwareS
                 />
               </div>
 
-              <div className="flex items-center justify-between opacity-50">
+              <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <label className="text-sm font-medium">Controle Automático de Ganho</label>
-                  <p className="text-xs text-muted-foreground">Desativado para qualidade profissional</p>
+                  <p className="text-xs text-muted-foreground">Ajusta volume automaticamente</p>
                 </div>
-                <Switch checked={false} disabled />
+                <Switch
+                  checked={localConfig.autoGainControl}
+                  onCheckedChange={(checked) => setLocalConfig({ ...localConfig, autoGainControl: checked })}
+                />
               </div>
             </div>
           </div>
