@@ -24,7 +24,7 @@ const DEFAULT_CONFIG: HardwareConfig = {
   microphoneGain: 50,
   echoCancellation: true,
   noiseSuppression: true,
-  autoGainControl: true,
+  autoGainControl: false,
 };
 
 const STORAGE_KEY = "hardware_config_v1";
@@ -96,7 +96,7 @@ export function useHardwareControl(sessionId: string) {
           deviceId: config.selectedMicrophone || undefined,
           echoCancellation: config.echoCancellation,
           noiseSuppression: config.noiseSuppression,
-          autoGainControl: config.autoGainControl,
+          autoGainControl: false,
           sampleRate: 48000,
           channelCount: 1,
         },
