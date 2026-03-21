@@ -163,15 +163,6 @@ export default function RecordingRoom() {
   // Se for diretor, só libera quando confirmar. Se não for, libera direto.
   const isControlBlocked = isDirector && !directorControlConfirmed;
 
-  // Recordings pagination and filtering
-  const [recordingsPage, setRecordingsPage] = useState(1);
-  const [recordingsSearch, setRecordingsSearch] = useState("");
-  const [recordingsScope, setRecordingsScope] = useState<"all" | "mine">("mine");
-  const [recordingsDateFrom, setRecordingsDateFrom] = useState("");
-  const [recordingsDateTo, setRecordingsDateTo] = useState("");
-  const [recordingsSortBy, setRecordingsSortBy] = useState<"createdAt" | "durationSeconds" | "lineIndex" | "characterName">("createdAt");
-  const [recordingsSortDir, setRecordingsSortDir] = useState<"asc" | "desc">("desc");
-
   // Modal state
   const [discardModalTake, setDiscardModalTake] = useState<any>(null);
   const [discardFinalStep, setDiscardFinalStep] = useState(false);
@@ -196,7 +187,6 @@ export default function RecordingRoom() {
 
   // Additional state
   const [recordingsPreviewId, setRecordingsPreviewId] = useState<string | null>(null);
-  const [recordingsPlaybackRate, setRecordingsPlaybackRate] = useState(1.0);
   const [desktopVideoTextSplit, setDesktopVideoTextSplit] = useState(60);
   const [isDraggingVideoTextSplit, setIsDraggingVideoTextSplit] = useState(false);
   const [sideScriptWidth, setSideScriptWidth] = useState(320);
@@ -839,17 +829,8 @@ export default function RecordingRoom() {
     data: recordingsResponse,
     error: recordingsError,
     isError: hasRecordingsError,
-  } = useRecordingsList(sessionId, {
-    page: recordingsPage,
-    pageSize: 20,
-    search: recordingsSearch,
-    userId: recordingsScope === "all" ? undefined : String(user?.id || ""),
-    from: recordingsDateFrom || undefined,
-    to: recordingsDateTo || undefined,
-    sortBy: recordingsSortBy,
-    sortDir: recordingsSortDir,
-  });
-  const recordingsList = recordingsResponse?.items || [];
+  } = useRecordingsList(sessionId);
+  const recordingsList = recordingsResponse?.takes || [];
 
   const savedTakes = useMemo(() => {
     const s = new Set<number>();
@@ -1024,15 +1005,12 @@ export default function RecordingRoom() {
     });
   }, [scopedRecordings]);
   useEffect(() => {
-    setRecordingsPage(1);
-  }, [recordingsScope, recordingsSearch, recordingsDateFrom, recordingsDateTo, recordingsSortBy, recordingsSortDir]);
-  useEffect(() => {
     const currentId = String(recordingsPlayerOpenId || "");
     if (!currentId) return;
     const audio = recordingRowAudioRefs.current[currentId];
     if (!audio) return;
-    audio.playbackRate = recordingsPlaybackRate;
-  }, [recordingsPlayerOpenId, recordingsPlaybackRate]);
+    audio.playbackRate = 1.0;
+  }, [recordingsPlayerOpenId]);
   useEffect(() => {
     return () => {
       Object.values(cachedRecordingBlobUrlsRef.current).forEach((url) => {
@@ -2388,16 +2366,6 @@ export default function RecordingRoom() {
       {recordingsOpen && (
         <RecordingsPanel
           zIndex={UI_LAYER_BASE.modalOverlay}
-          isPrivileged={isPrivileged}
-          canViewOnlineUsers={canViewOnlineUsers}
-          canDiscardTake={canDiscardTake}
-          recordingsScope={recordingsScope}
-          recordingsSearch={recordingsSearch}
-          recordingsSortBy={recordingsSortBy}
-          recordingsSortDir={recordingsSortDir}
-          recordingsPlaybackRate={recordingsPlaybackRate}
-          recordingsDateFrom={recordingsDateFrom}
-          recordingsDateTo={recordingsDateTo}
           recordingsResponse={recordingsResponse}
           scopedRecordings={scopedRecordings}
           recordingAvailability={recordingAvailability}
@@ -2406,23 +2374,12 @@ export default function RecordingRoom() {
           recordingsPlayerOpenId={recordingsPlayerOpenId}
           recordingPlayableUrls={recordingPlayableUrls}
           optimisticRemovingTakeIds={optimisticRemovingTakeIds}
-          onlineRosterForCurrentRole={onlineRosterForCurrentRole}
           audioRef={recordingsPreviewAudioRef}
           rowAudioRefs={recordingRowAudioRefs}
           getTakeStreamUrl={getTakeStreamUrl}
           onClose={() => setRecordingsOpen(false)}
-          onScopeToggle={() => setRecordingsScope((v) => (v === "all" ? "mine" : "all"))}
-          onSearchChange={setRecordingsSearch}
-          onSortByChange={(v) => setRecordingsSortBy(v as any)}
-          onSortDirChange={(v) => setRecordingsSortDir(v as any)}
-          onPlaybackRateChange={setRecordingsPlaybackRate}
-          onDateFromChange={setRecordingsDateFrom}
-          onDateToChange={setRecordingsDateTo}
-          onPagePrev={() => setRecordingsPage((p) => Math.max(1, p - 1))}
-          onPageNext={() => setRecordingsPage((p) => Math.min(recordingsResponse?.pageCount || 1, p + 1))}
           onPlayTake={handlePlayRecordingTake}
           onDownloadTake={handleDownloadRecordingTake}
-          onDiscardTake={handleDiscardRecordingTake}
           onLoadedMetadata={handleRecordingLoadedMetadata}
           onAudioError={handleRecordingAudioError}
         />
