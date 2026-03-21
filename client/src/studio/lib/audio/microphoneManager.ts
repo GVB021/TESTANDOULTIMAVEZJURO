@@ -66,9 +66,9 @@ export async function requestMicrophone(
       });
     } else {
       Object.assign(constraints, {
-        echoCancellation: isStudio,
-        noiseSuppression: isStudio,
-        autoGainControl: isStudio,
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
       });
     }
 
