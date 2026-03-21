@@ -108,24 +108,9 @@ export async function requestMicrophone(
   const filterNodes: AudioNode[] = [];
 
   if (isStudio) {
-    const highPassFilter = audioContext.createBiquadFilter();
-    highPassFilter.type = "highpass";
-    highPassFilter.frequency.value = 80;
-    highPassFilter.Q.value = 0.7;
-    filterNodes.push(highPassFilter);
-
-    const compressor = audioContext.createDynamicsCompressor();
-    compressor.threshold.value = -24;
-    compressor.knee.value = 12;
-    compressor.ratio.value = 4;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.15;
-    filterNodes.push(compressor);
-
-    sourceNode.connect(highPassFilter);
-    highPassFilter.connect(compressor);
-    compressor.connect(gainNode);
-    console.log("[Mic] Studio mode: highpass(80Hz) → compressor → gain");
+    // Studio mode: RAW capture without processing
+    sourceNode.connect(gainNode);
+    console.log("[Mic] Studio mode: RAW capture (no processing)");
   } else if (isHighFidelity) {
     // Direct path for high fidelity
     sourceNode.connect(gainNode);
