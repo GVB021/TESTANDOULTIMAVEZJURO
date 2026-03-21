@@ -1481,8 +1481,11 @@ export default function RecordingRoom() {
     }
     setLastUploadedTakeId(take.id);
     logAudioStep("upload-created", { takeId: take.id, audioUrl: take.audioUrl, lineIndex: input.lineIndex });
+    // Invalidate and immediately refetch both takes and recordings queries
     await queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "takes"], exact: false });
     await queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId, "recordings"], exact: false });
+    // Force immediate refetch of recordings to show the new take in the director's tab
+    await queryClient.refetchQueries({ queryKey: ["/api/sessions", sessionId, "recordings"], exact: false, type: "active" });
     logAudioStep("upload-integrity-check", { takeId: take.id, persisted: true });
     setRecordingAvailability((prev) => ({ ...prev, [String(take.id || "")]: "available" }));
     return take;
