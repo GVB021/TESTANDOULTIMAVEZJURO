@@ -117,8 +117,8 @@ export default function HubAlignPage() {
     });
   }, [takes]);
 
-  const selectedTakes = useMemo<HubAlignTake[]>(()
-    => takes.filter((take) => selectedIds.has(take.id)),
+  const selectedTakes = useMemo<HubAlignTake[]>(() =>
+    takes.filter((take) => selectedIds.has(take.id)),
   [takes, selectedIds]);
 
   const totalDuration = useMemo(
