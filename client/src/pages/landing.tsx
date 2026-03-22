@@ -181,7 +181,10 @@ export default function LandingPage() {
                   Começar grátis
                 </button>
               </Link>
-              <button className="px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2">
+              <button 
+                onClick={() => scrollToSection("como-funciona")}
+                className="px-8 py-4 bg-white text-gray-700 font-semibold rounded-xl border border-gray-200 hover:bg-gray-50 transition-colors flex items-center gap-2"
+              >
                 <Play className="w-5 h-5" />
                 Ver como funciona
               </button>

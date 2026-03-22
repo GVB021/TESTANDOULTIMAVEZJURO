@@ -51,7 +51,8 @@ const StudioAdminSessions = lazyWithRetry(() => import("@/pages/studio-admin/ses
 const StudioAdminTakes = lazyWithRetry(() => import("@/pages/studio-admin/takes"));
 const StudioAdminSettings = lazyWithRetry(() => import("@/pages/studio-admin/settings"));
 // Studio Pages (imported from the HUBDUB-STUDIO folder)
-const Login = lazyWithRetry(() => import("@studio/pages/login"));
+const Login = lazyWithRetry(() => import("@/pages/auth/login"));
+const Signup = lazyWithRetry(() => import("@/pages/auth/signup"));
 const StudioSelect = lazyWithRetry(() => import("@studio/pages/studio-select"));
 const Dashboard = lazyWithRetry(() => import("@studio/pages/dashboard"));
 const Productions = lazyWithRetry(() => import("@studio/pages/productions"));
@@ -221,6 +222,20 @@ function Router() {
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full fixed inset-0 bg-background overflow-y-auto z-50">
               <Login />
             </motion.div>
+          </Route>
+
+          <Route path="/hub-dub/signup">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full fixed inset-0 bg-background overflow-y-auto z-50">
+              <Signup />
+            </motion.div>
+          </Route>
+
+          <Route path="/auth/login">
+            <Redirect to="/hub-dub/login" />
+          </Route>
+
+          <Route path="/auth/signup">
+            <Redirect to="/hub-dub/signup" />
           </Route>
 
           <Route path="/hub-dub/secretaria/login">

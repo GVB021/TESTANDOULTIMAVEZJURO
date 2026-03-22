@@ -16,7 +16,9 @@ import {
   ChevronDown,
   LayoutGrid,
   CalendarDays,
-  UserPlus
+  UserPlus,
+  LogOut,
+  X
 } from 'lucide-react';
 import { useAuth } from '@studio/hooks/use-auth';
 import { useProductions } from '@studio/hooks/use-productions';
@@ -24,9 +26,12 @@ import { useSessions } from '@studio/hooks/use-sessions';
 import { useStudio } from '@studio/hooks/use-studios';
 import { useStudioRole } from '@studio/hooks/use-studio-role';
 import { isSessionVisibleOnDashboard } from '@studio/lib/session-status';
+import { authFetch } from '@studio/lib/auth-fetch';
+import { useToast } from '@studio/hooks/use-toast';
 
 export default function Dashboard({ studioId }: { studioId: string }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const { toast } = useToast();
   const studio = useStudio(studioId);
   const { data: productions } = useProductions(studioId);
   const { data: sessions } = useSessions(studioId);
@@ -34,6 +39,31 @@ export default function Dashboard({ studioId }: { studioId: string }) {
   const isAdmin = role === 'admin' || role === 'owner';
   const isOwner = role === 'owner';
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [realTakes, setRealTakes] = useState<any[]>([]);
+  const [takesLoading, setTakesLoading] = useState(false);
+
+  // Fetch real takes data
+  useEffect(() => {
+    const fetchTakes = async () => {
+      if (!studioId) return;
+      setTakesLoading(true);
+      try {
+        // Try to fetch takes from the studio
+        const data = await authFetch(`/api/studios/${studioId}/takes?limit=5`);
+        if (Array.isArray(data)) {
+          setRealTakes(data);
+        } else if (data?.items) {
+          setRealTakes(data.items);
+        }
+      } catch (err) {
+        console.error('Failed to fetch takes:', err);
+      } finally {
+        setTakesLoading(false);
+      }
+    };
+    fetchTakes();
+  }, [studioId]);
 
   // Calculate stats
   const now = new Date();
@@ -54,12 +84,8 @@ export default function Dashboard({ studioId }: { studioId: string }) {
     .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
     .slice(0, 4);
 
-  const recentTakes = [
-    { id: 1, character: 'João', actor: 'Carlos Silva', session: 'Sessão 1', duration: '2:34', status: 'completed' },
-    { id: 2, character: 'Maria', actor: 'Ana Santos', session: 'Sessão 2', duration: '1:45', status: 'processing' },
-    { id: 3, character: 'Pedro', actor: 'João Costa', session: 'Sessão 1', duration: '3:12', status: 'completed' },
-    { id: 4, character: 'Lucas', actor: 'Mário Oliveira', session: 'Sessão 3', duration: '2:08', status: 'processing' },
-  ];
+  // Use real takes data or fallback to empty array
+  const recentTakes = realTakes.length > 0 ? realTakes : [];
 
   const formatDate = (date: Date) => {
     return new Intl.DateTimeFormat('pt-BR', { 
@@ -276,7 +302,12 @@ export default function Dashboard({ studioId }: { studioId: string }) {
                     <div className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">Configurações</div>
                   </Link>
                   <div className="border-t border-gray-100 my-1" />
-                  <button className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left">Sair</button>
+                  <button 
+                    onClick={() => logout()} 
+                    className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />Sair
+                  </button>
                 </div>
               )}
             </div>
@@ -400,7 +431,10 @@ export default function Dashboard({ studioId }: { studioId: string }) {
                       </button>
                     </Link>
                   )}
-                  <button className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all">
+                  <button 
+                    onClick={() => setShowInviteModal(true)}
+                    className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all"
+                  >
                     <UserPlus className="w-5 h-5 text-gray-600" />
                     <span className="text-xs font-medium text-gray-700 text-center">Convidar Membro</span>
                   </button>
@@ -439,21 +473,39 @@ export default function Dashboard({ studioId }: { studioId: string }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {recentTakes.map((take) => {
-                      const status = getTakeStatus(take.status);
-                      return (
-                        <tr key={take.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-4"><span className="font-medium text-gray-900">{take.character}</span></td>
-                          <td className="py-4 text-gray-600">{take.actor}</td>
-                          <td className="py-4 text-gray-600">{take.session}</td>
-                          <td className="py-4 text-gray-600">{take.duration}</td>
-                          <td className="py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${status.className}`}>{status.label}</span></td>
-                          <td className="py-4">
-                            <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"><Play className="w-4 h-4" /></button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {recentTakes.length > 0 ? (
+                      recentTakes.map((take) => {
+                        const status = getTakeStatus(take.status || 'pending');
+                        const characterName = take.characterName || take.character || '-';
+                        const actorName = take.voiceActorName || take.actorName || take.actor || '-';
+                        const sessionName = take.sessionTitle || take.session || 'Sessão';
+                        const duration = take.durationFormatted || take.duration || '-';
+                        return (
+                          <tr key={take.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="py-4"><span className="font-medium text-gray-900">{characterName}</span></td>
+                            <td className="py-4 text-gray-600">{actorName}</td>
+                            <td className="py-4 text-gray-600">{sessionName}</td>
+                            <td className="py-4 text-gray-600">{duration}</td>
+                            <td className="py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${status.className}`}>{status.label}</span></td>
+                            <td className="py-4">
+                              <button 
+                                onClick={() => take.audioUrl && window.open(take.audioUrl, '_blank')}
+                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                disabled={!take.audioUrl}
+                              >
+                                <Play className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-gray-500">
+                          {takesLoading ? 'Carregando takes...' : 'Nenhum take gravado ainda'}
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -461,6 +513,42 @@ export default function Dashboard({ studioId }: { studioId: string }) {
           </div>
         </main>
       </div>
+
+      {/* Invite Member Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Convidar Membro</h3>
+              <button 
+                onClick={() => setShowInviteModal(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-gray-500 mb-6">
+              Para convidar um membro, acesse o painel de administração do estúdio.
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setShowInviteModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Fechar
+              </button>
+              <Link href={`/hub-dub/studio/${studioId}/admin`}>
+                <button 
+                  onClick={() => setShowInviteModal(false)}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Ir para Admin
+                </button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

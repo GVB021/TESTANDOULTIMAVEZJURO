@@ -2725,10 +2725,31 @@ export default function RecordingRoom() {
                       {take.status === "approved" ? "APROVADO" : take.status === "pending" ? "PENDENTE" : "DESCARTADO"}
                     </span>
                     <div className="flex items-center gap-1">
-                      <button className="w-8 h-8 bg-green-500 text-white rounded-lg flex items-center justify-center hover:bg-green-600 transition-colors">
+                      <button 
+                        onClick={() => handlePlayRecordingTake(take)}
+                        className="w-8 h-8 bg-blue-500 text-white rounded-lg flex items-center justify-center hover:bg-blue-600 transition-colors"
+                        title="Reproduzir"
+                      >
+                        <Play className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setReviewingTake({ takeId: take.id, audioUrl: take.audioUrl, durationSeconds: take.durationSeconds, characterName: take.characterName, lineIndex: take.lineIndex, start: take.startTimeSeconds });
+                          handleDirectorApprove();
+                        }}
+                        className="w-8 h-8 bg-green-500 text-white rounded-lg flex items-center justify-center hover:bg-green-600 transition-colors"
+                        title="Aprovar"
+                      >
                         <Check className="w-4 h-4" />
                       </button>
-                      <button className="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors">
+                      <button 
+                        onClick={() => {
+                          setReviewingTake({ takeId: take.id, audioUrl: take.audioUrl, durationSeconds: take.durationSeconds, characterName: take.characterName, lineIndex: take.lineIndex, start: take.startTimeSeconds });
+                          handleDirectorReject();
+                        }}
+                        className="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors"
+                        title="Rejeitar"
+                      >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
