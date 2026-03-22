@@ -2,7 +2,7 @@
 # Garante que Node.js, Python e FFmpeg estejam disponíveis no mesmo container
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "python311", "ffmpeg", "npm"]
+nixPkgs = ["nodejs_20", "python311", "ffmpeg"]
 
 [phases.install]
 cmds = [
