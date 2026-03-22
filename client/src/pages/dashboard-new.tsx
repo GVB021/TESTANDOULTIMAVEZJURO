@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'wouter';
 import { 
-  Home, 
+  LayoutDashboard,
   Film, 
   Calendar, 
   Mic, 
@@ -14,7 +14,6 @@ import {
   Users,
   Search,
   ChevronDown,
-  LayoutGrid,
   CalendarDays,
   UserPlus,
   LogOut,
@@ -138,157 +137,129 @@ export default function Dashboard({ studioId }: { studioId: string }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Left Sidebar - Fixed 260px */}
-      <aside className="hidden lg:flex lg:w-[260px] flex-col bg-white border-r border-gray-100 fixed h-full z-30">
-        {/* Logo Section */}
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-              <Mic className="w-5 h-5 text-white" />
+    <div className="h-screen flex overflow-hidden bg-gray-50">
+      {/* LEFT SIDEBAR - w-64 bg-white */}
+      <aside className="hidden md:flex w-64 bg-white border-r border-gray-100 flex-col">
+        {/* TOP - Logo */}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+              H
             </div>
             <div>
-              <span className="text-xl font-bold text-gray-900">HubDub</span>
-              <p className="text-xs text-gray-400">Studio {studio?.name || ''}</p>
+              <span className="text-sm font-semibold text-gray-900">HubDub</span>
+              <p className="text-xs text-gray-400">Studio studio</p>
             </div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 overflow-y-auto">
-          <div className="space-y-6">
-            {/* ESTÚDIO Section */}
-            <div>
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3 px-3">ESTÚDIO</h3>
-              <div className="space-y-1">
-                <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-blue-50 text-blue-600 border-l-2 border-blue-600 font-medium cursor-pointer">
-                    <LayoutGrid className="w-5 h-5" />
-                    <span>Dashboard</span>
-                  </div>
-                </Link>
-                <Link href={`/hub-dub/studio/${studioId}/productions`}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
-                    <Film className="w-5 h-5" />
-                    <span>Projetos</span>
-                  </div>
-                </Link>
-                <Link href={`/hub-dub/studio/${studioId}/sessions`}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
-                    <CalendarDays className="w-5 h-5" />
-                    <span>Sessões</span>
-                  </div>
-                </Link>
-                <Link href={`/hub-dub/studio/${studioId}/takes`}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
-                    <Mic className="w-5 h-5" />
-                    <span>Takes</span>
-                  </div>
-                </Link>
-              </div>
-            </div>
-
-            {/* FERRAMENTAS Section */}
-            <div>
-              <h3 className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3 px-3">FERRAMENTAS</h3>
-              <div className="space-y-1">
-                <Link href={`/hub-dub/studio/${studioId}/hubalign`}>
-                  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
-                    <Sliders className="w-5 h-5" />
-                    <span>HubAlign</span>
-                  </div>
-                </Link>
-              </div>
-            </div>
-
-            {/* ADMIN Section */}
-            {(isAdmin || isOwner) && (
-              <div>
-                <h3 className="text-xs font-medium text-gray-400 uppercase tracking-widest mb-3 px-3">ADMIN</h3>
-                <div className="space-y-1">
-                  <Link href={`/hub-dub/studio/${studioId}/admin`}>
-                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer">
-                      <Settings className="w-5 h-5" />
-                      <span>Painel do Estúdio</span>
-                    </div>
-                  </Link>
+        {/* NAV */}
+        <nav className="flex-1 p-3 overflow-y-auto">
+          {/* ESTÚDIO Section */}
+          <div>
+            <h3 className="text-xs tracking-widest text-gray-400 uppercase px-3 mt-4 mb-2">
+              ESTÚDIO
+            </h3>
+            <div className="space-y-1">
+              {/* Dashboard - ACTIVE */}
+              <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-600 border-l-2 border-blue-600 cursor-pointer">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span>Dashboard</span>
                 </div>
-              </div>
-            )}
+              </Link>
+              <Link href={`/hub-dub/studio/${studioId}/productions`}>
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
+                  <Film className="w-4 h-4" />
+                  <span>Projetos</span>
+                </div>
+              </Link>
+              <Link href={`/hub-dub/studio/${studioId}/sessions`}>
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Sessões</span>
+                </div>
+              </Link>
+              <Link href={`/hub-dub/studio/${studioId}/takes`}>
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
+                  <Mic className="w-4 h-4" />
+                  <span>Takes</span>
+                </div>
+              </Link>
+            </div>
           </div>
+
+          {/* FERRAMENTAS Section */}
+          <div className="mt-6">
+            <h3 className="text-xs tracking-widest text-gray-400 uppercase px-3 mb-2">
+              FERRAMENTAS
+            </h3>
+            <Link href={`/hub-dub/studio/${studioId}/hubalign`}>
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
+                <Sliders className="w-4 h-4" />
+                <span>HubAlign</span>
+              </div>
+            </Link>
+          </div>
+
+          {/* ADMIN Section - only for admin/owner */}
+          {(isAdmin || isOwner) && (
+            <div className="mt-6">
+              <h3 className="text-xs tracking-widest text-gray-400 uppercase px-3 mb-2">
+                ADMIN
+              </h3>
+              <Link href={`/hub-dub/studio/${studioId}/admin`}>
+                <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">
+                  <Settings className="w-4 h-4" />
+                  <span>Painel do Estúdio</span>
+                </div>
+              </Link>
+            </div>
+          )}
         </nav>
 
-        {/* Bottom User Profile */}
+        {/* BOTTOM - User Profile */}
         <div className="p-4 border-t border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium">
               {user?.fullName?.charAt(0) || 'U'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">{user?.fullName || 'Usuário'}</p>
-              <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
-                {user?.role || 'dubber'}
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user?.fullName || 'Usuário'}
+              </p>
+              <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                {role || 'dubber'}
               </span>
             </div>
-            <button className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors">
+            <button className="text-gray-400 hover:text-gray-600 ml-auto">
               <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Mobile Bottom Navigation */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-50 px-4 py-2">
-        <div className="flex items-center justify-around">
-          <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
-            <div className="flex flex-col items-center gap-1 p-2 text-blue-600">
-              <LayoutGrid className="w-5 h-5" />
-              <span className="text-xs">Dashboard</span>
-            </div>
-          </Link>
-          <Link href={`/hub-dub/studio/${studioId}/productions`}>
-            <div className="flex flex-col items-center gap-1 p-2 text-gray-400">
-              <Film className="w-5 h-5" />
-              <span className="text-xs">Projetos</span>
-            </div>
-          </Link>
-          <Link href={`/hub-dub/studio/${studioId}/sessions`}>
-            <div className="flex flex-col items-center gap-1 p-2 text-gray-400">
-              <CalendarDays className="w-5 h-5" />
-              <span className="text-xs">Sessões</span>
-            </div>
-          </Link>
-          <Link href={`/hub-dub/studio/${studioId}/takes`}>
-            <div className="flex flex-col items-center gap-1 p-2 text-gray-400">
-              <Mic className="w-5 h-5" />
-              <span className="text-xs">Takes</span>
-            </div>
-          </Link>
-          <Link href={`/hub-dub/studio/${studioId}/hubalign`}>
-            <div className="flex flex-col items-center gap-1 p-2 text-gray-400">
-              <Sliders className="w-5 h-5" />
-              <span className="text-xs">HubAlign</span>
-            </div>
-          </Link>
-        </div>
-      </nav>
-
-      {/* Main Content Area */}
-      <div className="flex-1 lg:ml-[260px] flex flex-col min-h-screen pb-20 lg:pb-0">
-        {/* Top Navbar - 60px */}
-        <header className="h-[60px] bg-white border-b border-gray-100 px-6 flex items-center justify-between sticky top-0 z-20">
-          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+      {/* MAIN AREA */}
+      <div className="flex-1 flex flex-col">
+        {/* TOP NAVBAR */}
+        <header className="h-14 bg-white border-b border-gray-100 flex items-center px-6">
+          <h1 className="text-xl font-bold text-gray-900 flex-1">Dashboard</h1>
           <div className="flex items-center gap-4">
-            <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+            <button className="text-gray-400 hover:text-gray-600">
               <Search className="w-5 h-5" />
             </button>
-            <button className="relative p-2 text-gray-400 hover:text-gray-600 transition-colors">
+            <button className="relative text-gray-400 hover:text-gray-600">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">1</span>
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                1
+              </span>
             </button>
             <div className="relative user-dropdown">
-              <button onClick={() => setShowUserDropdown(!showUserDropdown)} className="flex items-center gap-2 hover:bg-gray-50 rounded-lg p-1 transition-colors">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
+              <button 
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-2 hover:bg-gray-50 rounded-lg p-1 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-medium">
                   {user?.fullName?.charAt(0) || 'U'}
                 </div>
                 <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -296,15 +267,15 @@ export default function Dashboard({ studioId }: { studioId: string }) {
               {showUserDropdown && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                   <Link href={`/hub-dub/profile`}>
-                    <div className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">Perfil</div>
+                    <div className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">Perfil</div>
                   </Link>
                   <Link href={`/hub-dub/settings`}>
-                    <div className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">Configurações</div>
+                    <div className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">Configurações</div>
                   </Link>
                   <div className="border-t border-gray-100 my-1" />
                   <button 
                     onClick={() => logout()} 
-                    className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left flex items-center gap-2"
+                    className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 text-left flex items-center gap-2"
                   >
                     <LogOut className="w-4 h-4" />Sair
                   </button>
@@ -314,216 +285,402 @@ export default function Dashboard({ studioId }: { studioId: string }) {
           </div>
         </header>
 
-        {/* Main Content */}
-        <main className="flex-1 p-8">
-          {/* Header Section */}
-          <div className="flex items-start justify-between mb-8">
+        {/* MAIN CONTENT */}
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
+          {/* PAGE HEADER */}
+          <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">Olá, {user?.fullName?.split(' ')[0] || 'Gabriel'} 👋</h2>
-              <p className="text-gray-400">{formatDate(now).charAt(0).toUpperCase() + formatDate(now).slice(1)}</p>
+              <h2 className="text-4xl font-bold text-gray-900">
+                Olá, {user?.fullName?.split(' ')[0] || 'Gabriel'} 👋
+              </h2>
+              <p className="text-gray-400 text-sm mt-1">
+                {formatDate(now).charAt(0).toUpperCase() + formatDate(now).slice(1)}
+              </p>
             </div>
             {canCreateSessions && (
               <Link href={`/hub-dub/studio/${studioId}/sessions/new`}>
-                <button className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20">
-                  <Plus className="w-5 h-5" />Nova Sessão
+                <button className="bg-blue-600 text-white px-4 py-2 rounded-xl font-medium flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                  <Plus className="w-4 h-4" />Nova Sessão
                 </button>
               </Link>
             )}
           </div>
 
-          {/* Stats Row - 4 Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {/* STATS ROW */}
+          <div className="grid grid-cols-4 gap-4 mt-8">
+            {/* Card 1 - Sessões */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center"><Calendar className="w-6 h-6 text-blue-600" /></div>
-                <span className="text-xs font-medium text-green-500">+12% este mês</span>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-blue-600" />
+                </div>
+                <span className="text-green-500 text-xs">+12% este mês</span>
               </div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">{sessionsThisMonth}</div>
-              <div className="text-sm text-gray-500">Sessões este mês</div>
+              <div className="text-4xl font-bold text-gray-900 mt-3">360</div>
+              <div className="text-gray-500 text-sm mt-1">Sessões este mês</div>
             </div>
+
+            {/* Card 2 - Takes */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center"><Mic className="w-6 h-6 text-purple-600" /></div>
-                <span className="text-xs font-medium text-green-500">+8% este mês</span>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                  <Mic className="w-5 h-5 text-orange-600" />
+                </div>
+                <span className="text-green-500 text-xs">+12% este mês</span>
               </div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">{totalTakes}</div>
-              <div className="text-sm text-gray-500">Takes gravados</div>
+              <div className="text-4xl font-bold text-gray-900 mt-3">138</div>
+              <div className="text-gray-500 text-sm mt-1">Takes gravados</div>
             </div>
+
+            {/* Card 3 - Projetos */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-orange-50 rounded-xl flex items-center justify-center"><Film className="w-6 h-6 text-orange-600" /></div>
-                <span className="text-xs font-medium text-green-500">+3% este mês</span>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <Film className="w-5 h-5 text-green-600" />
+                </div>
+                <span className="text-green-500 text-xs">+12% este mês</span>
               </div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">{activeProjects}</div>
-              <div className="text-sm text-gray-500">Projetos ativos</div>
+              <div className="text-4xl font-bold text-gray-900 mt-3">22</div>
+              <div className="text-gray-500 text-sm mt-1">Projetos ativos</div>
             </div>
+
+            {/* Card 4 - Membros */}
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-green-50 rounded-xl flex items-center justify-center"><Users className="w-6 h-6 text-green-600" /></div>
-                <span className="text-xs font-medium text-green-500">+5% este mês</span>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                  <Users className="w-5 h-5 text-purple-600" />
+                </div>
+                <span className="text-green-500 text-xs">+12% este mês</span>
               </div>
-              <div className="text-4xl font-bold text-gray-900 mb-1">{studioMembers}</div>
-              <div className="text-sm text-gray-500">Membros do estúdio</div>
+              <div className="text-4xl font-bold text-gray-900 mt-3">25</div>
+              <div className="text-gray-500 text-sm mt-1">Membros do estúdio</div>
             </div>
           </div>
 
-          {/* Two Column Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
-            <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-gray-900">Próximas sessões</h3>
+          {/* TWO COLUMN ROW */}
+          <div className="grid grid-cols-[1fr_300px] gap-4 mt-6">
+            {/* LEFT - PRÓXIMAS SESSÕES */}
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Próximas sessões</h3>
                 <Link href={`/hub-dub/studio/${studioId}/sessions`}>
-                  <span className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Ver todas</span>
+                  <span className="text-blue-600 text-sm cursor-pointer hover:text-blue-700">Ver todas</span>
                 </Link>
               </div>
-              {upcomingSessions.length > 0 ? (
-                <div className="space-y-4">
-                  {upcomingSessions.map((session) => {
-                    const status = getSessionStatus(session);
-                    return (
-                      <div key={session.id} className="flex items-center gap-4 p-4 hover:bg-gray-50 rounded-xl transition-colors">
-                        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0"><Calendar className="w-5 h-5 text-blue-600" /></div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{session.title}</p>
-                          <p className="text-sm text-gray-500">{productions?.find(p => p.id === session.productionId)?.name || 'Projeto'}</p>
+
+              {/* Table */}
+              <table className="w-full mt-4">
+                <thead>
+                  <tr className="text-xs text-gray-400 uppercase tracking-wide text-left">
+                    <th className="pb-3 font-medium">Nome</th>
+                    <th className="pb-3 font-medium">Projeto</th>
+                    <th className="pb-3 font-medium">Data</th>
+                    <th className="pb-3 font-medium">Participantes</th>
+                    <th className="pb-3 font-medium">Status</th>
+                    <th className="pb-3 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {/* Row 1 */}
+                  <tr className="border-t border-gray-100">
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900">Sessão Dewam 1</p>
+                          <p className="text-xs text-gray-400">Projeto · HubDub 1</p>
                         </div>
-                        <div className="text-sm text-gray-500 hidden sm:block">{formatTime(session.scheduledAt)} • {new Date(session.scheduledAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</div>
-                        <div className="hidden sm:flex -space-x-2">
+                      </div>
+                    </td>
+                    <td className="py-3 text-gray-600">Projeto</td>
+                    <td className="py-3 text-gray-600">
+                      <p>18/08/2023</p>
+                      <p className="text-xs">Data 10:00</p>
+                    </td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-1">
+                        <div className="flex -space-x-2">
                           {[1, 2, 3].map((i) => (
-                            <div key={i} className="w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-medium">{String.fromCharCode(64 + i)}</div>
+                            <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 border border-white flex items-center justify-center text-white text-[10px]">
+                              {String.fromCharCode(64 + i)}
+                            </div>
                           ))}
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${status.className}`}>{status.label}</span>
-                        <Link href={`/hub-dub/studio/${studioId}/sessions/${session.id}/room`}>
-                          <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">Entrar</button>
-                        </Link>
+                        <div className="w-2 h-2 rounded-full bg-green-500 ml-1"></div>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-24 h-24 bg-gray-100 rounded-2xl mx-auto mb-4 flex items-center justify-center"><Calendar className="w-10 h-10 text-gray-300" /></div>
-                  <p className="text-gray-500 mb-4">Nenhuma sessão agendada</p>
-                  <Link href={`/hub-dub/studio/${studioId}/sessions/new`}>
-                    <button className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">Criar sessão</button>
-                  </Link>
-                </div>
-              )}
+                    </td>
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">AGENDADA</span>
+                        <span className="text-green-600 text-xs flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                          AO VIVO
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-3">
+                      <button className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700">
+                        Entrar
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Row 2 */}
+                  <tr className="border-t border-gray-100">
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900">Sessão Dewam 2</p>
+                          <p className="text-xs text-gray-400">Projeto · HubDub 2</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 text-gray-600">N/A</td>
+                    <td className="py-3 text-gray-600">
+                      <p>20/08/2023</p>
+                      <p className="text-xs">14:00</p>
+                    </td>
+                    <td className="py-3">
+                      <div className="flex -space-x-2">
+                        {[1, 2].map((i) => (
+                          <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-blue-500 border border-white flex items-center justify-center text-white text-[10px]">
+                            {String.fromCharCode(64 + i)}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3">
+                      <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">N/A</span>
+                    </td>
+                    <td className="py-3">
+                      <button className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700">
+                        Entrar
+                      </button>
+                    </td>
+                  </tr>
+
+                  {/* Row 3 */}
+                  <tr className="border-t border-gray-100">
+                    <td className="py-3">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <p className="font-medium text-gray-900">Sessão Dewam 3</p>
+                          <p className="text-xs text-gray-400">Projeto · HubDub 3</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3 text-gray-600">Projeto</td>
+                    <td className="py-3 text-gray-600">
+                      <p>22/08/2023</p>
+                      <p className="text-xs">16:00</p>
+                    </td>
+                    <td className="py-3">
+                      <div className="flex -space-x-2">
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-red-500 border border-white flex items-center justify-center text-white text-[10px]">
+                            {String.fromCharCode(64 + i)}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3">
+                      <span className="bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded-full">CONCLUÍDA</span>
+                    </td>
+                    <td className="py-3">
+                      <button className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700">
+                        Entrar
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <div className="lg:col-span-1 space-y-4">
+
+            {/* RIGHT COLUMN */}
+            <div className="flex flex-col gap-4">
+              {/* Empty State Card */}
               <div className="bg-white rounded-2xl border border-gray-100 p-6">
-                <h3 className="text-sm font-medium text-gray-400 uppercase tracking-widest mb-4">AÇÕES RÁPIDAS</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {canCreateProductions && (
-                    <Link href={`/hub-dub/studio/${studioId}/productions/new`}>
-                      <button className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all">
-                        <Film className="w-5 h-5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-700 text-center">Criar Projeto</span>
-                      </button>
-                    </Link>
-                  )}
-                  {canCreateSessions && (
-                    <Link href={`/hub-dub/studio/${studioId}/sessions/new`}>
-                      <button className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all">
-                        <Calendar className="w-5 h-5 text-gray-600" />
-                        <span className="text-xs font-medium text-gray-700 text-center">Agendar Sessão</span>
-                      </button>
-                    </Link>
-                  )}
-                  <button 
-                    onClick={() => setShowInviteModal(true)}
-                    className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all"
-                  >
-                    <UserPlus className="w-5 h-5 text-gray-600" />
-                    <span className="text-xs font-medium text-gray-700 text-center">Convidar Membro</span>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900">Próximas sessões</h3>
+                  <span className="text-blue-600 text-sm cursor-pointer">Ver todas</span>
+                </div>
+                <div className="flex flex-col items-center py-6">
+                  <div className="w-24 h-24 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
+                    <Calendar className="w-10 h-10 text-blue-300" />
+                  </div>
+                  <p className="text-gray-500 text-sm text-center">Nenhuma sessão agendada</p>
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm mt-4 hover:bg-blue-700">
+                    Criar sessão
                   </button>
-                  <Link href={`/hub-dub/studio/${studioId}/hubalign`}>
-                    <button className="flex flex-col items-center gap-2 p-4 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all">
-                      <Sliders className="w-5 h-5 text-gray-600" />
-                      <span className="text-xs font-medium text-gray-700 text-center">Abrir HubAlign</span>
-                    </button>
-                  </Link>
+                </div>
+              </div>
+
+              {/* Ações Rápidas */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h3 className="text-xs tracking-widest uppercase text-gray-400 mb-3">
+                  AÇÕES RÁPIDAS
+                </h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <button className="border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-700 hover:bg-gray-50 transition text-center">
+                    Criar Projeto
+                  </button>
+                  <button className="border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-700 hover:bg-gray-50 transition text-center">
+                    Agendar Sessão
+                  </button>
+                  <button className="border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-700 hover:bg-gray-50 transition text-center">
+                    Convidar Membro
+                  </button>
+                  <button className="border border-gray-200 rounded-lg py-2 px-3 text-sm text-gray-700 hover:bg-gray-50 transition text-center">
+                    Abrir HubAlign
+                  </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Takes Recentes */}
-          <div className="bg-white rounded-2xl border border-gray-100">
-            <div className="p-6 border-b border-gray-100">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Takes recentes</h3>
-                <Link href={`/hub-dub/studio/${studioId}/takes`}>
-                  <span className="text-sm font-medium text-blue-600 hover:text-blue-700 cursor-pointer">Ver todos</span>
-                </Link>
-              </div>
+          {/* TAKES RECENTES */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-gray-900">Takes recentes</h3>
+              <Link href={`/hub-dub/studio/${studioId}/takes`}>
+                <span className="text-blue-600 text-sm cursor-pointer hover:text-blue-700">Ver todos</span>
+              </Link>
             </div>
-            <div className="p-6">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-                      <th className="pb-4">Personagem</th>
-                      <th className="pb-4">Ator</th>
-                      <th className="pb-4">Sessão</th>
-                      <th className="pb-4">Duração</th>
-                      <th className="pb-4">Status</th>
-                      <th className="pb-4"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {recentTakes.length > 0 ? (
-                      recentTakes.map((take) => {
-                        const status = getTakeStatus(take.status || 'pending');
-                        const characterName = take.characterName || take.character || '-';
-                        const actorName = take.voiceActorName || take.actorName || take.actor || '-';
-                        const sessionName = take.sessionTitle || take.session || 'Sessão';
-                        const duration = take.durationFormatted || take.duration || '-';
-                        return (
-                          <tr key={take.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="py-4"><span className="font-medium text-gray-900">{characterName}</span></td>
-                            <td className="py-4 text-gray-600">{actorName}</td>
-                            <td className="py-4 text-gray-600">{sessionName}</td>
-                            <td className="py-4 text-gray-600">{duration}</td>
-                            <td className="py-4"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${status.className}`}>{status.label}</span></td>
-                            <td className="py-4">
-                              <button 
-                                onClick={() => take.audioUrl && window.open(take.audioUrl, '_blank')}
-                                className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                disabled={!take.audioUrl}
-                              >
-                                <Play className="w-4 h-4" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-gray-500">
-                          {takesLoading ? 'Carregando takes...' : 'Nenhum take gravado ainda'}
+            <table className="w-full">
+              <thead>
+                <tr className="text-xs text-gray-400 uppercase tracking-wide text-left">
+                  <th className="pb-3 font-medium">Character</th>
+                  <th className="pb-3 font-medium">Ator</th>
+                  <th className="pb-3 font-medium">Sessão</th>
+                  <th className="pb-3 font-medium">Duração</th>
+                  <th className="pb-3 font-medium">Status</th>
+                  <th className="pb-3 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {recentTakes.length > 0 ? (
+                  recentTakes.map((take) => {
+                    const status = getTakeStatus(take.status || 'pending');
+                    return (
+                      <tr key={take.id} className="border-t border-gray-100">
+                        <td className="py-3 font-medium text-gray-900">{take.characterName || take.character || '-'}</td>
+                        <td className="py-3 text-gray-600">{take.voiceActorName || take.actorName || '-'}</td>
+                        <td className="py-3 text-gray-600">{take.sessionTitle || 'Sessão'}</td>
+                        <td className="py-3 text-gray-600">{take.durationFormatted || take.duration || '-'}</td>
+                        <td className="py-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${status.className}`}>
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <button 
+                            onClick={() => take.audioUrl && window.open(take.audioUrl, '_blank')}
+                            className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition"
+                            disabled={!take.audioUrl}
+                          >
+                            <Play className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                    );
+                  })
+                ) : (
+                  <>
+                    <tr className="border-t border-gray-100">
+                      <td className="py-3 font-medium text-gray-900">Personagem A</td>
+                      <td className="py-3 text-gray-600">João Silva</td>
+                      <td className="py-3 text-gray-600">Sessão Dewam 1</td>
+                      <td className="py-3 text-gray-600">02:34</td>
+                      <td className="py-3">
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full">Aprovado</span>
+                      </td>
+                      <td className="py-3">
+                        <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition">
+                          <Play className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-100">
+                      <td className="py-3 font-medium text-gray-900">Personagem B</td>
+                      <td className="py-3 text-gray-600">Maria Santos</td>
+                      <td className="py-3 text-gray-600">Sessão Dewam 2</td>
+                      <td className="py-3 text-gray-600">01:45</td>
+                      <td className="py-3">
+                        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">Pendente</span>
+                      </td>
+                      <td className="py-3">
+                        <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition">
+                          <Play className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                    <tr className="border-t border-gray-100">
+                      <td className="py-3 font-medium text-gray-900">Personagem C</td>
+                      <td className="py-3 text-gray-600">Pedro Costa</td>
+                      <td className="py-3 text-gray-600">Sessão Dewam 3</td>
+                      <td className="py-3 text-gray-600">03:12</td>
+                      <td className="py-3">
+                        <span className="bg-gray-100 text-gray-400 text-xs px-2 py-1 rounded-full">N/A</span>
+                      </td>
+                      <td className="py-3">
+                        <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200 transition">
+                          <Play className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
           </div>
         </main>
       </div>
 
-      {/* Invite Member Modal */}
+      {/* MOBILE BOTTOM NAV */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 h-16 z-50">
+        <div className="flex items-center justify-around h-full">
+          <Link href={`/hub-dub/studio/${studioId}/dashboard`}>
+            <div className="flex flex-col items-center gap-1 text-blue-600">
+              <LayoutDashboard className="w-5 h-5" />
+              <span className="text-[10px]">Dashboard</span>
+            </div>
+          </Link>
+          <Link href={`/hub-dub/studio/${studioId}/productions`}>
+            <div className="flex flex-col items-center gap-1 text-gray-400">
+              <Film className="w-5 h-5" />
+              <span className="text-[10px]">Projetos</span>
+            </div>
+          </Link>
+          <Link href={`/hub-dub/studio/${studioId}/sessions`}>
+            <div className="flex flex-col items-center gap-1 text-gray-400">
+              <CalendarDays className="w-5 h-5" />
+              <span className="text-[10px]">Sessões</span>
+            </div>
+          </Link>
+          <Link href={`/hub-dub/studio/${studioId}/takes`}>
+            <div className="flex flex-col items-center gap-1 text-gray-400">
+              <Mic className="w-5 h-5" />
+              <span className="text-[10px]">Takes</span>
+            </div>
+          </Link>
+          <Link href={`/hub-dub/studio/${studioId}/hubalign`}>
+            <div className="flex flex-col items-center gap-1 text-gray-400">
+              <Sliders className="w-5 h-5" />
+              <span className="text-[10px]">HubAlign</span>
+            </div>
+          </Link>
+        </div>
+      </nav>
+
+      {/* Invite Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900">Convidar Membro</h3>
-              <button 
-                onClick={() => setShowInviteModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
+              <button onClick={() => setShowInviteModal(false)} className="text-gray-400 hover:text-gray-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -531,17 +688,11 @@ export default function Dashboard({ studioId }: { studioId: string }) {
               Para convidar um membro, acesse o painel de administração do estúdio.
             </p>
             <div className="flex gap-3">
-              <button 
-                onClick={() => setShowInviteModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
+              <button onClick={() => setShowInviteModal(false)} className="flex-1 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50">
                 Fechar
               </button>
               <Link href={`/hub-dub/studio/${studioId}/admin`}>
-                <button 
-                  onClick={() => setShowInviteModal(false)}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
+                <button onClick={() => setShowInviteModal(false)} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                   Ir para Admin
                 </button>
               </Link>
