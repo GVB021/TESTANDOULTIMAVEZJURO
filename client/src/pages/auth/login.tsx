@@ -104,16 +104,11 @@ export default function Login() {
     <div className="min-h-screen flex">
       {/* Left Panel - 40% - Dark Brand Side */}
       <div className="hidden lg:flex lg:w-[40%] bg-gray-950 relative overflow-hidden flex-col items-center justify-center px-12">
-        {/* Background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950" />
-        
-        {/* Blue glow effects */}
         <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-600/20 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
 
-        {/* Content */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-sm">
-          {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
             <div className="w-12 h-12 bg-blue-600 rounded-xl flex items-center justify-center">
               <Mic className="w-7 h-7 text-white" />
@@ -121,19 +116,16 @@ export default function Login() {
             <span className="text-3xl font-bold text-white">HubDub</span>
           </div>
 
-          {/* Tagline */}
           <h1 className="text-2xl font-semibold text-white mb-12 leading-relaxed">
             Seu estúdio.
             <br />
             Em qualquer lugar.
           </h1>
 
-          {/* Audio Waveform */}
           <div className="mb-12">
             <AudioWaveform />
           </div>
 
-          {/* Quote */}
           <div className="mt-auto">
             <p className="text-sm text-gray-400 italic mb-2">
               "A dublagem remota nunca foi tão eficiente. HubDub revolucionou nosso workflow."
@@ -146,7 +138,6 @@ export default function Login() {
       {/* Right Panel - 60% - White Form Side */}
       <div className="w-full lg:w-[60%] bg-white flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm mx-auto">
-          {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
             <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
               <Mic className="w-6 h-6 text-white" />
@@ -154,15 +145,12 @@ export default function Login() {
             <span className="text-2xl font-bold text-gray-900">HubDub</span>
           </div>
 
-          {/* Header */}
           <div className="mb-8">
             <p className="text-sm text-gray-500 mb-1">Bem-vindo de volta</p>
             <h2 className="text-3xl font-bold text-gray-900">Entrar na sua conta</h2>
           </div>
 
-          {/* Form */}
           <form onSubmit={submit} className="space-y-5">
-            {/* Email Field */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Email</label>
               <div className="relative">
@@ -185,13 +173,11 @@ export default function Login() {
               </div>
               {touched.email && emailError && (
                 <div className="flex items-center gap-2 text-red-500 text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  {emailError}
+                  <AlertCircle className="w-4 h-4" />{emailError}
                 </div>
               )}
             </div>
 
-            {/* Password Field */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">Senha</label>
               <div className="relative">
@@ -221,20 +207,17 @@ export default function Login() {
               </div>
               {touched.password && passwordError && (
                 <div className="flex items-center gap-2 text-red-500 text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  {passwordError}
+                  <AlertCircle className="w-4 h-4" />{passwordError}
                 </div>
               )}
             </div>
 
-            {/* Forgot Password */}
             <div className="text-right">
               <button type="button" className="text-sm text-blue-600 hover:text-blue-700 transition-colors">
                 Esqueci minha senha
               </button>
             </div>
 
-            {/* Remember Me */}
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -243,38 +226,28 @@ export default function Login() {
                 onChange={(e) => setRememberMe(e.target.checked)}
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
-              <label htmlFor="remember" className="ml-2 text-sm text-gray-600">
-                Lembrar de mim
-              </label>
+              <label htmlFor="remember" className="ml-2 text-sm text-gray-600">Lembrar de mim</label>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={!canSubmit}
               className={`w-full h-12 bg-blue-600 text-white font-semibold rounded-xl transition-all ${
-                !canSubmit 
-                  ? 'opacity-70 cursor-not-allowed' 
-                  : 'hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/25'
+                !canSubmit ? 'opacity-70 cursor-not-allowed' : 'hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-500/25'
               }`}
             >
               {isLoggingIn ? (
                 <div className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Entrando...
+                  <Loader2 className="w-5 h-5 animate-spin" />Entrando...
                 </div>
               ) : isSuccess ? (
                 <div className="flex items-center justify-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-white" />
-                  Autorizado
+                  <div className="w-2 h-2 rounded-full bg-white" />Autorizado
                 </div>
-              ) : (
-                "Entrar"
-              )}
+              ) : "Entrar"}
             </button>
           </form>
 
-          {/* Divider */}
           <div className="relative my-8">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-200" />
@@ -284,7 +257,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Google Button */}
           <button className="w-full h-12 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors flex items-center justify-center gap-3 mb-6">
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -295,7 +267,6 @@ export default function Login() {
             Continuar com Google
           </button>
 
-          {/* Sign Up Link */}
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Não tem conta?{' '}
