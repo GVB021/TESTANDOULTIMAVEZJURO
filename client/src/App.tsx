@@ -52,6 +52,7 @@ const Takes = lazyWithRetry(() => import("@studio/pages/takes"));
 const Profile = lazyWithRetry(() => import("@studio/pages/profile"));
 const Daw = lazyWithRetry(() => import("@studio/pages/daw"));
 const SecretariaLogin = lazyWithRetry(() => import("@studio/pages/secretaria-login"));
+const StudioManagement = lazyWithRetry(() => import("@studio/pages/studio-management"));
 
 import { StudioLayout } from "@studio/components/layout/studio-layout";
 
@@ -202,6 +203,10 @@ function Router() {
 
           <Route path="/hub-dub/studio/:studioId/admin/main">
             {params => <ProtectedRoute component={StudioMain} requireStudio params={params} />}
+          </Route>
+
+          <Route path="/hub-dub/admin/studios/:studioId/management">
+            {params => <ProtectedRoute component={StudioManagement} requireStudio params={params} />}
           </Route>
 
           <Route path="/hub-dub/studio/:studioId/sessions/:sessionId/room">

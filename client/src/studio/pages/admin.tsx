@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@studio/hooks/use-auth";
 import { useLocation } from "wouter";
 import {
   ShieldAlert, LayoutDashboard, Users, Building2, Film,
-  Calendar, Mic2, ClipboardList, KeyRound, HardDrive,
+  Calendar, Clock3, Mic2, ClipboardList, KeyRound, HardDrive,
   LogOut, ChevronRight, Trash2, Pencil, Plus, RotateCcw,
   CheckCircle2, AlertCircle, Save, Search, RefreshCw,
   Eye, EyeOff, Activity, Database, BadgeCheck, XCircle,
-  UserCog, ToggleLeft, ToggleRight, Star, Download
+  UserCog, ToggleLeft, ToggleRight, Star, Download, AudioLines
 } from "lucide-react";
 import { Button } from "@studio/components/ui/button";
 import { Input } from "@studio/components/ui/input";
@@ -80,64 +80,184 @@ function ConfirmDialog({ open, onClose, onConfirm, title, description, confirmLa
   );
 }
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: React.ElementType; color: string }) {
-  return (
-    <div className="vhub-card p-5">
-      <div className="flex items-start justify-between mb-3">
-        <span className="vhub-label">{label}</span>
-        <div className={`shrink-0 w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center`}>
-          <Icon className={`h-4 w-4 ${color}`} />
-        </div>
-      </div>
-      <div className="text-3xl font-bold text-foreground">{value}</div>
-    </div>
-  );
+const MONTH_NAMES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+function formatRelativeTime(dateInput: string | number | Date): string {
+  const timestamp = new Date(dateInput).getTime();
+  if (Number.isNaN(timestamp)) return "";
+  const diffMs = Date.now() - timestamp;
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours} h`;
+  const days = Math.floor(hours / 24);
+  return `há ${days} dia${days > 1 ? "s" : ""}`;
 }
 
-function OverviewSection() {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["/api/admin/stats"],
-    queryFn: () => authFetch("/api/admin/stats") as Promise<Record<string, number>>,
-    refetchInterval: 5000,
+function OverviewSection({ onNavigateSection, onCreateSession }: { onNavigateSection: (section: Section) => void; onCreateSession: () => void; }) {
+  const { data: usersList = [], isLoading: usersLoading } = useQuery({
+    queryKey: ["/api/admin/users"],
+    queryFn: () => authFetch("/api/admin/users") as Promise<any[]>,
+    refetchInterval: 10000,
   });
-  const { data: logs } = useQuery({
+
+  const { data: sessionsList = [], isLoading: sessionsLoading } = useQuery({
+    queryKey: ["/api/admin/sessions"],
+    queryFn: () => authFetch("/api/admin/sessions") as Promise<any[]>,
+    refetchInterval: 10000,
+  });
+
+  const { data: takesList = [], isLoading: takesLoading } = useQuery({
+    queryKey: ["/api/admin/takes"],
+    queryFn: () => authFetch("/api/admin/takes") as Promise<any[]>,
+    refetchInterval: 10000,
+  });
+
+  const { data: logs = [], isLoading: logsLoading } = useQuery({
     queryKey: ["/api/admin/audit"],
     queryFn: () => authFetch("/api/admin/audit") as Promise<any[]>,
-    refetchInterval: 5000,
+    refetchInterval: 10000,
   });
+
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const todayEnd = todayStart + 24 * 60 * 60 * 1000;
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  const totalDubbers = useMemo(() => {
+    if (usersLoading) return "—";
+    const isVoiceActor = (user: any) => {
+      if (user.role === "aluno") return true;
+      if (user.role === "dublador") return true;
+      return user.studioMemberships?.some((m: any) => m.roles?.includes("dublador"));
+    };
+    return usersList.filter((u: any) => u.status === "approved" && isVoiceActor(u)).length;
+  }, [usersList, usersLoading]);
+
+  const scheduledSoon = useMemo(() => {
+    if (sessionsLoading) return "—";
+    const upcoming = sessionsList.filter((sess: any) => {
+      if (sess.status !== "scheduled") return false;
+      const time = new Date(sess.scheduledAt).getTime();
+      return time >= Date.now();
+    });
+    return upcoming.length;
+  }, [sessionsList, sessionsLoading]);
+
+  const sessionsToday = useMemo(() => {
+    if (sessionsLoading) return "—";
+    return sessionsList.filter((sess: any) => {
+      const time = new Date(sess.scheduledAt).getTime();
+      return time >= todayStart && time < todayEnd;
+    }).length;
+  }, [sessionsList, sessionsLoading, todayStart, todayEnd]);
+
+  const takesThisMonth = useMemo(() => {
+    if (takesLoading) return "—";
+    return takesList.filter((take: any) => {
+      const created = new Date(take.createdAt).getTime();
+      return created >= monthStart;
+    }).length;
+  }, [takesList, takesLoading, monthStart]);
+
+  const cards = [
+    { label: "Dubladores ativos", value: totalDubbers, icon: Mic2, accent: "from-rose-500/10 to-rose-500/0" },
+    { label: "Sessoes agendadas", value: scheduledSoon, icon: Calendar, accent: "from-blue-500/10 to-blue-500/0" },
+    { label: "Sessoes hoje", value: sessionsToday, icon: Clock3, accent: "from-amber-500/10 to-amber-500/0" },
+    { label: `Takes (${MONTH_NAMES[now.getMonth()]})`, value: takesThisMonth, icon: AudioLines, accent: "from-violet-500/10 to-violet-500/0" },
+  ];
+
+  const latestLogs = useMemo(() => {
+    if (!logs?.length) return [];
+    return logs.slice(0, 5).map((log: any) => {
+      let details: any = {};
+      try {
+        details = log.details ? JSON.parse(log.details) : {};
+      } catch {
+        details = log.details || {};
+      }
+      return {
+        id: log.id,
+        action: log.action,
+        createdAt: log.createdAt,
+        details,
+        userName: details?.userName || details?.user || details?.actorName || log.user?.displayName || log.user?.fullName || log.user?.email || "Usuario",
+        summary: details?.summary || details?.message || log.action.replace(/[_\.]/g, " "),
+      };
+    });
+  }, [logs]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Visao Geral do Sistema</h2>
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-          <StatCard label="Usuarios" value={isLoading ? "—" : stats?.users ?? 0} icon={Users} color="text-primary" />
-          <StatCard label="Pendentes" value={isLoading ? "—" : stats?.pendingUsers ?? 0} icon={AlertCircle} color="text-blue-400" />
-          <StatCard label="Estudios" value={isLoading ? "—" : stats?.studios ?? 0} icon={Building2} color="text-violet-400" />
-          <StatCard label="Producoes" value={isLoading ? "—" : stats?.productions ?? 0} icon={Film} color="text-emerald-400" />
-          <StatCard label="Sessoes" value={isLoading ? "—" : stats?.sessions ?? 0} icon={Calendar} color="text-primary" />
-          <StatCard label="Takes" value={isLoading ? "—" : stats?.takes ?? 0} icon={Mic2} color="text-rose-400" />
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        {cards.map(card => (
+          <div key={card.label} className="vhub-card p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{card.label}</p>
+                <p className="text-2xl font-bold text-foreground mt-1">{card.value}</p>
+              </div>
+              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${card.accent} flex items-center justify-center`}>
+                <card.icon className="w-5 h-5 text-foreground" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="vhub-card p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold">Acoes rapidas</p>
+            <p className="text-xs text-muted-foreground">Escolha um atalho para comecar</p>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <Button className="h-14 justify-between px-5" onClick={onCreateSession}>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Nova Sessao
+            </div>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button className="h-14 justify-between px-5" variant="secondary" onClick={() => onNavigateSection("users")}>
+            <div className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Gerenciar Usuarios
+            </div>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button className="h-14 justify-between px-5" variant="secondary" onClick={() => onNavigateSection("productions")}>
+            <div className="flex items-center gap-2">
+              <Film className="h-4 w-4" />
+              Ver Producoes
+            </div>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </div>
+
       <div className="vhub-card overflow-hidden">
         <div className="vhub-card-header">
           <div className="flex items-center gap-2 text-sm font-medium text-foreground/80">
-            <Activity className="h-4 w-4" /> Atividade Recente
+            <Activity className="h-4 w-4" /> Ultimas atividades
           </div>
+          <p className="text-xs text-muted-foreground">Ultimos 5 eventos registrados</p>
         </div>
         <div className="vhub-card-body">
-          {!logs?.length ? (
-            <p className="text-sm text-muted-foreground">Nenhum registro de auditoria.</p>
+          {logsLoading ? (
+            <p className="text-sm text-muted-foreground">Carregando...</p>
+          ) : !latestLogs.length ? (
+            <p className="text-sm text-muted-foreground">Nenhum registro recente.</p>
           ) : (
-            <div className="space-y-2">
-              {logs.slice(0, 10).map((log: any) => (
-                <div key={log.id} className="flex items-center gap-3 text-sm py-2 border-b border-white/6 last:border-0">
-                  <BadgeCheck className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="font-mono text-xs text-muted-foreground w-36 shrink-0">
-                    {new Date(log.createdAt).toLocaleString()}
-                  </span>
-                  <span className="font-medium">{log.action}</span>
-                  {log.details && <span className="text-muted-foreground truncate">{log.details}</span>}
+            <div className="space-y-3">
+              {latestLogs.map(log => (
+                <div key={log.id} className="flex items-center gap-3 p-3 rounded-lg border border-white/5">
+                  <BadgeCheck className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-medium truncate flex-1">
+                    {log.userName} {log.summary} · {formatRelativeTime(log.createdAt)}
+                  </p>
                 </div>
               ))}
             </div>
@@ -1086,13 +1206,13 @@ const SESS_STATUSES = [
   { value: "cancelled", label: "Cancelada" },
 ];
 
-function SessionsSection() {
+function SessionsSection({ createIntent = 0 }: { createIntent?: number }) {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [deleteConfirm, setDeleteConfirm] = useState<any | null>(null);
   const [editSess, setEditSess] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({ title: "", scheduledAt: "", durationMinutes: "60", status: "" });
-  const [createOpen, setCreateOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(createIntent > 0);
   const [createForm, setCreateForm] = useState({ studioId: "", productionId: "", title: "", scheduledAt: "", durationMinutes: "60" });
   const [search, setSearch] = useState("");
   const [forceLogoutUserId, setForceLogoutUserId] = useState<string>("");
@@ -1766,13 +1886,23 @@ export default function Admin() {
     );
   }
 
+  const [sessionCreateIntent, setSessionCreateIntent] = useState(0);
+
   const sectionMap: Record<Section, React.ReactNode> = {
-    overview: <OverviewSection />,
+    overview: (
+      <OverviewSection
+        onNavigateSection={setSection}
+        onCreateSession={() => {
+          setSection("sessions");
+          setSessionCreateIntent((prev) => prev + 1);
+        }}
+      />
+    ),
     pending: <PendingUsersSection />,
     users: <UsersSection />,
     studios: <StudiosSection />,
     productions: <ProductionsSection />,
-    sessions: <SessionsSection />,
+    sessions: <SessionsSection createIntent={sessionCreateIntent} />,
     takes: <TakesSection />,
     logs: <LogsSection />,
     integrations: <IntegrationsSection />,
