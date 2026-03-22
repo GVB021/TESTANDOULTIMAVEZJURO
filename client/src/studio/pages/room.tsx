@@ -15,6 +15,21 @@ import {
   PhoneCall,
   Check,
   X,
+  Home,
+  Film,
+  MessageSquare,
+  Wrench,
+  CreditCard,
+  ChevronRight,
+  RotateCcw,
+  Plus,
+  Send,
+  Users,
+  Play,
+  Pause,
+  Square,
+  Repeat,
+  Clock,
 } from "lucide-react";
 import { HardwareSetupDialog } from "@studio/components/hardware/HardwareSetupDialog";
 import { useHardwareControl } from "@studio/hooks/use-hardware-control";
@@ -2331,7 +2346,7 @@ export default function RecordingRoom() {
 
   return (
     <div
-      className="recording-room h-screen w-screen overflow-hidden flex flex-col select-none relative bg-background text-foreground"
+      className="recording-room h-screen w-screen overflow-hidden flex flex-col select-none relative bg-white text-gray-900"
       onClickCapture={(event) => {
         const target = event.target as HTMLElement | null;
         const button = target?.closest?.("button") as HTMLButtonElement | null;
@@ -2342,12 +2357,6 @@ export default function RecordingRoom() {
         window.setTimeout(() => button.classList.remove("rr-click-blink"), 300);
       }}
     >
-      {/* Background */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/12 via-background to-background"></div>
-        <div className="absolute -top-28 right-[-12rem] w-[34rem] h-[34rem] rounded-full bg-primary/10 blur-3xl opacity-70 md:w-[28rem] md:h-[28rem]" />
-        <div className="absolute -bottom-24 left-[-8rem] w-[26rem] h-[26rem] rounded-full bg-primary/8 blur-3xl opacity-70 md:w-[20rem] md:h-[20rem]" />
-      </div>
 
       {isCustomizing && (
         <ShortcutsDialog
@@ -2434,255 +2443,348 @@ export default function RecordingRoom() {
         onEnded={handleRecordingsAudioEnded}
       />
 
-      <RoomHeader
-        isMobile={isMobile}
-        productionName={production?.name || "Sessão"}
-        sessionTitle={session?.title}
-        sideScriptWidth={sideScriptWidth}
-        recordingProfile={recordingProfile}
-        charSelectorOpen={charSelectorOpen}
-        setCharSelectorOpen={setCharSelectorOpen}
-        charactersList={charactersList || []}
-        handleCharacterChange={handleCharacterChange}
-        onActorNameChange={handleActorNameChange}
-        onBack={handleBack}
-        scriptAutoFollow={scriptAutoFollow}
-        onToggleAutoFollow={handleToggleAutoFollow}
-        onlySelectedCharacter={onlySelectedCharacter}
-        onToggleCharacterFilter={handleToggleCharacterFilter}
-        dailyStatus={dailyStatus}
-        onDailyToggle={() => setDailyMeetOpen(v => !v)}
-        onMobileMenuOpen={isMobile ? () => setMobileMenuOpen(true) : undefined}
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <span
-              title={wsConnected ? "Conectado" : "Reconectando..."}
-              className={cn("w-2 h-2 rounded-full shrink-0 transition-colors", wsConnected ? "bg-green-500" : "bg-yellow-400 animate-pulse")}
-            />
-            <RoomHeaderActions
-              isMobile={isMobile}
-              isDubberView={isDubberView}
-              recordingStatus={recordingStatus}
-              canViewOnlineUsers={canViewOnlineUsers}
-              canTextControl={canTextControl}
-              canAccessDashboard={canAccessDashboard}
-              roomUsers={presenceUsers}
-              studioId={studioId}
-              onRecordOrStop={handleRecordOrStop}
-              onOpenMenu={() => setMobileMenuOpen(true)}
-              onOpenRecordings={() => setRecordingsOpen(true)}
-              onOpenTextControl={() => setTextControlPopupOpen(true)}
-              onOpenDeviceSettings={() => setDeviceSettingsOpen(true)}
-              onOpenShortcuts={() => setIsCustomizing(true)}
-              onPanelClick={() => logFeatureAudit("room.panel", "redirect", { studioId })}
-            />
+      {/* ===== TOP NAVIGATION BAR ===== */}
+      <nav className="h-14 bg-white border-b border-gray-200 flex items-center px-4 shrink-0 z-20">
+        <div className="flex items-center gap-2 mr-8">
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <Mic className="w-4 h-4 text-white" />
           </div>
-        }
-      />
+          <span className="font-semibold text-gray-900">HubDub</span>
+        </div>
+        
+        <div className="flex items-center gap-1">
+          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <span className="flex items-center gap-2">
+              <Home className="w-4 h-4" />
+              Home
+            </span>
+          </button>
+          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <span className="flex items-center gap-2">
+              <Film className="w-4 h-4" />
+              Projects
+            </span>
+          </button>
+          <button className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg transition-colors">
+            <span className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Communication
+            </span>
+          </button>
+          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <span className="flex items-center gap-2">
+              <Wrench className="w-4 h-4" />
+              Tools
+            </span>
+          </button>
+          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <span className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Settings
+            </span>
+          </button>
+          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
+            <span className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              Account/Billing
+            </span>
+          </button>
+        </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="flex-1 overflow-auto px-4 md:px-8 py-6 pb-safe md:py-10">
-          <div
+        <div className="ml-auto flex items-center gap-3">
+          <span
+            title={wsConnected ? "Conectado" : "Reconectando..."}
+            className={cn("w-2 h-2 rounded-full shrink-0 transition-colors", wsConnected ? "bg-green-500" : "bg-yellow-400 animate-pulse")}
+          />
+          <button
+            onClick={() => setDailyMeetOpen(v => !v)}
             className={cn(
-              "grid gap-6 min-h-[calc(100vh-88px)]",
-              isDirectorView ? "lg:grid-cols-[2fr_1fr]" : "lg:grid-cols-1",
-              "grid-cols-1"
+              "h-8 px-3 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors",
+              dailyMeetOpen ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
             )}
           >
-            <section className="space-y-4">
-              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
-                <div>
-                  <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">Status</p>
-                  <p className="text-2xl font-semibold text-foreground">{statusInfo.label}</p>
+            <PhoneCall className="w-4 h-4" />
+            {dailyStatus === "conectado" ? "Waco Dots" : "Chat"}
+          </button>
+          <button
+            onClick={() => setDeviceSettingsOpen(true)}
+            className="h-8 px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium flex items-center gap-2"
+          >
+            <Settings className="w-4 h-4" />
+            Config
+          </button>
+          <button
+            onClick={handleBack}
+            className="h-8 px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium"
+          >
+            Sair
+          </button>
+        </div>
+      </nav>
+
+      {/* ===== MAIN 3-COLUMN LAYOUT ===== */}
+      <div className="flex-1 flex overflow-hidden bg-gray-50">
+        {/* LEFT COLUMN - 50% - Video & Transport */}
+        <div className="w-[50%] flex flex-col border-r border-gray-200 bg-white">
+          {/* Studio Header */}
+          <div className="px-6 py-4 border-b border-gray-100">
+            <p className="text-xs text-gray-500 uppercase tracking-wider">{production?.studioName || "Studio"}</p>
+            <h1 className="text-lg font-semibold text-gray-900">{production?.name || "Production"}</h1>
+            <p className="text-sm text-gray-500">{session?.title || "Session"}</p>
+          </div>
+
+          {/* Video Player */}
+          <div className="flex-1 flex flex-col p-6">
+            <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg">
+              <VideoPlayer
+                ref={videoRef}
+                src={production?.videoUrl}
+                isMuted={isMuted}
+                onMuteToggle={() => setIsMuted((m) => !m)}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onTimeUpdate={setVideoTime}
+                onDurationChange={setVideoDuration}
+                countdownValue={countdownValue}
+                loopInfo={loopInfo}
+                className="w-full h-full"
+              />
+            </div>
+
+            {/* Transport Controls */}
+            <div className="mt-4 space-y-3">
+              {/* Timecode Display */}
+              <div className="flex items-center justify-center">
+                <div className="px-6 py-2 bg-gray-900 rounded-lg font-mono text-xl text-white tracking-wider">
+                  {formatTimecodeByFormat(videoTime, "HH:MM:SS:FF", 24)}
                 </div>
-                <span className={cn("px-3 py-1 rounded-full text-xs font-semibold", statusInfo.badge)}>{statusInfo.label}</span>
               </div>
-              <div className="rounded-2xl border border-white/5 bg-black/40 overflow-hidden">
-                <VideoPlayer
-                  ref={videoRef}
-                  src={production?.videoUrl}
-                  isMuted={isMuted}
-                  onMuteToggle={() => setIsMuted((m) => !m)}
-                  onPlay={() => setIsPlaying(true)}
-                  onPause={() => setIsPlaying(false)}
-                  onTimeUpdate={setVideoTime}
-                  onDurationChange={setVideoDuration}
-                  countdownValue={countdownValue}
-                  loopInfo={loopInfo}
-                  className="w-full aspect-[16/9]"
-                />
-                {isDirectorView ? (
-                  <div className="p-4 border-t border-white/5 bg-black/40 backdrop-blur">
-                    <div className="flex flex-col gap-3">
-                      <div className="flex gap-2">
-                        <button className="flex-1 h-12 rounded-lg bg-white/10 text-sm font-medium" onClick={() => seek(-2)}>−2s</button>
-                        <button className="flex-1 h-12 rounded-lg bg-white/10 text-sm font-medium" onClick={handlePlayPause}>{isPlaying ? "Pausar" : "Play"}</button>
-                        <button className="flex-1 h-12 rounded-lg bg-white/10 text-sm font-medium" onClick={() => seek(2)}>+2s</button>
-                      </div>
-                      <button
-                        className={cn(
-                          "w-full h-14 rounded-xl text-base font-bold uppercase tracking-wide disabled:opacity-50 bg-rose-500 text-white",
-                          recordingStatus === "recording" && "shadow-[0_0_35px_rgba(244,63,94,0.5)] animate-pulse"
-                        )}
-                        onClick={recordingStatus === "recording" ? handleStopRecording : startCountdown}
-                        disabled={!micReady || micInitializing}
-                      >
-                        {recordingStatus === "recording" ? "Parar" : "Gravar"}
-                      </button>
+
+              {/* Control Buttons */}
+              {isDirectorView ? (
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    className={cn(
+                      "w-16 h-16 rounded-full flex items-center justify-center transition-all",
+                      recordingStatus === "recording"
+                        ? "bg-red-600 animate-pulse shadow-lg shadow-red-500/50"
+                        : "bg-red-500 hover:bg-red-600 shadow-lg"
+                    )}
+                    onClick={recordingStatus === "recording" ? handleStopRecording : startCountdown}
+                    disabled={!micReady || micInitializing}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-white" />
+                  </button>
+                  <button
+                    className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                    onClick={handleStopRecording}
+                    disabled={recordingStatus !== "recording"}
+                  >
+                    <Square className="w-5 h-5 text-gray-700" />
+                  </button>
+                  <button
+                    className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                    onClick={handlePlayPause}
+                  >
+                    {isPlaying ? <Pause className="w-5 h-5 text-gray-700" /> : <Play className="w-5 h-5 text-gray-700" />}
+                  </button>
+                  <button
+                    className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
+                      isLooping ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                    )}
+                    onClick={handleLoopButton}
+                  >
+                    <Repeat className="w-5 h-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center gap-3 py-4">
+                  <span className={cn("inline-flex items-center px-4 py-2 rounded-full text-sm font-medium", statusInfo.badge)}>
+                    {statusInfo.label}
+                  </span>
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                      <Mic className="w-5 h-5" />
                     </div>
+                    <span className="text-sm">Aguardando comando do diretor</span>
                   </div>
-                ) : (
-                  <div className="p-6 border-t border-white/5 bg-black/40 text-center space-y-3">
-                    <span className={cn("inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold", statusInfo.badge)}>
-                      {statusInfo.label}
-                    </span>
-                    <div className="flex flex-col items-center gap-2 text-slate-100">
-                      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
-                        <Mic className="w-7 h-7 text-white/80" />
-                      </div>
-                      <p className="text-sm text-slate-200">Aguardando comando do diretor</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {pendingTake && isDubberView && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                  Seu take está aguardando revisão do diretor.
                 </div>
               )}
-            </section>
 
-            <section
-              className={cn(
-                "rounded-2xl border border-white/5 bg-white/5 backdrop-blur flex flex-col min-h-0",
-                isDirectorView ? "lg:col-start-2 lg:row-start-1" : undefined
+              {/* Seek Controls */}
+              {isDirectorView && (
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+                    onClick={() => seek(-2)}
+                  >
+                    −2s
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+                    onClick={() => seek(-5)}
+                  >
+                    −5s
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+                    onClick={() => seek(5)}
+                  >
+                    +5s
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
+                    onClick={() => seek(2)}
+                  >
+                    +2s
+                  </button>
+                </div>
               )}
-            >
-              <header className="p-4 pb-safe border-b border-white/5">
-                <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">Roteiro</p>
-                <h3 className="text-lg font-semibold">Script sincronizado</h3>
-              </header>
-              <div className="relative flex-1">
-                <span className="absolute left-5 top-4 bottom-4 w-px bg-white/5" aria-hidden />
-                <div ref={scriptViewportRef} className="flex-1 overflow-y-auto p-4 pl-7 pb-safe space-y-3">
-                  {displayedScriptLines.map((line) => {
-                    const i = line.originalIndex;
-                    const isActive = i === currentLine;
-                    const isDone = savedTakes.has(i);
-                    return (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => { setCurrentLine(i); if (canControlVideo) emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); }}
-                        disabled={!canControlVideo}
-                        className={cn(
-                          "w-full text-left p-4 rounded-xl border transition shadow-sm",
-                          isActive
-                            ? "border-primary/40 bg-primary/5 ring-2 ring-primary/40 shadow-[0_0_25px_rgba(14,165,233,0.25)]"
-                            : "border-white/5 hover:border-white/20 bg-white/5/50",
-                          isDubberView && "cursor-default"
-                        )}
-                      >
-                        <div className="flex items-center gap-3 text-xs tracking-[0.3em] uppercase text-slate-400">
-                          <span>#{i + 1}</span>
-                          <span className="font-semibold text-slate-300">{line.character}</span>
-                          {isDone && <span className="ml-auto text-emerald-400 tracking-normal">take salvo</span>}
-                        </div>
-                        <p
-                          className="mt-2 text-base leading-relaxed text-slate-100"
-                          style={{ fontSize: `${Math.max(16, scriptFontSize)}px` }}
-                        >
-                          {liveDrafts[i] || line.text}
-                        </p>
-                      </button>
-                    );
-                  })}
-                  {!displayedScriptLines.length && (
-                    <p className="text-sm text-muted-foreground">Nenhuma linha disponível.</p>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {isDirectorView && (
-              <section className="rounded-2xl border border-white/5 bg-white/5 backdrop-blur flex flex-col min-h-0 lg:col-start-2 lg:row-start-2">
-                <header className="p-4 pb-safe border-b border-white/5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">Takes</p>
-                      <h3 className="text-lg font-semibold">Pendentes</h3>
-                    </div>
-                    <button
-                      onClick={() => setRecordingsOpen(true)}
-                      className="h-10 px-3 rounded-lg bg-white/10 text-sm flex items-center gap-2"
-                    >
-                      <ListMusic className="w-4 h-4" />
-                      <span className="text-xs">Ver todos</span>
-                    </button>
-                  </div>
-                </header>
-                <div className="flex-1 overflow-y-auto p-4 pb-safe space-y-4">
-                  {reviewingTake ? (
-                    <div className="rounded-2xl border border-white/10 bg-black/30 p-5 shadow-xl space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
-                          <User className="w-5 h-5 text-white/70" />
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Linha #{(reviewingTake.lineIndex ?? 0) + 1}</p>
-                          <p className="text-base font-semibold text-white">{reviewingTake.characterName || "Personagem"}</p>
-                        </div>
-                        <span className="ml-auto text-sm text-white/70">{formatDurationLabel(Math.round(reviewingTake.duration || 0))}</span>
-                      </div>
-                      <div>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                          PENDENTE
-                        </span>
-                      </div>
-                      <DirectorReview
-                        mode="director"
-                        take={reviewingTake}
-                        isSaving={isDirectorSaving}
-                        isWaitingReview={isWaitingReview}
-                        onApprove={handleDirectorApprove}
-                        onReject={handleDirectorReject}
-                        data-testid="director-review-inline"
-                      />
-                      <div className="grid grid-cols-1 gap-3">
-                        <button
-                          onClick={handleDirectorApprove}
-                          disabled={isDirectorSaving}
-                          className="w-full h-14 rounded-xl bg-emerald-500/90 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-2"
-                        >
-                          <Check className="w-5 h-5" /> Aprovar
-                        </button>
-                        <button
-                          onClick={handleDirectorReject}
-                          disabled={isDirectorSaving}
-                          className="w-full h-14 rounded-xl bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold flex items-center justify-center gap-2"
-                        >
-                          <X className="w-5 h-5" /> Rejeitar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Nenhum take aguardando aprovação.</p>
-                  )}
-                </div>
-              </section>
-            )}
+            </div>
           </div>
         </div>
 
-        <div className="fixed bottom-4 right-4 w-64 max-w-[85vw] z-30 drop-shadow-2xl md:w-72 md:max-w-[90vw] md:bottom-8 md:right-8">
-          <DailyMeetPanel
-            sessionId={sessionId}
-            zIndexBase={UI_LAYER_BASE.chatPanel}
-            open={dailyMeetOpen}
-            onOpenChange={setDailyMeetOpen}
-            onStatusChange={setDailyStatus}
-            mode="floating"
-          />
+        {/* CENTER COLUMN - 30% - Script */}
+        <div className="w-[30%] flex flex-col border-r border-gray-200 bg-white">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900">Script</h2>
+            <span className="text-xs text-gray-500">{displayedScriptLines.length} lines</span>
+          </div>
+
+          <div ref={scriptViewportRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+            {displayedScriptLines.map((line, index) => {
+              const i = line.originalIndex;
+              const isActive = i === currentLine;
+              const isDone = savedTakes.has(i);
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => { setCurrentLine(i); if (canControlVideo) emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); }}
+                  disabled={!canControlVideo}
+                  className={cn(
+                    "w-full text-left p-4 rounded-lg border transition-all text-sm",
+                    isActive
+                      ? "border-blue-400 bg-blue-50 ring-1 ring-blue-400"
+                      : "border-gray-200 hover:border-gray-300 bg-white",
+                    isDone && "border-green-300 bg-green-50/50",
+                    !canControlVideo && "cursor-default"
+                  )}
+                >
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                    <span className="font-mono">#{i + 1}</span>
+                    <span className="font-medium text-gray-700">{line.character}</span>
+                    {isDone && <span className="ml-auto text-green-600 font-medium">✓ done</span>}
+                  </div>
+                  <p className="text-gray-800 leading-relaxed" style={{ fontSize: `${Math.max(14, scriptFontSize)}px` }}>
+                    {liveDrafts[i] || line.text}
+                  </p>
+                </button>
+              );
+            })}
+            {!displayedScriptLines.length && (
+              <p className="text-sm text-gray-500 text-center py-8">Nenhuma linha disponível.</p>
+            )}
+          </div>
+
+          {/* Script Action Buttons */}
+          <div className="p-4 border-t border-gray-100 space-y-2">
+            <button className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors">
+              <RotateCcw className="w-4 h-4" />
+              Re-record Note
+            </button>
+            <button className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors">
+              <Plus className="w-4 h-4" />
+              Add Note
+            </button>
+            <button className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors">
+              <ChevronRight className="w-4 h-4" />
+              View Alternate
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN - 20% - Chat & Characters */}
+        <div className="w-[20%] flex flex-col bg-gray-50">
+          {/* Live Chat */}
+          <div className="flex-1 flex flex-col bg-white border-b border-gray-200">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Live Chat
+              </h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Chat messages placeholder */}
+              <div className="flex items-start gap-2">
+                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-600">
+                  JD
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-gray-700">John Director</p>
+                  <p className="text-sm text-gray-600">Ready to start recording?</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2">
+                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-xs font-medium text-green-600">
+                  MS
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-gray-700">Maria Silva</p>
+                  <p className="text-sm text-gray-600">Yes, character selected!</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-3 border-t border-gray-100">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Type a message..."
+                  className="flex-1 px-3 py-2 bg-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Character List */}
+          <div className="h-1/2 flex flex-col bg-white">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Characters
+              </h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {charactersList.map((char: any) => (
+                <button
+                  key={char.id}
+                  onClick={() => handleCharacterChange(char)}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left",
+                    recordingProfile?.characterId === char.id
+                      ? "bg-blue-50 border border-blue-200"
+                      : "hover:bg-gray-50 border border-transparent"
+                  )}
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-medium">
+                    {char.name?.charAt(0) || "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{char.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{char.actor || "No actor"}</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+              ))}
+              {(!charactersList || charactersList.length === 0) && (
+                <p className="text-xs text-gray-500 text-center py-4">No characters</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
