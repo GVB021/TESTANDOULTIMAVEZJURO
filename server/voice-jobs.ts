@@ -7,6 +7,8 @@ import fs from "fs";
 import { requireAuth } from "./middleware/auth";
 import { storage } from "./storage";
 
+const MEDIA_PIPELINE_ENABLED = process.env.MEDIA_PIPELINE_ENABLED === "true";
+
 function safeAudioPath(audioUrl: string): string | null {
   const normalized = audioUrl.replace(/^\/+/, "");
   const resolved = path.resolve(process.cwd(), "public", normalized);
@@ -79,6 +81,21 @@ export function registerVoiceJobs(app: Express) {
         outputs: null,
       };
       fs.writeFileSync(voiceJobStatusPath(jobId), JSON.stringify(initialStatus, null, 2));
+
+      if (!MEDIA_PIPELINE_ENABLED) {
+        // Media pipeline disabled - return error status
+        const disabledStatus = {
+          job_id: jobId,
+          status: "failed",
+          step: "disabled",
+          progress: 1,
+          message: "Media pipeline is disabled",
+          error: "Media pipeline is disabled. Set MEDIA_PIPELINE_ENABLED=true to enable.",
+          outputs: null,
+        };
+        fs.writeFileSync(voiceJobStatusPath(jobId), JSON.stringify(disabledStatus, null, 2));
+        return res.json(disabledStatus);
+      }
 
       const workerScript = path.join(process.cwd(), "services", "media-pipeline", "voice_worker.py");
       const venvPython = path.join(process.cwd(), "services", "media-pipeline", ".venv", "bin", "python");
@@ -168,6 +185,21 @@ export function registerVoiceJobs(app: Express) {
         outputs: null,
       };
       fs.writeFileSync(voiceJobStatusPath(jobId), JSON.stringify(initialStatus, null, 2));
+
+      if (!MEDIA_PIPELINE_ENABLED) {
+        // Media pipeline disabled - return error status
+        const disabledStatus = {
+          job_id: jobId,
+          status: "failed",
+          step: "disabled",
+          progress: 1,
+          message: "Media pipeline is disabled",
+          error: "Media pipeline is disabled. Set MEDIA_PIPELINE_ENABLED=true to enable.",
+          outputs: null,
+        };
+        fs.writeFileSync(voiceJobStatusPath(jobId), JSON.stringify(disabledStatus, null, 2));
+        return res.json(disabledStatus);
+      }
 
       const workerScript = path.join(process.cwd(), "services", "media-pipeline", "voice_worker.py");
       const venvPython = path.join(process.cwd(), "services", "media-pipeline", ".venv", "bin", "python");
