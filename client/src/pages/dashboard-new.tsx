@@ -30,7 +30,9 @@ export default function Dashboard({ studioId }: { studioId: string }) {
   const studio = useStudio(studioId);
   const { data: productions } = useProductions(studioId);
   const { data: sessions } = useSessions(studioId);
-  const { canCreateProductions, canCreateSessions, isAdmin, isOwner } = useStudioRole(studioId);
+  const { canCreateProductions, canCreateSessions, role } = useStudioRole(studioId);
+  const isAdmin = role === 'admin' || role === 'owner';
+  const isOwner = role === 'owner';
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Calculate stats
@@ -43,7 +45,7 @@ export default function Dashboard({ studioId }: { studioId: string }) {
     return sessionDate.getMonth() === currentMonth && sessionDate.getFullYear() === currentYear;
   }).length || 0;
 
-  const totalTakes = sessions?.reduce((acc, s) => acc + (s.takesCount || 0), 0) || 0;
+  const totalTakes = sessions?.reduce((acc, s) => acc + ((s as any).takesCount || 0), 0) || 0;
   const activeProjects = productions?.filter(p => p.status !== 'completed').length || 0;
   const studioMembers = 5; // This would come from studio members API
 

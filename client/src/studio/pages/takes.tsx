@@ -532,6 +532,7 @@ const Takes = memo(function Takes({ studioId }: { studioId: string }) {
   const { hasMinRole } = useStudioRole(studioId);
   const { toast } = useToast();
   const isOwner = user?.role === "owner";
+  const isPlatformOwner = user?.role === "owner";
   const canManageAudio = hasMinRole("director");
   const hasAccess = isOwner || canManageAudio;
 

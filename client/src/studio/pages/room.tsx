@@ -347,6 +347,8 @@ export default function RecordingRoom() {
   const canViewOnlineUsers = hasUiPermission(uiRole, "presence_view");
   // Only director or text_controller (dubber with text released) can control video
   const canControlVideo = isDirector || uiRole === "text_controller";
+  const canAccessDashboard = hasUiPermission(uiRole, "dashboard_access") || isDirector || user?.role === "owner";
+  const isPrivileged = user?.role === "owner" || studioRole === "admin" || studioRole === "owner" || isDirector;
   const isDubberView = !isDirector && !canApproveTake;
   const isDirectorView = !isDubberView;
 

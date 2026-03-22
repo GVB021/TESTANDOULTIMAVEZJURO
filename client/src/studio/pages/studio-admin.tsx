@@ -55,6 +55,7 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
   const { canManageMembers } = useStudioRole(studioId);
   const { user } = useAuth();
   const isOwner = user?.role === "owner";
+  const isPlatformOwner = user?.role === "owner";
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string[]>>({});

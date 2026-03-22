@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, User } from 'lucide-react';
 import { useAuth } from '@studio/hooks/use-auth';
 import { Input } from '@studio/components/ui/input';
