@@ -7,7 +7,7 @@ nixPkgs = ["nodejs_20", "python311", "ffmpeg"]
 [phases.install]
 cmds = [
     "npm ci",
-    "pip3 install -r services/media-pipeline/requirements.txt"
+    "python3 -m pip install -r services/media-pipeline/requirements.txt"
 ]
 
 [phases.build]
