@@ -5,7 +5,16 @@ export async function authFetch(url: string, options: RequestInit = {}) {
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(url, { ...options, headers, credentials: "include" });
+  let res;
+  try {
+    res = await fetch(url, { ...options, headers, credentials: "include" });
+  } catch (fetchError) {
+    throw new Error("Falha na conexão. Verifique sua internet e tente novamente.");
+  }
+
+  if (!res) {
+    throw new Error("Resposta inválida do servidor");
+  }
 
   if (res.status === 401) {
     const { memoryNavigate } = await import("@studio/lib/memory-router");
