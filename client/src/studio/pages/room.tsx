@@ -237,6 +237,7 @@ export default function RecordingRoom() {
   const [recordingsOpen, setRecordingsOpen] = useState(false);
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
+  const [activeTab, setActiveTab] = useState("communication");
 
   // Session access state
   const [sessionAccessStatus, setSessionAccessStatus] = useState<{
@@ -2346,7 +2347,10 @@ export default function RecordingRoom() {
 
   return (
     <div
-      className="recording-room h-screen w-screen overflow-hidden flex flex-col select-none relative bg-white text-gray-900"
+      className={cn(
+        "recording-room h-screen w-screen overflow-hidden flex flex-col select-none relative bg-gray-50 text-gray-900",
+        recordingStatus === "recording" && "ring-2 ring-red-400"
+      )}
       onClickCapture={(event) => {
         const target = event.target as HTMLElement | null;
         const button = target?.closest?.("button") as HTMLButtonElement | null;
@@ -2357,6 +2361,12 @@ export default function RecordingRoom() {
         window.setTimeout(() => button.classList.remove("rr-click-blink"), 300);
       }}
     >
+      {/* Countdown Overlay */}
+      {recordingStatus === "countdown" && countdownValue > 0 && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center">
+          <div className="text-9xl font-bold text-white">{countdownValue}</div>
+        </div>
+      )}
 
       {isCustomizing && (
         <ShortcutsDialog
@@ -2443,55 +2453,63 @@ export default function RecordingRoom() {
         onEnded={handleRecordingsAudioEnded}
       />
 
-      {/* ===== TOP NAVIGATION BAR ===== */}
-      <nav className="h-14 bg-white border-b border-gray-200 flex items-center px-4 shrink-0 z-20">
-        <div className="flex items-center gap-2 mr-8">
+      {/* ===== DARK NAVBAR ===== */}
+      <nav className="h-12 bg-gray-950 flex items-center px-4 shrink-0 z-20">
+        {/* Left: Logo */}
+        <div className="flex items-center gap-3 mr-8">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
             <Mic className="w-4 h-4 text-white" />
           </div>
-          <span className="font-semibold text-gray-900">HubDub</span>
-        </div>
-        
-        <div className="flex items-center gap-1">
-          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
-            <span className="flex items-center gap-2">
-              <Home className="w-4 h-4" />
-              Home
-            </span>
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
-            <span className="flex items-center gap-2">
-              <Film className="w-4 h-4" />
-              Projects
-            </span>
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg transition-colors">
-            <span className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Communication
-            </span>
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
-            <span className="flex items-center gap-2">
-              <Wrench className="w-4 h-4" />
-              Tools
-            </span>
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
-            <span className="flex items-center gap-2">
-              <Settings className="w-4 h-4" />
-              Settings
-            </span>
-          </button>
-          <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors">
-            <span className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              Account/Billing
-            </span>
-          </button>
+          <div>
+            <span className="font-semibold text-white">HubDub</span>
+            <span className="text-xs text-gray-400 ml-2">Recording Room</span>
+          </div>
         </div>
 
-        <div className="ml-auto flex items-center gap-3">
+        {/* Center: Tabs */}
+        <div className="flex items-center gap-1 flex-1 justify-center">
+          {[
+            { id: "home", label: "Home", icon: Home },
+            { id: "projects", label: "Projects", icon: Film },
+            { id: "communication", label: "Communication", icon: MessageSquare },
+            { id: "tools", label: "Tools", icon: Wrench },
+            { id: "settings", label: "Settings", icon: Settings },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              className={cn(
+                "px-4 py-2 text-sm font-medium text-white transition-colors border-b-2",
+                activeTab === tab.id
+                  ? "border-white"
+                  : "border-transparent hover:text-gray-300"
+              )}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <span className="flex items-center gap-2">
+                <tab.icon className="w-4 h-4" />
+                {tab.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Right: Avatar with status */}
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-medium">
+              {user?.fullName?.charAt(0) || "U"}
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-950" />
+          </div>
+        </div>
+      </nav>
+
+      {/* ===== SESSION INFO BAR ===== */}
+      <div className="bg-white border-b border-gray-100 px-4 py-2 flex items-center justify-between shrink-0">
+        <p className="text-sm text-gray-500">
+          <span className="font-medium">Session:</span> {session?.title || "Session"} <span className="mx-2">|</span> <span className="font-medium">Project:</span> {production?.name || "Project"}
+        </p>
+        <div className="flex items-center gap-3">
           <span
             title={wsConnected ? "Conectado" : "Reconectando..."}
             className={cn("w-2 h-2 rounded-full shrink-0 transition-colors", wsConnected ? "bg-green-500" : "bg-yellow-400 animate-pulse")}
@@ -2504,7 +2522,7 @@ export default function RecordingRoom() {
             )}
           >
             <PhoneCall className="w-4 h-4" />
-            {dailyStatus === "conectado" ? "Waco Dots" : "Chat"}
+            {dailyStatus === "conectado" ? "Chat" : "Chat"}
           </button>
           <button
             onClick={() => setDeviceSettingsOpen(true)}
@@ -2513,29 +2531,17 @@ export default function RecordingRoom() {
             <Settings className="w-4 h-4" />
             Config
           </button>
-          <button
-            onClick={handleBack}
-            className="h-8 px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium"
-          >
-            Sair
-          </button>
+          <button onClick={handleBack} className="h-8 px-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium">Sair</button>
         </div>
-      </nav>
+      </div>
 
-      {/* ===== MAIN 3-COLUMN LAYOUT ===== */}
+      {/* ===== MAIN 2-COLUMN LAYOUT ===== */}
       <div className="flex-1 flex overflow-hidden bg-gray-50">
-        {/* LEFT COLUMN - 50% - Video & Transport */}
-        <div className="w-[50%] flex flex-col border-r border-gray-200 bg-white">
-          {/* Studio Header */}
-          <div className="px-6 py-4 border-b border-gray-100">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">{production?.studioName || "Studio"}</p>
-            <h1 className="text-lg font-semibold text-gray-900">{production?.name || "Production"}</h1>
-            <p className="text-sm text-gray-500">{session?.title || "Session"}</p>
-          </div>
-
+        {/* LEFT COLUMN - 60% */}
+        <div className="w-[60%] flex flex-col border-r border-gray-100 bg-white">
           {/* Video Player */}
-          <div className="flex-1 flex flex-col p-6">
-            <div className="flex-1 bg-black rounded-xl overflow-hidden shadow-lg">
+          <div className="flex-1 p-4 flex flex-col">
+            <div className="relative flex-1 bg-black rounded-lg overflow-hidden shadow-lg">
               <VideoPlayer
                 ref={videoRef}
                 src={production?.videoUrl}
@@ -2549,239 +2555,233 @@ export default function RecordingRoom() {
                 loopInfo={loopInfo}
                 className="w-full h-full"
               />
+              {/* Timecode Overlay */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white font-mono text-sm px-3 py-1 rounded">
+                {formatTimecodeByFormat(videoTime, "HH:MM:SS:FF", 24)}
+              </div>
             </div>
 
-            {/* Transport Controls */}
+            {/* Director Controls / Dubber Status */}
             <div className="mt-4 space-y-3">
-              {/* Timecode Display */}
-              <div className="flex items-center justify-center">
-                <div className="px-6 py-2 bg-gray-900 rounded-lg font-mono text-xl text-white tracking-wider">
-                  {formatTimecodeByFormat(videoTime, "HH:MM:SS:FF", 24)}
-                </div>
-              </div>
-
-              {/* Control Buttons */}
               {isDirectorView ? (
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    className={cn(
-                      "w-16 h-16 rounded-full flex items-center justify-center transition-all",
-                      recordingStatus === "recording"
-                        ? "bg-red-600 animate-pulse shadow-lg shadow-red-500/50"
-                        : "bg-red-500 hover:bg-red-600 shadow-lg"
-                    )}
-                    onClick={recordingStatus === "recording" ? handleStopRecording : startCountdown}
-                    disabled={!micReady || micInitializing}
-                  >
-                    <div className="w-4 h-4 rounded-full bg-white" />
-                  </button>
-                  <button
-                    className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
-                    onClick={handleStopRecording}
-                    disabled={recordingStatus !== "recording"}
-                  >
-                    <Square className="w-5 h-5 text-gray-700" />
-                  </button>
-                  <button
-                    className="w-12 h-12 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
-                    onClick={handlePlayPause}
-                  >
-                    {isPlaying ? <Pause className="w-5 h-5 text-gray-700" /> : <Play className="w-5 h-5 text-gray-700" />}
-                  </button>
-                  <button
-                    className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center transition-colors",
-                      isLooping ? "bg-blue-500 text-white" : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-                    )}
-                    onClick={handleLoopButton}
-                  >
-                    <Repeat className="w-5 h-5" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-3 py-4">
-                  <span className={cn("inline-flex items-center px-4 py-2 rounded-full text-sm font-medium", statusInfo.badge)}>
-                    {statusInfo.label}
-                  </span>
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Mic className="w-5 h-5" />
+                <>
+                  {/* Director Controls */}
+                  <div className="flex items-center justify-center gap-3">
+                    {/* REC Button */}
+                    <button
+                      className={cn(
+                        "flex items-center gap-2 px-4 h-10 rounded-lg font-bold text-white transition-all",
+                        recordingStatus === "recording"
+                          ? "bg-red-500 animate-pulse shadow-lg shadow-red-500/50"
+                          : "bg-red-500 hover:bg-red-600 shadow-lg"
+                      )}
+                      onClick={recordingStatus === "recording" ? handleStopRecording : startCountdown}
+                      disabled={!micReady || micInitializing}
+                    >
+                      <div className="w-2 h-2 rounded-full bg-white" />
+                      REC
+                    </button>
+                    {/* Stop */}
+                    <button
+                      className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                      onClick={handleStopRecording}
+                      disabled={recordingStatus !== "recording"}
+                    >
+                      <Square className="w-4 h-4 text-gray-700" />
+                    </button>
+                    {/* Play */}
+                    <button
+                      className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                      onClick={handlePlayPause}
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4 text-gray-700" /> : <Play className="w-4 h-4 text-gray-700" />}
+                    </button>
+                    {/* Loop */}
+                    <button
+                      className={cn(
+                        "w-10 h-10 rounded-lg border flex items-center justify-center transition-colors",
+                        isLooping ? "bg-blue-500 border-blue-500 text-white" : "border-gray-300 hover:bg-gray-50"
+                      )}
+                      onClick={handleLoopButton}
+                    >
+                      <Repeat className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {/* Timecode & Start Take */}
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="font-mono text-lg font-bold text-gray-900">
+                      {formatTimecodeByFormat(videoTime, "HH:MM:SS:FF", 24)}
                     </div>
-                    <span className="text-sm">Aguardando comando do diretor</span>
+                    <button
+                      onClick={recordingStatus === "recording" ? handleStopRecording : startCountdown}
+                      disabled={!micReady || micInitializing}
+                      className="px-4 h-10 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Iniciar Take
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Dubber Status */
+                <div className="flex flex-col items-center gap-3 py-2">
+                  <span className={cn(
+                    "inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium animate-pulse",
+                    recordingStatus === "recording" ? "bg-red-100 text-red-600" : "bg-gray-100 text-gray-500"
+                  )}>
+                    <div className={cn("w-2 h-2 rounded-full", recordingStatus === "recording" ? "bg-red-500" : "bg-gray-400")} />
+                    {recordingStatus === "recording" ? "GRAVANDO" : "AGUARDANDO"}
+                  </span>
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                    <Mic className="w-8 h-8 text-gray-400" />
                   </div>
                 </div>
               )}
-
-              {/* Seek Controls */}
-              {isDirectorView && (
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
-                    onClick={() => seek(-2)}
-                  >
-                    −2s
-                  </button>
-                  <button
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
-                    onClick={() => seek(-5)}
-                  >
-                    −5s
-                  </button>
-                  <button
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
-                    onClick={() => seek(5)}
-                  >
-                    +5s
-                  </button>
-                  <button
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors"
-                    onClick={() => seek(2)}
-                  >
-                    +2s
-                  </button>
-                </div>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* CENTER COLUMN - 30% - Script */}
-        <div className="w-[30%] flex flex-col border-r border-gray-200 bg-white">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="font-semibold text-gray-900">Script</h2>
-            <span className="text-xs text-gray-500">{displayedScriptLines.length} lines</span>
-          </div>
-
-          <div ref={scriptViewportRef} className="flex-1 overflow-y-auto p-4 space-y-2">
-            {displayedScriptLines.map((line, index) => {
-              const i = line.originalIndex;
-              const isActive = i === currentLine;
-              const isDone = savedTakes.has(i);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => { setCurrentLine(i); if (canControlVideo) emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); }}
-                  disabled={!canControlVideo}
-                  className={cn(
-                    "w-full text-left p-4 rounded-lg border transition-all text-sm",
-                    isActive
-                      ? "border-blue-400 bg-blue-50 ring-1 ring-blue-400"
-                      : "border-gray-200 hover:border-gray-300 bg-white",
-                    isDone && "border-green-300 bg-green-50/50",
-                    !canControlVideo && "cursor-default"
-                  )}
-                >
-                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                    <span className="font-mono">#{i + 1}</span>
-                    <span className="font-medium text-gray-700">{line.character}</span>
-                    {isDone && <span className="ml-auto text-green-600 font-medium">✓ done</span>}
-                  </div>
-                  <p className="text-gray-800 leading-relaxed" style={{ fontSize: `${Math.max(14, scriptFontSize)}px` }}>
-                    {liveDrafts[i] || line.text}
-                  </p>
-                </button>
-              );
-            })}
-            {!displayedScriptLines.length && (
-              <p className="text-sm text-gray-500 text-center py-8">Nenhuma linha disponível.</p>
-            )}
-          </div>
-
-          {/* Script Action Buttons */}
-          <div className="p-4 border-t border-gray-100 space-y-2">
-            <button className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors">
-              <RotateCcw className="w-4 h-4" />
-              Re-record Note
-            </button>
-            <button className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors">
-              <Plus className="w-4 h-4" />
-              Add Note
-            </button>
-            <button className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors">
-              <ChevronRight className="w-4 h-4" />
-              View Alternate
-            </button>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN - 20% - Chat & Characters */}
-        <div className="w-[20%] flex flex-col bg-gray-50">
-          {/* Live Chat */}
-          <div className="flex-1 flex flex-col bg-white border-b border-gray-200">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Live Chat
-              </h2>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {/* Chat messages placeholder */}
-              <div className="flex items-start gap-2">
-                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-xs font-medium text-blue-600">
-                  JD
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-gray-700">John Director</p>
-                  <p className="text-sm text-gray-600">Ready to start recording?</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2">
-                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-xs font-medium text-green-600">
-                  MS
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-gray-700">Maria Silva</p>
-                  <p className="text-sm text-gray-600">Yes, character selected!</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-3 border-t border-gray-100">
+          {/* Script Section */}
+          <div className="flex-1 flex flex-col border-t border-gray-100 min-h-0">
+            {/* Script Header */}
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900">Script</h2>
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  className="flex-1 px-3 py-2 bg-gray-100 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  <Send className="w-4 h-4" />
-                </button>
+                <button onClick={() => changeScriptFontSize(-1)} className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors text-xs font-bold">A-</button>
+                <button onClick={() => changeScriptFontSize(1)} className="p-1.5 text-gray-400 hover:text-gray-600 transition-colors text-sm font-bold">A+</button>
               </div>
+            </div>
+            {/* Script Lines */}
+            <div ref={scriptViewportRef} className="flex-1 overflow-y-auto p-4 space-y-2">
+              {displayedScriptLines.map((line) => {
+                const i = line.originalIndex;
+                const isActive = i === currentLine;
+                const isDone = savedTakes.has(i);
+                return (
+                  <div
+                    key={i}
+                    onClick={() => { setCurrentLine(i); if (canControlVideo) emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); }}
+                    className={cn(
+                      "w-full text-left p-3 rounded-lg transition-all cursor-pointer",
+                      isActive
+                        ? "bg-blue-50 border-l-4 border-blue-500 rounded-r-lg"
+                        : "hover:bg-gray-50",
+                      isDone && "bg-green-50/30"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="text-xs text-gray-400 font-mono w-8 shrink-0">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">{line.character}</p>
+                        <p className="text-base text-gray-900 leading-relaxed" style={{ fontSize: `${Math.max(14, scriptFontSize)}px` }}>
+                          {liveDrafts[i] || line.text}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Script Action Buttons */}
+            <div className="p-4 border-t border-gray-100 flex items-center gap-2">
+              <button className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5">
+                <RotateCcw className="w-4 h-4" />Regravar Nota
+              </button>
+              <button className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5">
+                <Edit3 className="w-4 h-4" />Adicionar Nota
+              </button>
+              <button className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5">
+                <ChevronRight className="w-4 h-4" />Ver Alternativo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN - 40% */}
+        <div className="w-[40%] flex flex-col bg-white p-4 gap-4 overflow-y-auto">
+          {/* Takes Panel */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-900">Takes</h2>
+              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">[{scopedRecordings.length || 0}]</span>
+            </div>
+            <div className="space-y-2 overflow-y-auto">
+              {scopedRecordings.slice(0, 5).map((take: any) => (
+                <div key={take.id} className="bg-white border border-gray-100 rounded-xl p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-medium">
+                      {take.characterName?.charAt(0) || "T"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm text-gray-900 truncate">Take #{take.takeNumber || 1}</p>
+                      <p className="text-xs text-gray-400">{take.startTc} - {take.endTc}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-xs font-medium",
+                      take.status === "approved" ? "bg-green-100 text-green-700" :
+                      take.status === "pending" ? "bg-amber-100 text-amber-700" :
+                      "bg-gray-100 text-gray-400"
+                    )}>
+                      {take.status === "approved" ? "APROVADO" : take.status === "pending" ? "PENDENTE" : "DESCARTADO"}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button className="w-8 h-8 bg-green-500 text-white rounded-lg flex items-center justify-center hover:bg-green-600 transition-colors">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button className="w-8 h-8 bg-red-500 text-white rounded-lg flex items-center justify-center hover:bg-red-600 transition-colors">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {scopedRecordings.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">Nenhum take gravado</p>
+              )}
             </div>
           </div>
 
-          {/* Character List */}
-          <div className="h-1/2 flex flex-col bg-white">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Characters
-              </h2>
+          {/* Participants Panel */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-semibold text-gray-900">Participantes</h2>
+              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">[{presenceUsers.length || 1}]</span>
             </div>
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {charactersList.map((char: any) => (
-                <button
-                  key={char.id}
-                  onClick={() => handleCharacterChange(char)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-2 rounded-lg transition-colors text-left",
-                    recordingProfile?.characterId === char.id
-                      ? "bg-blue-50 border border-blue-200"
-                      : "hover:bg-gray-50 border border-transparent"
-                  )}
-                >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-xs font-medium">
-                    {char.name?.charAt(0) || "?"}
+            <div className="space-y-2 overflow-y-auto">
+              {presenceUsers.map((u: any) => (
+                <div key={u.userId} className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
+                      {u.name?.charAt(0) || "U"}
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{char.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{char.actor || "No actor"}</p>
+                    <p className="font-medium text-sm text-gray-900 truncate">{u.name}</p>
+                    <span className={cn(
+                      "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium",
+                      u.role === "director" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"
+                    )}>
+                      {u.role === "director" ? "DIRETOR" : "VOICE ACTOR"}
+                    </span>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-400" />
-                </button>
+                </div>
               ))}
-              {(!charactersList || charactersList.length === 0) && (
-                <p className="text-xs text-gray-500 text-center py-4">No characters</p>
+              {presenceUsers.length === 0 && (
+                <div className="flex items-center gap-3 p-2">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-sm font-medium">
+                      {user?.fullName?.charAt(0) || "U"}
+                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-gray-900">{user?.fullName || "Você"}</p>
+                    <span className="inline-flex items-center px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs font-medium">
+                      {isDirectorView ? "DIRETOR" : "VOICE ACTOR"}
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -2798,14 +2798,12 @@ export default function RecordingRoom() {
               contentZIndex={UI_LAYER_BASE.mobileDrawerContent}
               items={mobileMenuItems}
             />
-
             <button
               onClick={() => setScriptOpen(true)}
-              className="fixed bottom-20 left-5 h-14 w-14 rounded-full flex items-center justify-center shadow-lg z-[90] room-bg-elevated backdrop-blur-md border border-border room-text-primary md:hidden"
+              className="fixed bottom-20 left-5 h-14 w-14 rounded-full flex items-center justify-center shadow-lg z-[90] bg-white border border-gray-200 md:hidden"
             >
               <Edit3 className="w-6 h-6" />
             </button>
-
             <MobileScriptDrawer
               open={scriptOpen}
               onOpenChange={setScriptOpen}
@@ -2837,15 +2835,10 @@ export default function RecordingRoom() {
         />
       )}
 
-      {/* Director Entry Modal and Blocking Overlay */}
+      {/* Director Entry Modal */}
       {isDirector && !directorControlConfirmed && (
-        <DirectorEntryModal
-          isOpen={true}
-          studioId={studioId}
-          onConfirm={() => setDirectorControlConfirmed(true)}
-        />
+        <DirectorEntryModal isOpen={true} studioId={studioId} onConfirm={() => setDirectorControlConfirmed(true)} />
       )}
-      
       {isControlBlocked && (
         <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center text-white">
@@ -2855,13 +2848,8 @@ export default function RecordingRoom() {
         </div>
       )}
 
-      {/* 🎙️ Hardware Setup Dialog */}
-      <HardwareSetupDialog
-        open={hardwareDialogOpen}
-        onOpenChange={setHardwareDialogOpen}
-        sessionId={sessionId || ""}
-      />
-
+      {/* Hardware Setup Dialog */}
+      <HardwareSetupDialog open={hardwareDialogOpen} onOpenChange={setHardwareDialogOpen} sessionId={sessionId || ""} />
     </div>
   );
 }
