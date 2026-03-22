@@ -864,6 +864,24 @@ export default function RecordingRoom() {
     isError: hasRecordingsError,
   } = useRecordingsList(sessionId, recordingsListParams);
   const recordingsList = recordingsResponse?.items || [];
+  const normalizedRecordings = useMemo(() => {
+    return Array.isArray(recordingsList) ? recordingsList : [];
+  }, [recordingsList]);
+  const scopedRecordings = useMemo(() => {
+    if (!onlySelectedCharacter || !recordingProfile?.characterName) {
+      return normalizedRecordings;
+    }
+
+    const targetCharacter = recordingProfile.characterName.trim().toLowerCase();
+    if (!targetCharacter) {
+      return normalizedRecordings;
+    }
+
+    return normalizedRecordings.filter((take: any) => {
+      const character = String(take?.characterName || take?.character || "").trim().toLowerCase();
+      return character === targetCharacter;
+    });
+  }, [normalizedRecordings, onlySelectedCharacter, recordingProfile?.characterName]);
 
   const savedTakes = useMemo(() => {
     const s = new Set<number>();
