@@ -41,20 +41,18 @@ const NAV: { id: Section; label: string; icon: React.ElementType }[] = [
   { id: "integrations", label: "API e Integracoes", icon: KeyRound },
 ];
 
-const ROLES = ["platform_owner", "user", "aluno"];
+const ROLES = ["owner", "user", "dubber"];
 
 const ALL_STUDIO_ROLES = [
-  { value: "studio_admin", label: "Admin Estudio" },
-  { value: "diretor", label: "Diretor" },
-  { value: "engenheiro_audio", label: "Engenheiro de Audio" },
-  { value: "dublador", label: "Dublador" },
-  { value: "aluno", label: "Aluno" },
+  { value: "admin", label: "Admin Estudio" },
+  { value: "director", label: "Diretor" },
+  { value: "dubber", label: "Dublador" },
 ];
 
 function roleBadgeVariant(role: string): "destructive" | "default" | "secondary" | "outline" {
-  if (role === "platform_owner") return "destructive";
-  if (role === "studio_admin") return "default";
-  if (role === "diretor") return "secondary";
+  if (role === "owner") return "destructive";
+  if (role === "admin") return "default";
+  if (role === "director") return "secondary";
   return "outline";
 }
 
@@ -128,9 +126,8 @@ function OverviewSection({ onNavigateSection, onCreateSession }: { onNavigateSec
   const totalDubbers = useMemo(() => {
     if (usersLoading) return "—";
     const isVoiceActor = (user: any) => {
-      if (user.role === "aluno") return true;
-      if (user.role === "dublador") return true;
-      return user.studioMemberships?.some((m: any) => m.roles?.includes("dublador"));
+      if (user.role === "dubber") return true;
+      return user.studioMemberships?.some((m: any) => m.roles?.includes("dubber"));
     };
     return usersList.filter((u: any) => u.status === "approved" && isVoiceActor(u)).length;
   }, [usersList, usersLoading]);
@@ -433,7 +430,7 @@ function PendingUsersSection() {
               onClick={() => approveUser && approveStudioId && approveMut.mutate({
                 userId: approveUser.id,
                 studioId: approveStudioId,
-                studioRoles: approveRoles.length > 0 ? approveRoles : ["dublador"],
+                studioRoles: approveRoles.length > 0 ? approveRoles : ["dubber"],
               })}
               disabled={!approveStudioId || approveMut.isPending}
               data-testid="button-confirm-approve"
@@ -610,7 +607,7 @@ function UsersSection() {
                     </td>
                     <td className="p-3 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        {user.role !== "platform_owner" && (
+                        {user.role !== "owner" && (
                           <Button size="icon" variant="ghost" title="Atribuir a estudio" onClick={() => { setAssignUser(user); setAssignStudioId(""); setAssignRoles([]); }} data-testid={`button-assign-user-${user.id}`}>
                             <Building2 className="h-3.5 w-3.5" />
                           </Button>
@@ -846,7 +843,7 @@ function StudiosSection() {
     refetchInterval: 5000,
   });
 
-  const approvedUsers = usersList.filter((u: any) => u.role !== "platform_owner" && u.status === "approved");
+  const approvedUsers = usersList.filter((u: any) => u.role !== "owner" && u.status === "approved");
 
   const createMut = useMutation({
     mutationFn: (data: { name: string; studioAdminUserId?: string }) =>
@@ -1868,14 +1865,13 @@ export default function Admin() {
   const { data: stats } = useQuery({
     queryKey: ["/api/admin/stats"],
     queryFn: () => authFetch("/api/admin/stats") as Promise<Record<string, number>>,
-    refetchInterval: 5000,
   });
 
   const pendingCount = stats?.pendingUsers ?? 0;
 
   if (!user) return null;
 
-  if (user.role !== "platform_owner") {
+  if (user.role !== "owner") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background space-y-4">
         <ShieldAlert className="w-12 h-12 text-destructive" />

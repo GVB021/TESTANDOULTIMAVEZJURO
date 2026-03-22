@@ -219,10 +219,10 @@ export class DatabaseStorage implements IStorage {
     const [membership] = await db.insert(studioMemberships).values({
       userId: adminUserId,
       studioId: newStudio.id,
-      role: 'studio_admin',
+      role: 'admin',
       status: 'approved'
     }).returning();
-    await db.insert(userStudioRoles).values({ membershipId: membership.id, role: 'studio_admin' });
+    await db.insert(userStudioRoles).values({ membershipId: membership.id, role: 'admin' });
     return newStudio;
   }
 
@@ -344,6 +344,22 @@ export class DatabaseStorage implements IStorage {
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
     const [newLog] = await db.insert(auditLog).values(log).returning();
     return newLog;
+  }
+
+  async createAuditLogWithActor(log: InsertAuditLog, actingUserId?: string): Promise<AuditLog> {
+    const newLog = { ...log, actingUserId };
+    const [createdLog] = await db.insert(auditLog).values(newLog).returning();
+    return createdLog;
+  }
+
+  async requireStudioAdmin(userId: string, studioId: string): Promise<boolean> {
+    const [membership] = await db.select().from(studioMemberships)
+      .where(and(eq(studioMemberships.studioId, studioId), eq(studioMemberships.userId, userId), eq(studioMemberships.role, 'admin')));
+    return !!membership;
+  }
+
+  async getStudioScoped<T>(studioId: string, queryBuilder: { where: (...args: any[]) => T }): T {
+    return queryBuilder.where(eq(studios.id, studioId));
   }
 
   async getStaff(studioId: string): Promise<Staff[]> {
@@ -483,6 +499,67 @@ export class DatabaseStorage implements IStorage {
     return this.takesWithDetails(eq(takes.sessionId, sessionId));
   }
 
+  async getSessionRecordingsPage(params: {
+    sessionId: string;
+    page: number;
+    pageSize: number;
+    search?: string;
+    userId?: string;
+  }): Promise<{ items: any[]; total: number; page: number; pageSize: number }> {
+    const { sessionId, page, pageSize, search, userId } = params;
+    const baseWhere = [eq(takes.sessionId, sessionId)];
+    if (userId) {
+      baseWhere.push(eq(takes.voiceActorId, userId));
+    }
+    if (search) {
+      const term = `%${search.toLowerCase()}%`;
+      baseWhere.push(sql`(lower(${characters.name}) LIKE ${term} OR lower(${takes.voiceActorName}) LIKE ${term} OR cast(${takes.lineIndex} as text) LIKE ${term})`);
+    }
+
+    const [totalRow] = await db
+      .select({ count: count() })
+      .from(takes)
+      .innerJoin(sessions, eq(takes.sessionId, sessions.id))
+      .leftJoin(characters, eq(takes.characterId, characters.id))
+      .where(and(...baseWhere));
+    const total = Number(totalRow?.count || 0);
+
+    const offset = (page - 1) * pageSize;
+    const items = await db
+      .select({
+        id: takes.id,
+        sessionId: takes.sessionId,
+        characterId: takes.characterId,
+        voiceActorId: takes.voiceActorId,
+        lineIndex: takes.lineIndex,
+        audioUrl: takes.audioUrl,
+        durationSeconds: takes.durationSeconds,
+        isPreferred: takes.isPreferred,
+        qualityScore: takes.qualityScore,
+        aiRecommended: takes.aiRecommended,
+        createdAt: takes.createdAt,
+        characterName: characters.name,
+        voiceActorName: sql<string>`COALESCE(NULLIF(${takes.voiceActorName}, ''), ${users.displayName})`,
+        sessionTitle: sessions.title,
+        productionId: sessions.productionId,
+        productionName: productions.name,
+        studioId: sessions.studioId,
+        studioName: studios.name,
+      })
+      .from(takes)
+      .innerJoin(sessions, eq(takes.sessionId, sessions.id))
+      .innerJoin(productions, eq(sessions.productionId, productions.id))
+      .innerJoin(studios, eq(sessions.studioId, studios.id))
+      .leftJoin(characters, eq(takes.characterId, characters.id))
+      .leftJoin(users, eq(takes.voiceActorId, users.id))
+      .where(and(...baseWhere))
+      .orderBy(desc(takes.createdAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    return { items, total, page, pageSize };
+  }
+
   async getProductionTakesWithDetails(productionId: string): Promise<any[]> {
     return this.takesWithDetails(eq(sessions.productionId, productionId));
   }
@@ -525,7 +602,7 @@ export class DatabaseStorage implements IStorage {
     const adminUserIds = Array.from(
       new Set(
         memberships
-          .filter((m) => m.role === "studio_admin" || roleMap.get(m.id)?.has("studio_admin"))
+          .filter((m) => m.role === "admin" || roleMap.get(m.id)?.has("admin"))
           .map((m) => m.userId),
       ),
     );

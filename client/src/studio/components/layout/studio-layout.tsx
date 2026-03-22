@@ -90,7 +90,7 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
               </div>
             )}
             
-            {user?.role === "platform_owner" && !isMobile && (
+            {user?.role === "owner" && !isMobile && (
               <Link to="/hub-dub/admin">
                 <button className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-full border border-border/60 bg-card/60 hover:bg-card" data-testid="button-header-admin">
                   <ShieldAlert className="h-3.5 w-3.5" />
@@ -145,7 +145,7 @@ export function StudioLayout({ studioId, children }: StudioLayoutProps) {
                   Trocar Estúdio
                 </button>
               </Link>
-              {user?.role === "platform_owner" && (
+              {user?.role === "owner" && (
                 <Link to="/hub-dub/admin" onClick={() => setIsMenuOpen(false)}>
                   <button className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground w-full transition-colors">
                     <ShieldAlert className="h-4 w-4" />

@@ -35,7 +35,7 @@ const Sessions = memo(function Sessions({ studioId }: { studioId: string }) {
   const { canCreateSessions, hasMinRole } = useStudioRole(studioId);
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const canDeleteSessions = user?.role === "platform_owner";
+  const canDeleteSessions = user?.role === "owner";
   const { data: storageOptions } = useQuery({
     queryKey: ["/api/storage/options"],
     queryFn: () => authFetch("/api/storage/options") as Promise<any>,

@@ -36,6 +36,20 @@ const lazyWithRetry = <T extends ComponentType<any>>(importer: () => Promise<{ d
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 const Landing = lazyWithRetry(() => import("@/components/presentation/PresentationLanding"));
 const HubAlign = lazyWithRetry(() => import("@/pages/hub-align"));
+// Platform Admin Pages
+const PlatformAdminLayout = lazyWithRetry(() => import("@/pages/platform-admin/layout"));
+const PlatformAdminOverview = lazyWithRetry(() => import("@/pages/platform-admin"));
+const PlatformAdminStudios = lazyWithRetry(() => import("@/pages/platform-admin/studios"));
+const PlatformAdminUsers = lazyWithRetry(() => import("@/pages/platform-admin/users"));
+const PlatformAdminMetrics = lazyWithRetry(() => import("@/pages/platform-admin/metrics"));
+// Studio Admin Pages
+const StudioAdminLayout = lazyWithRetry(() => import("@/pages/studio-admin/layout"));
+const StudioAdminOverview = lazyWithRetry(() => import("@/pages/studio-admin"));
+const StudioAdminMembers = lazyWithRetry(() => import("@/pages/studio-admin/members"));
+const StudioAdminProjects = lazyWithRetry(() => import("@/pages/studio-admin/projects"));
+const StudioAdminSessions = lazyWithRetry(() => import("@/pages/studio-admin/sessions"));
+const StudioAdminTakes = lazyWithRetry(() => import("@/pages/studio-admin/takes"));
+const StudioAdminSettings = lazyWithRetry(() => import("@/pages/studio-admin/settings"));
 // Studio Pages (imported from the HUBDUB-STUDIO folder)
 const Login = lazyWithRetry(() => import("@studio/pages/login"));
 const StudioSelect = lazyWithRetry(() => import("@studio/pages/studio-select"));
@@ -119,6 +133,80 @@ function Router() {
               className="w-full min-h-screen bg-background"
             >
               <HubAlign />
+            </motion.div>
+          </Route>
+
+          {/* Platform Admin Routes */}
+          <Route path="/platform-admin">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <PlatformAdminLayout>
+                <PlatformAdminOverview />
+              </PlatformAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/platform-admin/studios">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <PlatformAdminLayout>
+                <PlatformAdminStudios />
+              </PlatformAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/platform-admin/users">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <PlatformAdminLayout>
+                <PlatformAdminUsers />
+              </PlatformAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/platform-admin/metrics">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <PlatformAdminLayout>
+                <PlatformAdminMetrics />
+              </PlatformAdminLayout>
+            </motion.div>
+          </Route>
+
+          {/* Studio Admin Routes */}
+          <Route path="/studio-admin">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <StudioAdminLayout>
+                <StudioAdminOverview />
+              </StudioAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/studio-admin/members">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <StudioAdminLayout>
+                <StudioAdminMembers />
+              </StudioAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/studio-admin/projects">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <StudioAdminLayout>
+                <StudioAdminProjects />
+              </StudioAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/studio-admin/sessions">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <StudioAdminLayout>
+                <StudioAdminSessions />
+              </StudioAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/studio-admin/takes">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <StudioAdminLayout>
+                <StudioAdminTakes />
+              </StudioAdminLayout>
+            </motion.div>
+          </Route>
+          <Route path="/studio-admin/settings">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="w-full h-full">
+              <StudioAdminLayout>
+                <StudioAdminSettings />
+              </StudioAdminLayout>
             </motion.div>
           </Route>
 

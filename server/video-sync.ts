@@ -175,8 +175,8 @@ async function getWsIdentity(studioId: string, req: any) {
 
   let studioRole: string | null = null;
 
-  if (platformRole === "platform_owner") {
-    studioRole = "platform_owner";
+  if (platformRole === "owner") {
+    studioRole = "owner";
   } else {
     const studioMembership = await pool.query(
       `select coalesce(usr.role, sm.role) as role
@@ -184,11 +184,9 @@ async function getWsIdentity(studioId: string, req: any) {
        left join user_studio_roles usr on usr.membership_id = sm.id
        where sm.studio_id = $1 and sm.user_id = $2 and sm.status = 'approved'
        order by case
-         when coalesce(usr.role, sm.role) = 'studio_admin' then 1
-         when coalesce(usr.role, sm.role) = 'diretor' then 2
-         when coalesce(usr.role, sm.role) = 'engenheiro_audio' then 3
-         when coalesce(usr.role, sm.role) = 'dublador' then 4
-         when coalesce(usr.role, sm.role) = 'aluno' then 5
+         when coalesce(usr.role, sm.role) = 'admin' then 1
+         when coalesce(usr.role, sm.role) = 'director' then 2
+         when coalesce(usr.role, sm.role) = 'dubber' then 3
          else 99
        end
        limit 1`,
@@ -275,7 +273,9 @@ export function setupVideoSync(httpServer: Server) {
           return;
         }
 
-        console.log(`[WS] Recebido ${msg.type} de ${ws.name} (${ws.userId}) no estúdio ${roomKey}`);
+        if (process.env.WS_LOG_LEVEL === "debug") {
+          console.debug(`[WS] ${msg.type} de ${ws.name} (${ws.userId}) no estúdio ${roomKey}`);
+        }
 
         const isPrivileged = isPrivilegedStudioRole(ws.role);
         const controllerUserIds = getTextControllers(roomKey);
@@ -421,8 +421,8 @@ export function setupVideoSync(httpServer: Server) {
         if (msg.type === "video:take-decision") {
           // Apenas Diretores ou superior podem tomar decisão sobre take
           const hasDirectorRole = isDirectorRole(ws.role);
-          const isPlatformOwner = ws.role === "platform_owner";
-          if (!hasDirectorRole && !isPlatformOwner) {
+          const isOwner = ws.role === "owner";
+          if (!hasDirectorRole && !isOwner) {
             console.warn(`[WS] Decisão de take bloqueada para ${ws.name} (${ws.role})`);
             return;
           }
@@ -454,7 +454,7 @@ export function setupVideoSync(httpServer: Server) {
           const existing = locks.get(msg.lineIndex);
           
           const isDirector = isDirectorRole(ws.role);
-          const isOwner = ws.role === "platform_owner";
+          const isOwner = ws.role === "owner";
           const canForceUnlock = isDirector || isOwner;
 
           // Só quem bloqueou (ou admin/diretor) pode desbloquear

@@ -28,11 +28,9 @@ import { format } from "date-fns";
 import { Link } from "wouter";
 
 const STUDIO_ROLES = [
-  { value: "studio_admin", label: pt.roles.studio_admin },
-  { value: "diretor", label: pt.roles.diretor },
-  { value: "engenheiro_audio", label: pt.roles.engenheiro_audio },
-  { value: "dublador", label: pt.roles.dublador },
-  { value: "aluno", label: "Aluno" },
+  { value: "admin", label: pt.roles.admin },
+  { value: "director", label: pt.roles.director },
+  { value: "dubber", label: pt.roles.dubber },
 ];
 
 const PRODUCTION_STATUSES = [
@@ -56,7 +54,7 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
   const { toast } = useToast();
   const { canManageMembers } = useStudioRole(studioId);
   const { user } = useAuth();
-  const isPlatformOwner = user?.role === "platform_owner";
+  const isOwner = user?.role === "owner";
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   const [selectedRoles, setSelectedRoles] = useState<Record<string, string[]>>({});
@@ -353,7 +351,7 @@ const StudioAdmin = memo(function StudioAdmin({ studioId }: { studioId: string }
         subtitle="Gerencie membros, producoes e sessoes do seu estudio"
       />
 
-      {/* Admin Avançado Link - apenas para studio_admin */}
+      {/* Admin Avançado Link - apenas para admin */}
       {canManageMembers && (
         <div className="mb-6">
           <Link to={`/hub-dub/studio/${studioId}/admin/main`}>

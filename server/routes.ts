@@ -4,6 +4,14 @@ declare module "express" {
   interface Request {
     params: Record<string, string>;
   }
+
+async function resolveRecordingAccess(user: any, sessionId: string, studioId: string) {
+  const canManage = await canManageSessionTakes(user, sessionId, studioId);
+  return {
+    canManage,
+    restrictedVoiceActorId: canManage ? undefined : String(user.id || ""),
+  };
+}
 }
 import type { Server } from "http";
 import { storage } from "./storage";
@@ -171,7 +179,7 @@ function requirePlatformOwnerDelete(req: Request, res: Response) {
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
 
-  if (role !== "platform_owner" && !isMaster) {
+  if (role !== "owner" && !isMaster) {
     res.status(403).json({ message: "Somente PLATFORM_OWNER pode excluir recursos" });
     return false;
   }
@@ -407,7 +415,7 @@ async function verifyProductionAccess(req: Request, res: Response, productionId:
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
 
-  if (user.role === "platform_owner" || isMaster) return prod;
+  if (user.role === "owner" || isMaster) return prod;
   const hasAccess = await storage.verifyUserStudioAccess(user.id, prod.studioId);
   if (!hasAccess) { res.status(403).json({ message: "Acesso negado" }); return null; }
   return prod;
@@ -425,10 +433,10 @@ async function verifySessionAccess(req: Request, res: Response, sessionId: strin
   const now = new Date();
   const scheduledTime = new Date(session.scheduledAt);
   
-  // Permitir acesso para platform_owner, master e diretores mesmo antes do horário
-  const isAdmin = user.role === "platform_owner" || isMaster;
+  // Permitir acesso para owner, master e directores mesmo antes do horário
+  const isAdmin = user.role === "owner" || isMaster;
   const studioRoles = (await storage.getUserRolesInStudio(user.id, session.studioId)).map(normalizeStudioRole);
-  const isDirector = studioRoles.includes("diretor");
+  const isDirector = studioRoles.includes("director");
   
   if (!isAdmin && !isDirector && scheduledTime > now) {
     const timeUntilStart = scheduledTime.getTime() - now.getTime();
@@ -443,7 +451,7 @@ async function verifySessionAccess(req: Request, res: Response, sessionId: strin
     });
   }
 
-  if (user.role === "platform_owner" || isMaster) return session;
+  if (user.role === "owner" || isMaster) return session;
   const hasAccess = await storage.verifyUserStudioAccess(user.id, session.studioId);
   if (!hasAccess) { res.status(403).json({ message: "Acesso negado" }); return null; }
   return session;
@@ -454,14 +462,14 @@ async function canManageSessionTakes(user: any, sessionId: string, studioId: str
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
 
-  if (platformRole === "platform_owner" || isMaster) return true;
+  if (platformRole === "owner" || isMaster) return true;
   const studioRoles = (await storage.getUserRolesInStudio(user.id, studioId)).map(normalizeStudioRole);
-  if (studioRoles.includes("studio_admin")) return true;
+  if (studioRoles.includes("admin")) return true;
   const participants = await storage.getSessionParticipants(sessionId);
   const self = participants.find((p) => String(p.userId || "") === String(user.id || ""));
   if (!self) return false;
   const participantRole = normalizeStudioRole(self.role);
-  return participantRole === "diretor" || participantRole === "studio_admin" || participantRole === "platform_owner";
+  return participantRole === "director" || participantRole === "admin" || participantRole === "owner";
 }
 
 async function canAccessTake(user: any, take: any, sessionId: string, studioId: string): Promise<boolean> {
@@ -469,18 +477,18 @@ async function canAccessTake(user: any, take: any, sessionId: string, studioId: 
   const platformRole = normalizePlatformRole(user?.role);
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
-  if (platformRole === "platform_owner" || isMaster) return true;
+  if (platformRole === "owner" || isMaster) return true;
 
   // Studio admins have access
   const studioRoles = (await storage.getUserRolesInStudio(user.id, studioId)).map(normalizeStudioRole);
-  if (studioRoles.includes("studio_admin")) return true;
+  if (studioRoles.includes("admin")) return true;
 
   // Session directors have access
   const participants = await storage.getSessionParticipants(sessionId);
   const self = participants.find((p) => String(p.userId || "") === String(user.id || ""));
   if (!self) return false;
   const participantRole = normalizeStudioRole(self.role);
-  if (participantRole === "diretor") return true;
+  if (participantRole === "director") return true;
 
   // Take owner (who recorded) has access
   if (String(take.voiceActorId || "") === String(user.id || "")) return true;
@@ -659,10 +667,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const email = String(user?.email || "").toLowerCase().trim();
     const isMaster = email === "borbaggabriel@gmail.com";
 
-    if (normalizePlatformRole(user.role) === "platform_owner" || isMaster) {
+    if (normalizePlatformRole(user.role) === "owner" || isMaster) {
       const allStudios = await storage.getStudios();
       const studiosWithRoles = await Promise.all(
-        allStudios.map(async (s) => ({ ...s, userRoles: ["platform_owner"] }))
+        allStudios.map(async (s) => ({ ...s, userRoles: ["owner"] }))
       );
       return res.status(200).json(studiosWithRoles);
     }
@@ -681,7 +689,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const email = String(user?.email || "").toLowerCase().trim();
     const isMaster = email === "borbaggabriel@gmail.com";
 
-    const baseStudios = (normalizePlatformRole(user.role) === "platform_owner" || isMaster)
+    const baseStudios = (normalizePlatformRole(user.role) === "owner" || isMaster)
       ? await storage.getStudios()
       : await storage.getStudiosForUser(user.id);
     if (baseStudios.length === 0) {
@@ -737,7 +745,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch("/api/studios/:studioId/profile", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.patch("/api/studios/:studioId/profile", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const parsed = studioProfilePatchSchema.parse(req.body || {});
       const profile = await storage.upsertStudioProfile(req.params.studioId, parsed.data || {});
@@ -834,9 +842,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(200).json(members);
   });
 
-  app.post("/api/studios/:studioId/members/:membershipId/approve", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.post("/api/studios/:studioId/members/:membershipId/approve", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
-      const validRoles = z.enum(["studio_admin", "diretor", "dublador", "engenheiro_audio", "aluno"]);
+      const validRoles = z.enum(["admin", "director", "dubber"]);
       const body = z.object({
         role: validRoles.optional(),
         roles: z.array(validRoles).optional(),
@@ -864,7 +872,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/studios/:studioId/members/:membershipId/reject", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.post("/api/studios/:studioId/members/:membershipId/reject", requireAuth, requireStudioRole("admin"), async (req, res) => {
     const membership = await storage.getMembership(req.params.membershipId);
     if (!membership || membership.studioId !== req.params.studioId) {
       return res.status(404).json({ message: "Membro nao encontrado" });
@@ -883,7 +891,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // MEMBERS - UPDATE ROLES
-  app.put("/api/studios/:studioId/members/:membershipId/roles", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.put("/api/studios/:studioId/members/:membershipId/roles", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const { roles } = req.body;
       if (!Array.isArray(roles) || roles.length === 0) {
@@ -902,7 +910,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // MEMBERS - REMOVE
-  app.delete("/api/studios/:studioId/members/:membershipId", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.delete("/api/studios/:studioId/members/:membershipId", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       if (!requirePlatformOwnerDelete(req, res)) return;
       const membership = await storage.getMembership(req.params.membershipId);
@@ -930,7 +938,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     });
     const studioAdmins = await storage.getStudioMemberships(req.params.studioId);
     for (const m of studioAdmins) {
-      if (m.role === "studio_admin" || (req.studioRoles || []).includes("studio_admin")) {
+      if (m.role === "admin" || (req.studioRoles || []).includes("admin")) {
         await storage.createNotification({
           userId: m.userId,
           type: "join_request",
@@ -955,7 +963,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // STUDIO PENDING MEMBERS
-  app.get("/api/studios/:studioId/pending-members", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.get("/api/studios/:studioId/pending-members", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const pending = await storage.getPendingMembersForStudio(req.params.studioId);
       res.status(200).json(pending);
@@ -977,7 +985,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(200).json(prod);
   });
 
-  app.post("/api/studios/:studioId/productions", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.post("/api/studios/:studioId/productions", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const input = insertProductionSchema.parse({ ...req.body, studioId: req.params.studioId });
       const prod = await storage.createProduction(input);
@@ -987,7 +995,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch("/api/studios/:studioId/productions/:id", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.patch("/api/studios/:studioId/productions/:id", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const prod = await storage.getProduction(req.params.id);
       if (!prod) return res.status(404).json({ message: "Producao nao encontrada" });
@@ -999,7 +1007,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete("/api/studios/:studioId/productions/:id", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.delete("/api/studios/:studioId/productions/:id", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       if (!requirePlatformOwnerDelete(req, res)) return;
       const prod = await storage.getProduction(req.params.id);
@@ -1067,7 +1075,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(200).json(session);
   });
 
-  app.post("/api/studios/:studioId/sessions", requireAuth, requireStudioRole("studio_admin", "diretor"), async (req, res) => {
+  app.post("/api/studios/:studioId/sessions", requireAuth, requireStudioRole("admin", "director"), async (req, res) => {
     try {
       const userId = (req.user as any)?.id;
       const settings = await storage.getAllSettings();
@@ -1107,7 +1115,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.delete("/api/studios/:studioId/sessions/:id", requireAuth, requireStudioRole("studio_admin", "diretor"), async (req, res) => {
+  app.delete("/api/studios/:studioId/sessions/:id", requireAuth, requireStudioRole("admin", "director"), async (req, res) => {
     try {
       if (!requirePlatformOwnerDelete(req, res)) return;
       const session = await storage.getSession(req.params.id);
@@ -1119,7 +1127,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.patch("/api/studios/:studioId/sessions/:id", requireAuth, requireStudioRole("studio_admin", "diretor"), async (req, res) => {
+  app.patch("/api/studios/:studioId/sessions/:id", requireAuth, requireStudioRole("admin", "director"), async (req, res) => {
     try {
       const session = await storage.getSession(req.params.id);
       if (!session || session.studioId !== req.params.studioId) return res.status(404).json({ message: "Sessao nao encontrada" });
@@ -1138,7 +1146,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(200).json({ format });
   });
 
-  app.put("/api/studios/:studioId/timecode-format", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.put("/api/studios/:studioId/timecode-format", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const payload = z.object({
         format: z.enum(["HH:MM:SS", "HH:MM:SS:MMM", "HH:MM:SS:FF"]),
@@ -1157,7 +1165,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // STUDIO HARDWARE CONFIG
-  app.get("/api/studios/:studioId/hardware-config", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.get("/api/studios/:studioId/hardware-config", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const key = `studio_hardware_config_${req.params.studioId}`;
       const config = await storage.getSetting(key);
@@ -1179,7 +1187,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.put("/api/studios/:studioId/hardware-config", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.put("/api/studios/:studioId/hardware-config", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const payload = z.object({
         sampleRate: z.union([z.literal(44100), z.literal(48000)]),
@@ -1204,7 +1212,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // STUDIO MONITORING LOGS
-  app.get("/api/studios/:studioId/monitoring/logs", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.get("/api/studios/:studioId/monitoring/logs", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       // Get audit logs for this studio
       const auditLogs = await storage.getAuditLogs();
@@ -1256,7 +1264,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   });
 
   // STUDIO SESSIONS STATUS
-  app.get("/api/studios/:studioId/sessions/status", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.get("/api/studios/:studioId/sessions/status", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const sessions = await storage.getSessions(req.params.studioId);
       const sessionsWithStatus = sessions.map(session => ({
@@ -1291,9 +1299,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       // Verificar permissões especiais
       const email = String(user?.email || "").toLowerCase().trim();
       const isMaster = email === "borbaggabriel@gmail.com";
-      const isAdmin = user.role === "platform_owner" || isMaster;
+      const isAdmin = user.role === "owner" || isMaster;
       const studioRoles = (await storage.getUserRolesInStudio(user.id, session.studioId)).map(normalizeStudioRole);
-      const isDirector = studioRoles.includes("diretor");
+      const isDirector = studioRoles.includes("director");
       
       const hasSpecialAccess = isAdmin || isDirector;
       const canAccess = hasSpecialAccess || scheduledTime <= now;
@@ -1332,7 +1340,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const participant = await storage.addSessionParticipant({
         sessionId: req.params.sessionId,
         userId: req.body.userId || (req as any).user!.id,
-        role: req.body.role || "dublador",
+        role: req.body.role || "dubber",
       });
       res.status(201).json(participant);
     } catch (err) {
@@ -1608,29 +1616,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         sessionId: req.params.sessionId,
         userId: user.id,
       });
-      const canManage = await canManageSessionTakes(user, req.params.sessionId, session.studioId);
-      const takesList = annotateTakeVersions(await storage.getSessionTakesWithDetails(req.params.sessionId));
-      const scoped = canManage
-        ? takesList
-        : takesList.filter(
-        (take: any) => String(take.voiceActorId || "") === String(user.id || "") || String(take.userId || "") === String(user.id || "")
-      );
 
-      // Apply stricter access control - filter takes user shouldn't have access to
-      const filteredScoped = await Promise.all(
-        scoped.map(async (take: any) => {
-          const hasAccess = await canAccessTake(user, take, req.params.sessionId, session.studioId);
-          return hasAccess ? take : null;
-        })
-      );
-      const finalScoped = filteredScoped.filter(Boolean);
-      if (canManage) {
-        await storage.createAuditLog({
-          userId: user.id,
-          action: "recordings.access.privileged",
-          details: JSON.stringify({ sessionId: req.params.sessionId, count: finalScoped.length }),
-        });
-      }
       const query = z.object({
         page: z.coerce.number().int().min(1).optional(),
         pageSize: z.coerce.number().int().min(1).max(20).optional(),
@@ -1639,16 +1625,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }).parse(req.query);
       const page = query.page || 1;
       const pageSize = query.pageSize || 10;
-      const search = query.search?.toLowerCase().trim() || "";
-      const filtered = search
-        ? finalScoped.filter((take) =>
-          (take.characterName?.toLowerCase().includes(search) ?? false) ||
-          (take.voiceActorName?.toLowerCase().includes(search) ?? false) ||
-          (take.lineIndex?.toString().includes(search) ?? false)
-        )
-        : finalScoped;
-      const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-      res.status(200).json({ takes: paginated, total: filtered.length, page, pageSize });
+      const search = query.search?.trim();
+
+      const { canManage, restrictedVoiceActorId } = await resolveRecordingAccess(user, req.params.sessionId, session.studioId);
+      const effectiveUserId = canManage ? query.userId : restrictedVoiceActorId;
+
+      const result = await storage.getSessionRecordingsPage({
+        sessionId: req.params.sessionId,
+        page,
+        pageSize,
+        search,
+        userId: effectiveUserId,
+      });
+
+      const items = annotateTakeVersions(result.items);
+
+      if (canManage) {
+        await storage.createAuditLog({
+          userId: user.id,
+          action: "recordings.access.privileged",
+          details: JSON.stringify({ sessionId: req.params.sessionId, count: result.total }),
+        });
+      }
+
+      const pageCount = Math.max(1, Math.ceil(result.total / pageSize));
+      res.status(200).json({
+        items,
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+        pageCount,
+      });
     } catch (error: any) {
       logger.error("[Recordings] Database fetch failure", {
         sessionId: req.params.sessionId,
@@ -1667,7 +1674,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       if (!session) return;
       const user = (req as any).user!;
       const canManage = await canManageSessionTakes(user, takeRecord.sessionId, session.studioId);
-      if (!canManage) return res.status(403).json({ message: "Somente diretor pode aprovar takes" });
+      if (!canManage) return res.status(403).json({ message: "Somente director pode aprovar takes" });
       const take = await storage.setPreferredTake(req.params.id);
 
       await storage.createAuditLog({
@@ -1804,7 +1811,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const session = await storage.getSession(takeRecord.sessionId);
       
       // Allow Platform Owner OR Session Managers (Director/Admin) to delete
-      const isPlatformOwner = normalizePlatformRole(user.role) === "platform_owner" || isMasterEmail(user.email);
+      const isPlatformOwner = normalizePlatformRole(user.role) === "owner" || isMasterEmail(user.email);
       const canManage = session ? await canManageSessionTakes(user, takeRecord.sessionId, session.studioId) : false;
 
       if (!isPlatformOwner && !canManage) {
@@ -1842,12 +1849,12 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const user = (req as any).user!;
       const studioId = req.params.studioId;
-      if (user.role === "platform_owner") {
+      if (user.role === "owner") {
         const allTakes = await storage.getAllTakesGrouped();
         return res.status(200).json(allTakes);
       }
       const roles = await storage.getUserRolesInStudio(user.id, studioId);
-      if (!roles.includes("studio_admin")) {
+      if (!roles.includes("admin")) {
         return res.status(403).json({ message: "Acesso restrito a administradores" });
       }
       const studioTakes = await storage.getStudioTakesGrouped(studioId);
@@ -2011,7 +2018,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const takeList = await storage.getTakesByIds(takeIds);
       if (takeList.length === 0) return res.status(404).json({ message: "Takes nao encontrados" });
       const user = (req as any).user!;
-      if (user.role !== "platform_owner") {
+      if (user.role !== "owner") {
         const studioIds: string[] = [];
         const seen: Record<string, true> = {};
         for (const take of takeList as any[]) {
@@ -2023,7 +2030,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         }
         for (const sid of studioIds) {
           const roles = await storage.getUserRolesInStudio(user.id, sid as string);
-          if (!roles.includes("studio_admin")) {
+          if (!roles.includes("admin")) {
             return res.status(403).json({ message: "Acesso negado a takes de outro estudio" });
           }
         }
@@ -2064,9 +2071,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const takeList = await storage.getSessionTakesWithDetails(req.params.sessionId);
       if (takeList.length === 0) return res.status(404).json({ message: "Nenhum take nesta sessao" });
       const user = (req as any).user!;
-      if (user.role !== "platform_owner") {
+      if (user.role !== "owner") {
         const roles = await storage.getUserRolesInStudio(user.id, takeList[0].studioId);
-        if (!roles.includes("studio_admin")) {
+        if (!roles.includes("admin")) {
           return res.status(403).json({ message: "Acesso negado" });
         }
       }
@@ -2107,9 +2114,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const takeList = await storage.getProductionTakesWithDetails(req.params.productionId);
       if (takeList.length === 0) return res.status(404).json({ message: "Nenhum take nesta producao" });
       const user = (req as any).user!;
-      if (user.role !== "platform_owner") {
+      if (user.role !== "owner") {
         const roles = await storage.getUserRolesInStudio(user.id, takeList[0].studioId);
-        if (!roles.includes("studio_admin")) {
+        if (!roles.includes("admin")) {
           return res.status(403).json({ message: "Acesso negado" });
         }
       }
@@ -2151,7 +2158,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const production = await storage.getProduction(req.params.id);
       if (!production) return res.status(404).json({ message: "Producao nao encontrada" });
       const user = (req as any).user!;
-      if (user.role !== "platform_owner") {
+      if (user.role !== "owner") {
         const roles = await storage.getUserRolesInStudio(user.id, production.studioId);
         if (!roles || roles.length === 0) {
           return res.status(403).json({ message: "Acesso negado" });
@@ -2261,7 +2268,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.status(200).json(staffList);
   });
 
-  app.post("/api/studios/:studioId/staff", requireAuth, requireStudioRole("studio_admin"), async (req, res) => {
+  app.post("/api/studios/:studioId/staff", requireAuth, requireStudioRole("admin"), async (req, res) => {
     try {
       const newStaff = await storage.createStaff({ ...req.body, studioId: req.params.studioId });
       res.status(201).json(newStaff);
@@ -2450,13 +2457,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         const existingMembership = existingMemberships.find(m => m.studioId === studioId);
         let membershipId: string;
         if (existingMembership) {
-          await storage.updateMembershipStatus(existingMembership.id, "approved", studioRoles?.[0] || "dublador");
+          await storage.updateMembershipStatus(existingMembership.id, "approved", studioRoles?.[0] || "dubber");
           membershipId = existingMembership.id;
         } else {
           const newMembership = await storage.createMembership({
             userId: req.params.id,
             studioId,
-            role: studioRoles?.[0] || "dublador",
+            role: studioRoles?.[0] || "dubber",
             status: "approved",
           });
           membershipId = newMembership.id;
@@ -2494,11 +2501,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     try {
       const { role } = z.object({ role: z.string() }).parse(req.body);
       const target = await getUserById(req.params.id);
-      if (target && isMasterEmail(target.email) && role !== "platform_owner") {
-        return res.status(403).json({ message: "Usuario master nao pode perder privilegio de platform_owner" });
+      if (target && isMasterEmail(target.email) && role !== "owner") {
+        return res.status(403).json({ message: "Usuario master nao pode perder privilegio de owner" });
       }
-      if (role === "platform_owner" && !isMasterEmail((req as any).user?.email)) {
-        return res.status(403).json({ message: "Somente o master admin pode conceder platform_owner" });
+      if (role === "owner" && !isMasterEmail((req as any).user?.email)) {
+        return res.status(403).json({ message: "Somente o master admin pode conceder owner" });
       }
       const user = await storage.updateUser(req.params.id, { role });
       await logAdminAction(req, "CHANGE_ROLE", `Alterou papel do usuario ${req.params.id} para ${role}`);
@@ -2546,8 +2553,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         delete patch.status;
         delete patch.email;
       }
-      if (patch.role === "platform_owner" && !isMasterEmail((req as any).user?.email)) {
-        return res.status(403).json({ message: "Somente o master admin pode conceder platform_owner" });
+      if (patch.role === "owner" && !isMasterEmail((req as any).user?.email)) {
+        return res.status(403).json({ message: "Somente o master admin pode conceder owner" });
       }
       const user = await storage.updateUser(req.params.id, patch);
       await logAdminAction(req, "UPDATE_USER", `Atualizou usuario ${req.params.id}`);
@@ -2581,11 +2588,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const existing = existingMemberships.find((m) => m.studioId === payload.studioId);
       let membershipId = "";
       if (existing) {
-        const primaryRole = payload.roles?.[0] || existing.role || "dublador";
+        const primaryRole = payload.roles?.[0] || existing.role || "dubber";
         await storage.updateMembershipStatus(existing.id, "approved", primaryRole);
         membershipId = existing.id;
       } else {
-        const primaryRole = payload.roles?.[0] || "dublador";
+        const primaryRole = payload.roles?.[0] || "dubber";
         const created = await storage.createMembership({
           userId: req.params.id,
           studioId: payload.studioId,
@@ -2594,7 +2601,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         });
         membershipId = created.id;
       }
-      const normalizedRoles = payload.roles?.length ? payload.roles : ["dublador"];
+      const normalizedRoles = payload.roles?.length ? payload.roles : ["dubber"];
       await storage.setUserStudioRoles(membershipId, normalizedRoles);
       await storage.createNotification({
         userId: req.params.id,

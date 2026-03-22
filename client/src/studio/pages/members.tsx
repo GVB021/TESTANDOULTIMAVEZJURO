@@ -18,11 +18,9 @@ import { useToast } from "@studio/hooks/use-toast";
 import { useStudioRole } from "@studio/hooks/use-studio-role";
 
 const STUDIO_ROLES = [
-  { value: "studio_admin", label: pt.roles.studio_admin },
-  { value: "diretor", label: pt.roles.diretor },
-  { value: "engenheiro_audio", label: pt.roles.engenheiro_audio },
-  { value: "dublador", label: pt.roles.dublador },
-  { value: "aluno", label: pt.roles.aluno },
+  { value: "admin", label: pt.roles.admin },
+  { value: "director", label: pt.roles.director },
+  { value: "dubber", label: pt.roles.dubber },
 ];
 
 const Members = memo(function Members({ studioId }: { studioId: string }) {

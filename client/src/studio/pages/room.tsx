@@ -11,6 +11,10 @@ import {
   Edit3,
   ListMusic,
   Video,
+  Mic,
+  PhoneCall,
+  Check,
+  X,
 } from "lucide-react";
 import { HardwareSetupDialog } from "@studio/components/hardware/HardwareSetupDialog";
 import { useHardwareControl } from "@studio/hooks/use-hardware-control";
@@ -63,9 +67,8 @@ import { VideoPlayer } from "@studio/components/room/video/VideoPlayer";
 import { DirectorReview, ShortcutsDialog, DiscardTakeModal, TextControlPopup } from "@studio/components/room/modals";
 import { RoomHeader } from "@studio/components/room/header/RoomHeader";
 import { RoomHeaderActions } from "@studio/components/room/header/RoomHeaderActions";
-import { MobileMenu, MobileScriptDrawer, MobileFooterControls } from "@studio/components/room/mobile";
-import { DesktopScriptColumn, ScriptLineRow } from "@studio/components/room/script";
-import { DesktopControlsBar } from "@studio/components/room/controls";
+import { MobileMenu, MobileScriptDrawer } from "@studio/components/room/mobile";
+import { ScriptLineRow } from "@studio/components/room/script";
 import { CountdownOverlay, DirectorConsole, DirectorEntryModal } from "@studio/components/room/overlays";
 import { RecordingsPanel } from "@studio/components/room/recordings";
 import { RecordingProfilePanel } from "@studio/components/room/profile";
@@ -283,6 +286,18 @@ export default function RecordingRoom() {
   const [loopAnchorIndex, setLoopAnchorIndex] = useState<number | null>(null);
   const [textControllerUserIds, setTextControllerUserIds] = useState<Set<string>>(new Set());
   const [recordingsPlayerOpenId, setRecordingsPlayerOpenId] = useState<string | null>(null);
+  const statusInfo = useMemo(() => {
+    switch (recordingStatus) {
+      case "countdown":
+        return { label: "Contagem", badge: "bg-amber-500/15 text-amber-300 border border-amber-500/30" };
+      case "recording":
+        return { label: "GRAVANDO", badge: "bg-red-500/15 text-red-400 border border-red-500/30" };
+      case "recorded":
+        return { label: "Take registrado", badge: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30" };
+      default:
+        return { label: "Aguardando", badge: "bg-muted/30 text-muted-foreground border border-white/10" };
+    }
+  }, [recordingStatus]);
 
   // Loop state
   const [isLooping, setIsLooping] = useState(false);
@@ -332,10 +347,12 @@ export default function RecordingRoom() {
   const canViewOnlineUsers = hasUiPermission(uiRole, "presence_view");
   // Only director or text_controller (dubber with text released) can control video
   const canControlVideo = isDirector || uiRole === "text_controller";
+  const isDubberView = !isDirector && !canApproveTake;
+  const isDirectorView = !isDubberView;
 
   // Mobile detection
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
@@ -577,10 +594,19 @@ export default function RecordingRoom() {
             try {
               const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
               if (audioContext.state !== "closed") {
-                playCountdownBeep(audioContext);
+                playCountdownBeep(audioContext, { volume: 0.09 });
               }
             } catch (error) {
               console.warn("[Room] Failed to create AudioContext for countdown beep:", error);
+            }
+          } else if (msg.count === 0) {
+            try {
+              const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+              if (audioContext.state !== "closed") {
+                playCountdownBeep(audioContext, { frequency: 660, duration: 0.18, volume: 0.06, type: "triangle" });
+              }
+            } catch (error) {
+              console.warn("[Room] Failed to create AudioContext for countdown final beep:", error);
             }
           }
         } else if (msg.type === "video:loop-preparing") {
@@ -825,12 +851,19 @@ export default function RecordingRoom() {
   }, [scriptLines, onlySelectedCharacter, recordingProfile?.characterName]);
 
   const { data: takesList = [] } = useTakesList(sessionId);
+  const recordingsListParams = useMemo(() => ({
+    page: 1,
+    pageSize: 10,
+    sortBy: "createdAt" as const,
+    sortDir: "desc" as const,
+    search: "",
+  }), []);
   const {
     data: recordingsResponse,
     error: recordingsError,
     isError: hasRecordingsError,
-  } = useRecordingsList(sessionId);
-  const recordingsList = recordingsResponse?.takes || [];
+  } = useRecordingsList(sessionId, recordingsListParams);
+  const recordingsList = recordingsResponse?.items || [];
 
   const savedTakes = useMemo(() => {
     const s = new Set<number>();
@@ -847,7 +880,7 @@ export default function RecordingRoom() {
   const handleDiscardTake = useCallback(async (take: any) => {
     const takeId = String(take.id);
     const rawRole = String(user?.role || "").trim().toLowerCase();
-    const canDeletePermanently = rawRole === "platform_owner" || rawRole === "master";
+    const canDeletePermanently = rawRole === "owner" || rawRole === "master";
     const takesQueryKey = ["/api/sessions", sessionId, "takes"] as const;
     const recordingsQueryKey = ["/api/sessions", sessionId, "recordings"] as const;
     const previousTakes = queryClient.getQueryData(takesQueryKey);
@@ -978,18 +1011,6 @@ export default function RecordingRoom() {
   }, []);
 
   const mySessionRole = useMemo(() => {
-    const participantRole = session?.participants?.find((p: any) => p.userId === user?.id)?.role;
-    if (participantRole) return normalizeRoomRole(participantRole);
-    return normalizeRoomRole(user?.role);
-  }, [session?.participants, user?.id, user?.role]);
-  const isPlatformOwner = useMemo(() => {
-    const rawRole = String(user?.role || "").trim().toLowerCase();
-    return rawRole === "platform_owner" || rawRole === "master" || rawRole === "admin";
-  }, [user?.role]);
-  const canDiscardTake = isPlatformOwner;
-  const canAccessDashboard = hasUiPermission(uiRole, "dashboard_access");
-  const isPrivileged = canManageAudio || canTextControl;
-  const scopedRecordings = useMemo(() => {
     const source = Array.isArray(recordingsList) ? recordingsList : [];
     return [...source].sort((a: any, b: any) => new Date(String(b.createdAt || 0)).getTime() - new Date(String(a.createdAt || 0)).getTime());
   }, [recordingsList]);
@@ -1512,40 +1533,26 @@ export default function RecordingRoom() {
     emitVideoEvent("play", { currentTime: prerollStart });
     emitVideoEvent("countdown-start", { initiatorUserId: user?.id, count: 3 });
     
-    if (micState?.audioContext) playCountdownBeep(micState.audioContext);
-    
-    // Audio starts at second 1 of preroll (1s after preroll begins)
-    const captureDelay = prerollStart < currentLineTime ? 1000 : 0;
-    const captureTimeout = window.setTimeout(async () => {
-      if (micState) {
-        await startCapture(micState);
-        setRecordingStatus("recording");
-      } else {
-        console.warn("Iniciando gravação sem micState - pode não funcionar");
-        setRecordingStatus("idle");
-      }
-    }, captureDelay);
-    
     if (countdownTimerRef.current) window.clearInterval(countdownTimerRef.current);
     let count = 3;
     
     countdownTimerRef.current = window.setInterval(() => {
       count -= 1;
-      setCountdownValue(Math.max(0, count));
-      emitVideoEvent("countdown-tick", { count: Math.max(0, count), initiatorUserId: user?.id });
+      const nextCount = Math.max(0, count);
+      setCountdownValue(nextCount);
+      emitVideoEvent("countdown-tick", { count: nextCount, initiatorUserId: user?.id });
       
-      if (count > 0 && micState?.audioContext) {
-        playCountdownBeep(micState.audioContext);
-      }
-      
-      if (count <= 0 && countdownTimerRef.current) {
-        window.clearInterval(countdownTimerRef.current);
+      if (nextCount === 0) {
+        window.clearInterval(countdownTimerRef.current!);
         countdownTimerRef.current = null;
+        if (micState) {
+          startCapture(micState).then(() => setRecordingStatus("recording"));
+        } else {
+          console.warn("Iniciando gravação sem micState - pode não funcionar");
+          setRecordingStatus("idle");
+        }
       }
     }, 1000);
-    
-    // Store timeout so we can cancel it if recording is stopped early
-    (countdownTimerRef as any)._captureTimeout = captureTimeout;
   }, [recordingStatus, micState, micReady, micInitializing, emitVideoEvent, logAudioStep, user?.id, recordingProfile, currentLine, scriptLines, mySessionRole, toast]);
 
   const handleDirectorApprove = useCallback(async () => {
@@ -1564,6 +1571,13 @@ export default function RecordingRoom() {
       setIsDirectorSaving(false);
     }
   }, [reviewingTake, emitVideoEvent, user?.id, toast]);
+
+  const formatDurationLabel = useCallback((seconds: number) => {
+    const s = Math.max(0, Math.floor(seconds));
+    const m = Math.floor(s / 60);
+    const sec = String(s % 60).padStart(2, "0");
+    return m > 0 ? `${m}m ${sec}s` : `${s}s`;
+  }, []);
 
   const handleDirectorReject = useCallback(async () => {
     if (!reviewingTake) return;
@@ -2311,8 +2325,8 @@ export default function RecordingRoom() {
       {/* Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/12 via-background to-background"></div>
-        <div className="absolute -top-28 right-[-12rem] w-[34rem] h-[34rem] rounded-full bg-primary/10 blur-3xl opacity-70" />
-        <div className="absolute -bottom-24 left-[-8rem] w-[26rem] h-[26rem] rounded-full bg-primary/8 blur-3xl opacity-70" />
+        <div className="absolute -top-28 right-[-12rem] w-[34rem] h-[34rem] rounded-full bg-primary/10 blur-3xl opacity-70 md:w-[28rem] md:h-[28rem]" />
+        <div className="absolute -bottom-24 left-[-8rem] w-[26rem] h-[26rem] rounded-full bg-primary/8 blur-3xl opacity-70 md:w-[20rem] md:h-[20rem]" />
       </div>
 
       {isCustomizing && (
@@ -2427,6 +2441,7 @@ export default function RecordingRoom() {
             />
             <RoomHeaderActions
               isMobile={isMobile}
+              isDubberView={isDubberView}
               recordingStatus={recordingStatus}
               canViewOnlineUsers={canViewOnlineUsers}
               canTextControl={canTextControl}
@@ -2445,296 +2460,211 @@ export default function RecordingRoom() {
         }
       />
 
-      {isMobile && (
-        <DailyMeetPanel
-          sessionId={sessionId}
-          zIndexBase={UI_LAYER_BASE.chatPanel}
-          open={dailyMeetOpen}
-          onOpenChange={setDailyMeetOpen}
-          onStatusChange={setDailyStatus}
-          mode="floating"
-        />
-      )}
-
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* ── MOBILE LAYOUT ── portrait: video → controls → script strip */}
-        {isMobile && (
-          <div className="flex-1 flex flex-col overflow-hidden landscape:flex-row">
-            {/* Video */}
-            <div className="shrink-0 bg-black landscape:flex-1">
-              <VideoPlayer
-                ref={videoRef}
-                src={production?.videoUrl}
-                isMuted={isMuted}
-                onMuteToggle={() => setIsMuted((m) => !m)}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onTimeUpdate={setVideoTime}
-                onDurationChange={setVideoDuration}
-                countdownValue={countdownValue}
-                volumeOverlay={null}
-                loopInfo={loopInfo}
-                className="w-full aspect-video"
-              />
-            </div>
-
-            {/* Controls bar — between video and script on portrait */}
-            <div className="shrink-0 landscape:hidden">
-              <MobileFooterControls
-                controlsVisible={true}
-                isLooping={isLooping}
-                isPlaying={isPlaying}
-                recordingStatus={recordingStatus}
-                micReady={micReady}
-                isSaving={isSaving}
-                loopSelectionMode={loopSelectionMode}
-                customLoop={customLoop}
-                videoTime={videoTime}
-                videoDuration={videoDuration}
-                formatTimecode={formatLiveTimecode}
-                onVisibilityChange={setControlsVisible}
-                onSeekBack={() => seek(-2)}
-                onRecordOrStop={handleRecordOrStop}
-                onPlayPause={handlePlayPause}
-                onScrub={scrub}
-                onLoop={handleLoopButton}
-                onRecord={startCountdown}
-                onStopRecord={handleStopRecording}
-              />
-            </div>
-
-            {/* Inline script strip (portrait) + landscape right column */}
-            <div className="flex-1 overflow-y-auto landscape:w-[40%] landscape:shrink-0 landscape:border-l landscape:border-border/40" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
-              {displayedScriptLines.map((line) => {
-                const i = line.originalIndex;
-                const isActive = i === currentLine;
-                const isDone = savedTakes.has(i);
-                return (
-                  <div
-                    key={i}
-                    data-line-index={i}
-                    onClick={() => { if (canControlVideo) { setCurrentLine(i); emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); } }}
-                    className={cn(
-                      "px-4 py-3 border-b border-border/20 transition-colors",
-                      isActive ? "bg-primary/10 border-l-2 border-l-primary" : "active:bg-muted/30",
-                      isDone && "opacity-70"
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-[10px] font-mono text-muted-foreground/60">#{i + 1}</span>
-                      <span className={cn("text-[11px] font-bold uppercase tracking-widest", isActive ? "text-primary" : "text-muted-foreground")}>
-                        {line.character}
-                      </span>
-                      {isDone && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-                    </div>
-                    <p
-                      className={cn("leading-snug text-sm", isActive ? "text-foreground font-medium" : "text-muted-foreground")}
-                      style={{ fontSize: `${scriptFontSize}px` }}
-                    >
-                      {liveDrafts[i] || line.text}
-                    </p>
-                  </div>
-                );
-              })}
-              {displayedScriptLines.length === 0 && (
-                <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">Nenhuma linha no roteiro</div>
-              )}
-            </div>
-
-            {/* Landscape: controls overlay at bottom of video column */}
-            <div className="hidden landscape:flex landscape:absolute landscape:bottom-0 landscape:left-0 landscape:right-[40%] landscape:z-20">
-              <MobileFooterControls
-                controlsVisible={controlsVisible}
-                isLooping={isLooping}
-                isPlaying={isPlaying}
-                recordingStatus={recordingStatus}
-                micReady={micReady}
-                isSaving={isSaving}
-                loopSelectionMode={loopSelectionMode}
-                customLoop={customLoop}
-                videoTime={videoTime}
-                videoDuration={videoDuration}
-                formatTimecode={formatLiveTimecode}
-                onVisibilityChange={setControlsVisible}
-                onSeekBack={() => seek(-2)}
-                onRecordOrStop={handleRecordOrStop}
-                onPlayPause={handlePlayPause}
-                onScrub={scrub}
-                onLoop={handleLoopButton}
-                onRecord={startCountdown}
-                onStopRecord={handleStopRecording}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* ── DESKTOP LAYOUT ── */}
-        {!isMobile && <div 
-          className="flex-1 grid overflow-hidden transition-[grid-template-columns] duration-75"
-          style={{ gridTemplateColumns: `1fr ${sideScriptWidth}px` }}
-        >
-          {/* Coluna Principal: Video + Texto Sincronizado */}
-          <div ref={desktopVideoTextContainerRef} className="flex flex-col min-h-0 relative bg-black/40">
-            <VideoPlayer
-              ref={videoRef}
-              src={production?.videoUrl}
-              isMuted={isMuted}
-              onMuteToggle={() => setIsMuted((m) => !m)}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-              onTimeUpdate={setVideoTime}
-              onDurationChange={setVideoDuration}
-              countdownValue={countdownValue}
-              volumeOverlay={null}
-              loopInfo={loopInfo}
-              className="min-h-[220px]"
-              height={`${desktopVideoTextSplit}%`}
-            />
-
-            {!isMobile && (
-              <DesktopControlsBar
-                isPlaying={isPlaying}
-                isLooping={isLooping}
-                recordingStatus={recordingStatus}
-                micReady={micReady}
-                isSaving={isSaving}
-                micInitializing={micInitializing}
-                videoTime={videoTime}
-                videoDuration={videoDuration}
-                formatTimecode={formatLiveTimecode}
-                onSeekBack={() => seek(-2)}
-                onPlayPause={handlePlayPause}
-                onSeekForward={() => seek(2)}
-                onScrub={scrub}
-                onLoop={handleLoopButton}
-                onRecord={startCountdown}
-                onStopRecord={handleStopRecording}
-                canControlVideo={canControlVideo}
-              />
+        <div className="flex-1 overflow-auto px-4 md:px-8 py-6 pb-safe md:py-10">
+          <div
+            className={cn(
+              "grid gap-6 min-h-[calc(100vh-88px)]",
+              isDirectorView ? "lg:grid-cols-[2fr_1fr]" : "lg:grid-cols-1",
+              "grid-cols-1"
             )}
-
-            {!isMobile && (
-              <div
-                onPointerDown={() => setIsDraggingVideoTextSplit(true)}
-                className={cn(
-                  "h-2 w-full cursor-row-resize flex items-center justify-center transition-all group z-30 relative",
-                  isDraggingVideoTextSplit ? "bg-primary" : "room-bg-surface hover:bg-primary/50"
-                )}
-                aria-label="Redimensionar roteiro (máx 50%)"
-                data-testid="video-text-resizer"
-              >
-                <div className={cn(
-                  "w-12 h-0.5 rounded-full transition-all",
-                  isDraggingVideoTextSplit ? "bg-white" : "bg-muted-foreground/30 group-hover:bg-white"
-                )} />
-                {isDraggingVideoTextSplit && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-lg">
-                    {Math.round(100 - desktopVideoTextSplit)}%
-                  </div>
-                )}
+          >
+            <section className="space-y-4">
+              <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 px-4 py-3">
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">Status</p>
+                  <p className="text-2xl font-semibold text-foreground">{statusInfo.label}</p>
+                </div>
+                <span className={cn("px-3 py-1 rounded-full text-xs font-semibold", statusInfo.badge)}>{statusInfo.label}</span>
               </div>
-            )}
-            {!isMobile && (
-              <div
-                className="border-t border-border min-h-[220px] room-bg-subtle"
-                style={{ height: `${100 - desktopVideoTextSplit}%` }}
-              >
-                <DailyMeetPanel
-                  sessionId={sessionId}
-                  open={dailyMeetOpen}
-                  onOpenChange={setDailyMeetOpen}
-                  mode="embedded"
+              <div className="rounded-2xl border border-white/5 bg-black/40 overflow-hidden">
+                <VideoPlayer
+                  ref={videoRef}
+                  src={production?.videoUrl}
+                  isMuted={isMuted}
+                  onMuteToggle={() => setIsMuted((m) => !m)}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onTimeUpdate={setVideoTime}
+                  onDurationChange={setVideoDuration}
+                  countdownValue={countdownValue}
+                  loopInfo={loopInfo}
+                  className="w-full aspect-[16/9]"
                 />
+                {isDirectorView ? (
+                  <div className="p-4 border-t border-white/5 bg-black/40 backdrop-blur">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex gap-2">
+                        <button className="flex-1 h-12 rounded-lg bg-white/10 text-sm font-medium" onClick={() => seek(-2)}>−2s</button>
+                        <button className="flex-1 h-12 rounded-lg bg-white/10 text-sm font-medium" onClick={handlePlayPause}>{isPlaying ? "Pausar" : "Play"}</button>
+                        <button className="flex-1 h-12 rounded-lg bg-white/10 text-sm font-medium" onClick={() => seek(2)}>+2s</button>
+                      </div>
+                      <button
+                        className={cn(
+                          "w-full h-14 rounded-xl text-base font-bold uppercase tracking-wide disabled:opacity-50 bg-rose-500 text-white",
+                          recordingStatus === "recording" && "shadow-[0_0_35px_rgba(244,63,94,0.5)] animate-pulse"
+                        )}
+                        onClick={recordingStatus === "recording" ? handleStopRecording : startCountdown}
+                        disabled={!micReady || micInitializing}
+                      >
+                        {recordingStatus === "recording" ? "Parar" : "Gravar"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 border-t border-white/5 bg-black/40 text-center space-y-3">
+                    <span className={cn("inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold", statusInfo.badge)}>
+                      {statusInfo.label}
+                    </span>
+                    <div className="flex flex-col items-center gap-2 text-slate-100">
+                      <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
+                        <Mic className="w-7 h-7 text-white/80" />
+                      </div>
+                      <p className="text-sm text-slate-200">Aguardando comando do diretor</p>
+                    </div>
+                  </div>
+                )}
               </div>
+              {pendingTake && isDubberView && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                  Seu take está aguardando revisão do diretor.
+                </div>
+              )}
+            </section>
+
+            <section
+              className={cn(
+                "rounded-2xl border border-white/5 bg-white/5 backdrop-blur flex flex-col min-h-0",
+                isDirectorView ? "lg:col-start-2 lg:row-start-1" : undefined
+              )}
+            >
+              <header className="p-4 pb-safe border-b border-white/5">
+                <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">Roteiro</p>
+                <h3 className="text-lg font-semibold">Script sincronizado</h3>
+              </header>
+              <div className="relative flex-1">
+                <span className="absolute left-5 top-4 bottom-4 w-px bg-white/5" aria-hidden />
+                <div ref={scriptViewportRef} className="flex-1 overflow-y-auto p-4 pl-7 pb-safe space-y-3">
+                  {displayedScriptLines.map((line) => {
+                    const i = line.originalIndex;
+                    const isActive = i === currentLine;
+                    const isDone = savedTakes.has(i);
+                    return (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => { setCurrentLine(i); if (canControlVideo) emitVideoEvent("seek", { currentTime: scriptLines[i]?.start ?? 0 }); }}
+                        disabled={!canControlVideo}
+                        className={cn(
+                          "w-full text-left p-4 rounded-xl border transition shadow-sm",
+                          isActive
+                            ? "border-primary/40 bg-primary/5 ring-2 ring-primary/40 shadow-[0_0_25px_rgba(14,165,233,0.25)]"
+                            : "border-white/5 hover:border-white/20 bg-white/5/50",
+                          isDubberView && "cursor-default"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 text-xs tracking-[0.3em] uppercase text-slate-400">
+                          <span>#{i + 1}</span>
+                          <span className="font-semibold text-slate-300">{line.character}</span>
+                          {isDone && <span className="ml-auto text-emerald-400 tracking-normal">take salvo</span>}
+                        </div>
+                        <p
+                          className="mt-2 text-base leading-relaxed text-slate-100"
+                          style={{ fontSize: `${Math.max(16, scriptFontSize)}px` }}
+                        >
+                          {liveDrafts[i] || line.text}
+                        </p>
+                      </button>
+                    );
+                  })}
+                  {!displayedScriptLines.length && (
+                    <p className="text-sm text-muted-foreground">Nenhuma linha disponível.</p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {isDirectorView && (
+              <section className="rounded-2xl border border-white/5 bg-white/5 backdrop-blur flex flex-col min-h-0 lg:col-start-2 lg:row-start-2">
+                <header className="p-4 pb-safe border-b border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.35em] text-muted-foreground">Takes</p>
+                      <h3 className="text-lg font-semibold">Pendentes</h3>
+                    </div>
+                    <button
+                      onClick={() => setRecordingsOpen(true)}
+                      className="h-10 px-3 rounded-lg bg-white/10 text-sm flex items-center gap-2"
+                    >
+                      <ListMusic className="w-4 h-4" />
+                      <span className="text-xs">Ver todos</span>
+                    </button>
+                  </div>
+                </header>
+                <div className="flex-1 overflow-y-auto p-4 pb-safe space-y-4">
+                  {reviewingTake ? (
+                    <div className="rounded-2xl border border-white/10 bg-black/30 p-5 shadow-xl space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
+                          <User className="w-5 h-5 text-white/70" />
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Linha #{(reviewingTake.lineIndex ?? 0) + 1}</p>
+                          <p className="text-base font-semibold text-white">{reviewingTake.characterName || "Personagem"}</p>
+                        </div>
+                        <span className="ml-auto text-sm text-white/70">{formatDurationLabel(Math.round(reviewingTake.duration || 0))}</span>
+                      </div>
+                      <div>
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          PENDENTE
+                        </span>
+                      </div>
+                      <DirectorReview
+                        mode="director"
+                        take={reviewingTake}
+                        isSaving={isDirectorSaving}
+                        isWaitingReview={isWaitingReview}
+                        onApprove={handleDirectorApprove}
+                        onReject={handleDirectorReject}
+                        data-testid="director-review-inline"
+                      />
+                      <div className="grid grid-cols-1 gap-3">
+                        <button
+                          onClick={handleDirectorApprove}
+                          disabled={isDirectorSaving}
+                          className="w-full h-14 rounded-xl bg-emerald-500/90 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-2"
+                        >
+                          <Check className="w-5 h-5" /> Aprovar
+                        </button>
+                        <button
+                          onClick={handleDirectorReject}
+                          disabled={isDirectorSaving}
+                          className="w-full h-14 rounded-xl bg-rose-500/20 text-rose-200 border border-rose-500/40 font-semibold flex items-center justify-center gap-2"
+                        >
+                          <X className="w-5 h-5" /> Rejeitar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nenhum take aguardando aprovação.</p>
+                  )}
+                </div>
+              </section>
             )}
-
           </div>
-
-          {/* Coluna do Roteiro (Opcional/Lateral no Desktop) */}
-          {!isMobile && (
-            <DesktopScriptColumn
-              viewportRef={scriptViewportRef}
-              onScroll={() => { scrollSyncCurrentRef.current = scriptViewportRef.current?.scrollTop || 0; }}
-              isDragging={isDraggingSideScript}
-              sideScriptWidth={sideScriptWidth}
-              onResizePointerDown={() => setIsDraggingSideScript(true)}
-              lineCount={scriptLines.length}
-              scriptFontSize={scriptFontSize}
-              onFontSizeChange={changeScriptFontSize}
-              onFontSizeExact={setScriptFontSizeExact}
-              lineKeys={displayedScriptLines.map((l) => l.originalIndex)}
-              renderLine={(i) => {
-                const line = displayedScriptLines.find((l) => l.originalIndex === i);
-                if (!line) return null;
-                return (
-                  <ScriptLineRow
-                    key={i}
-                    line={line}
-                    currentLine={currentLine}
-                    savedTakes={savedTakes}
-                    customLoop={customLoop}
-                    lockedLines={lockedLines}
-                    liveDrafts={liveDrafts}
-                    presenceUsers={presenceUsers}
-                    userId={user?.id}
-                    canTextControl={canTextControl}
-                    scriptFontSize={scriptFontSize}
-                    formatTimecode={formatLiveTimecode}
-                    editingField={editingField}
-                    editingDraftValue={editingDraftValue}
-                    lineEditHistory={lineEditHistory}
-                    lineRef={(el) => { lineRefs.current[i] = el; }}
-                    onLineClick={handleLineClick}
-                    onEditDraftChange={setEditingDraftValue}
-                    onStartEdit={startInlineEdit}
-                    onCancelEdit={cancelInlineEdit}
-                    onSaveEdit={saveInlineEdit}
-                  />
-                );
-              }}
-            />
-          )}
-        </div>}
-
-        {/* 🎙️ Popup de Revisão do Diretor — apenas diretor vê */}
-        <AnimatePresence>
-          {reviewingTake && (isDirector || canApproveTake) && (
-            <DirectorReview
-              mode="director"
-              take={reviewingTake}
-              isSaving={isDirectorSaving}
-              isWaitingReview={isWaitingReview}
-              onApprove={handleDirectorApprove}
-              onReject={handleDirectorReject}
-            />
-          )}
-        </AnimatePresence>
-
-        {/* 🎙️ Preview do Dublador — apenas dublador vê após gravar */}
-        <AnimatePresence>
-          {pendingTake && !canApproveTake && (
-            <DirectorReview
-              mode="dubber"
-              take={{
-                audioUrl: pendingTake.url,
-                duration: pendingTake.durationSeconds,
-                durationSeconds: pendingTake.durationSeconds,
-                metrics: pendingTake.metrics,
-              }}
-              isSaving={isSaving}
-              isWaitingReview={isWaitingReview}
-              onApprove={handleApproveTake}
-              onDiscard={() => {
-                if (pendingTake?.url) URL.revokeObjectURL(pendingTake.url);
-                setPendingTake(null);
-                setRecordingStatus("idle");
-                setIsWaitingReview(false);
-              }}
-            />
-          )}
-        </AnimatePresence>
-
         </div>
+
+        <div className="fixed bottom-4 right-4 w-64 max-w-[85vw] z-30 drop-shadow-2xl md:w-72 md:max-w-[90vw] md:bottom-8 md:right-8">
+          <DailyMeetPanel
+            sessionId={sessionId}
+            zIndexBase={UI_LAYER_BASE.chatPanel}
+            open={dailyMeetOpen}
+            onOpenChange={setDailyMeetOpen}
+            onStatusChange={setDailyStatus}
+            mode="floating"
+          />
+        </div>
+      </div>
 
       <AnimatePresence>
         {isMobile && (
@@ -2749,9 +2679,9 @@ export default function RecordingRoom() {
 
             <button
               onClick={() => setScriptOpen(true)}
-              className="fixed bottom-20 left-5 h-12 w-12 rounded-full flex items-center justify-center shadow-lg z-[90] room-bg-elevated backdrop-blur-md border border-border room-text-primary"
+              className="fixed bottom-20 left-5 h-14 w-14 rounded-full flex items-center justify-center shadow-lg z-[90] room-bg-elevated backdrop-blur-md border border-border room-text-primary md:hidden"
             >
-              <Edit3 className="w-5 h-5" />
+              <Edit3 className="w-6 h-6" />
             </button>
 
             <MobileScriptDrawer

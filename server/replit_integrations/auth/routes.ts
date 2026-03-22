@@ -64,13 +64,13 @@ async function seedPlatformOwner() {
         fullName: "Gabriel Borba",
         displayName: "Gabriel Borba",
         artistName: "Master Admin",
-        role: "platform_owner",
+        role: "owner",
         status: "approved",
       });
       logger.info("Platform owner account created: borbaggabriel@gmail.com");
     } else {
-      if (existing.role !== "platform_owner") {
-        await authStorage.updateUserRole(existing.id, "platform_owner");
+      if (existing.role !== "owner") {
+        await authStorage.updateUserRole(existing.id, "owner");
       }
       if (existing.status !== "approved") {
         await authStorage.updateUserStatus(existing.id, "approved");
@@ -102,7 +102,7 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(401).json({ message: info?.message || "Email ou senha incorretos" });
       }
 
-      if (user.status === "pending" && user.role !== "platform_owner") {
+      if (user.status === "pending" && user.role !== "owner") {
         return res.status(403).json({ message: "pending", status: "pending" });
       }
       if (user.status === "rejected") {
@@ -117,7 +117,7 @@ export function registerAuthRoutes(app: Express): void {
         let autoEntryMode: "redirect" | "select" = "select";
 
         try {
-          const baseStudios = normalizePlatformRole(user.role) === "platform_owner"
+          const baseStudios = normalizePlatformRole(user.role) === "owner"
             ? await storage.getStudios()
             : await storage.getStudiosForUser(user.id);
           studioCount = baseStudios.length;
@@ -175,7 +175,7 @@ export function registerAuthRoutes(app: Express): void {
 
       try {
         const allUsers = await storage.getAllUsers();
-        const owners = allUsers.filter((u: any) => u.role === "platform_owner");
+        const owners = allUsers.filter((u: any) => u.role === "owner");
         for (const owner of owners) {
           await storage.createNotification({
             userId: owner.id,
@@ -265,7 +265,7 @@ export function registerAuthRoutes(app: Express): void {
       const membership = await storage.createMembership({
         userId: user.id,
         studioId,
-        role: "dublador",
+        role: "dubber",
         status: "approved",
       });
 

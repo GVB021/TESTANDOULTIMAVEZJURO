@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { authFetch } from "@studio/lib/auth-fetch";
+import { DEFAULT_PAGINATION } from "@studio/lib/pagination";
 
 export function useSessionData(studioId: string, sessionId: string) {
   return useQuery({
@@ -56,14 +57,16 @@ export type RecordingsResponse = {
 
 export function useRecordingsList(sessionId: string, params: RecordingsQueryParams) {
   const cacheKey = `vhub_recordings_cache_${sessionId}`;
+  const page = params.page || DEFAULT_PAGINATION.page;
+  const pageSize = params.pageSize || DEFAULT_PAGINATION.pageSize;
   const query = useQuery({
     queryKey: ["/api/sessions", sessionId, "recordings", params],
     queryFn: async () => {
       console.debug("[Room][Recordings] iniciando leitura de takes", { sessionId });
       try {
         const queryString = new URLSearchParams();
-        queryString.set("page", String(params.page || 1));
-        queryString.set("pageSize", String(params.pageSize || 20));
+        queryString.set("page", String(page));
+        queryString.set("pageSize", String(pageSize));
         queryString.set("sortBy", params.sortBy);
         queryString.set("sortDir", params.sortDir);
         if (params.search) queryString.set("search", params.search);
@@ -72,13 +75,15 @@ export function useRecordingsList(sessionId: string, params: RecordingsQueryPara
         if (params.to) queryString.set("to", params.to);
         const data = await authFetch(`/api/sessions/${sessionId}/recordings?${queryString.toString()}`);
         const normalized: RecordingsResponse = Array.isArray(data)
-          ? { items: data, page: 1, pageSize: data.length || 20, total: data.length || 0, pageCount: 1 }
+          ? { items: data, page, pageSize: data.length || pageSize, total: data.length || 0, pageCount: 1 }
           : {
               items: Array.isArray(data?.items) ? data.items : Array.isArray(data?.takes) ? data.takes : [],
-              page: Number(data?.page || 1),
-              pageSize: Number(data?.pageSize || 20),
+              page: Number(data?.page || page),
+              pageSize: Number(data?.pageSize || pageSize),
               total: Number(data?.total || 0),
-              pageCount: Number(data?.pageCount || Math.ceil((data?.total || 0) / (data?.pageSize || 20)) || 1),
+              pageCount: Number(
+                data?.pageCount || Math.ceil((data?.total || 0) / (data?.pageSize || pageSize)) || 1
+              ),
             };
         console.debug("[Room][Recordings] takes carregados", { sessionId, total: normalized.total });
         return normalized;
@@ -95,13 +100,19 @@ export function useRecordingsList(sessionId: string, params: RecordingsQueryPara
         const items = raw ? JSON.parse(raw) : [];
         return {
           items,
-          page: 1,
-          pageSize: 20,
+          page: DEFAULT_PAGINATION.page,
+          pageSize: DEFAULT_PAGINATION.pageSize,
           total: Array.isArray(items) ? items.length : 0,
           pageCount: 1,
         };
       } catch {
-        return { items: [], page: 1, pageSize: 20, total: 0, pageCount: 1 };
+        return {
+          items: [],
+          page: DEFAULT_PAGINATION.page,
+          pageSize: DEFAULT_PAGINATION.pageSize,
+          total: 0,
+          pageCount: 1,
+        };
       }
     },
     staleTime: 1000,

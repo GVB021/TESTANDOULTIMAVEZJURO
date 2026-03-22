@@ -140,9 +140,9 @@ export function registerVoiceJobs(app: Express) {
       const take: any = takeList[0];
 
       const user = (req as any).user!;
-      if (user.role !== "platform_owner") {
+      if (user.role !== "owner") {
         const roles = await storage.getUserRolesInStudio(user.id, take.studioId);
-        const isStudioAdmin = Array.isArray(roles) && roles.includes("studio_admin");
+        const isStudioAdmin = Array.isArray(roles) && roles.includes("admin");
         const isOwner = take.voiceActorId === user.id;
         if (!isStudioAdmin && !isOwner) {
           return res.status(403).json({ message: "Acesso negado" });

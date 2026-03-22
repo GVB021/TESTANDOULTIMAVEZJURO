@@ -1,59 +1,58 @@
-export const PLATFORM_ROLES = ["platform_owner", "user"] as const;
+export const PLATFORM_ROLES = ["owner", "user"] as const;
 export type PlatformRole = (typeof PLATFORM_ROLES)[number];
 
 export const STUDIO_ROLES = [
-  "platform_owner",
-  "studio_admin",
-  "diretor",
-  "engenheiro_audio",
-  "dublador",
-  "aluno",
+  "owner",
+  "admin", 
+  "director",
+  "dubber",
 ] as const;
 export type StudioRole = (typeof STUDIO_ROLES)[number];
 
 export const STUDIO_ROLE_HIERARCHY: Record<StudioRole, number> = {
-  platform_owner: 100,
-  studio_admin: 80,
-  diretor: 60,
-  engenheiro_audio: 40,
-  dublador: 20,
-  aluno: 10,
+  owner: 100,
+  admin: 80,
+  director: 60,
+  dubber: 20,
 };
 
 const PLATFORM_ROLE_ALIASES: Record<string, PlatformRole> = {
-  platformowner: "platform_owner",
-  platform_owner: "platform_owner",
-  master: "platform_owner",
-  admin: "platform_owner",
-  administrador: "platform_owner",
-  administrator: "platform_owner",
-  super_admin: "platform_owner",
-  platform_admin: "platform_owner",
-  owner: "platform_owner",
+  owner: "owner",
+  platformowner: "owner",
+  platform_owner: "owner",
+  master: "owner",
+  admin: "owner",
+  administrador: "owner",
+  administrator: "owner",
+  super_admin: "owner",
+  platform_admin: "owner",
   user: "user",
 };
 
 const STUDIO_ROLE_ALIASES: Record<string, StudioRole> = {
-  platformowner: "platform_owner",
-  platform_owner: "platform_owner",
-  studio_admin: "studio_admin",
-  adminstudio: "studio_admin",
-  admin: "studio_admin",
-  administrador: "studio_admin",
-  administrator: "studio_admin",
-  master: "studio_admin",
-  diretor: "diretor",
-  director: "diretor",
-  teacher: "diretor",
-  engenheiro_audio: "engenheiro_audio",
-  engenheriodeaudio: "engenheiro_audio",
-  audio_engineer: "engenheiro_audio",
-  engineer: "engenheiro_audio",
-  dublador: "dublador",
-  actor: "dublador",
-  voice_actor: "dublador",
-  aluno: "aluno",
-  student: "aluno",
+  owner: "owner",
+  platformowner: "owner",
+  platform_owner: "owner",
+  admin: "admin",
+  studio_admin: "admin",
+  studioowner: "admin",
+  studio_owner: "admin",
+  administrador: "admin",
+  administrator: "admin",
+  master: "admin",
+  diretor: "director",
+  director: "director",
+  teacher: "director",
+  dublador: "dubber",
+  actor: "dubber",
+  voice_actor: "dubber",
+  dubber: "dubber",
+  engenheiro_audio: "dubber",
+  engenheriodeaudio: "dubber",
+  audio_engineer: "dubber",
+  engineer: "dubber",
+  aluno: "dubber",
+  student: "dubber",
 };
 
 export function normalizePlatformRole(role: unknown): PlatformRole {
@@ -63,11 +62,11 @@ export function normalizePlatformRole(role: unknown): PlatformRole {
 
 export function normalizeStudioRole(role: unknown): StudioRole {
   const key = String(role || "").trim().toLowerCase().replace(/\s+/g, "_");
-  return STUDIO_ROLE_ALIASES[key] ?? "aluno";
+  return STUDIO_ROLE_ALIASES[key] ?? "dubber";
 }
 
 export function getHighestStudioRole(roles: Array<string | null | undefined>): StudioRole {
-  let best: StudioRole = "aluno";
+  let best: StudioRole = "dubber";
   let bestLevel = STUDIO_ROLE_HIERARCHY[best];
   for (const r of roles) {
     const nr = normalizeStudioRole(r);
@@ -87,12 +86,12 @@ export function hasMinStudioRole(role: unknown, minRole: StudioRole) {
 
 export function isDirectorRole(role: unknown) {
   const r = normalizeStudioRole(role);
-  return r === "platform_owner" || r === "studio_admin" || r === "diretor" || r === "engenheiro_audio";
+  return r === "owner" || r === "admin" || r === "director";
 }
 
 export function isDubberRole(role: unknown) {
   const r = normalizeStudioRole(role);
-  return r === "dublador" || r === "aluno";
+  return r === "dubber";
 }
 
 export function isPrivilegedStudioRole(role: unknown) {

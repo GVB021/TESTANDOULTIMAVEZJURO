@@ -33,7 +33,7 @@ const AUTHORIZED_EMAIL = "borbaggabriel@gmail.com";
 function hasManagementAccess(user: any) {
   const normalizedEmail = String(user?.email || "").trim().toLowerCase();
   const normalizedRole = String(user?.role || "").trim().toLowerCase().replace(/\s+/g, "_");
-  return normalizedEmail === AUTHORIZED_EMAIL || normalizedRole === "platform_owner" || normalizedRole === "master" || normalizedRole === "admin";
+  return normalizedEmail === AUTHORIZED_EMAIL || normalizedRole === "owner" || normalizedRole === "master" || normalizedRole === "admin";
 }
 
 type ManagementSettings = {
@@ -57,11 +57,9 @@ const EMPTY_FORM: FormState = {
 };
 
 const STUDIO_ROLES = [
-  { value: "studio_admin", label: "Administrador do Estúdio" },
-  { value: "diretor", label: "Diretor" },
-  { value: "engenheiro_audio", label: "Engenheiro de Áudio" },
-  { value: "dublador", label: "Dublador" },
-  { value: "aluno", label: "Aluno" },
+  { value: "admin", label: "Administrador do Estúdio" },
+  { value: "director", label: "Diretor" },
+  { value: "dubber", label: "Dublador" },
 ];
 
 const PRODUCTION_STATUSES = [
@@ -86,7 +84,7 @@ export default function StudioManagementPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const canAccess = hasManagementAccess(user);
-  const isPlatformOwner = user?.role === "platform_owner";
+  const isOwner = user?.role === "owner";
 
   const [activeTab, setActiveTab] = useState<TabValue>("overview");
 
@@ -376,7 +374,7 @@ export default function StudioManagementPage() {
     { key: "totalSessionsAvailable", label: "Número total de sessões disponíveis" },
     { key: "simultaneousProductionsLimit", label: "Limite de produções simultâneas" },
     { key: "maxDirectorsPerSession", label: "Máximo de diretores por sessão" },
-    { key: "maxDubbersStudentsPerSession", label: "Máximo de dubladores/alunos por sessão" },
+    { key: "maxDubbersStudentsPerSession", label: "Máximo de dubladores por sessão" },
   ]) as Array<{ key: keyof ManagementSettings; label: string }>, []);
 
   const handleInputChange = (key: keyof ManagementSettings, value: string) => {

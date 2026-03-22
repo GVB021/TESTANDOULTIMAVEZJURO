@@ -93,7 +93,7 @@ export function TextControlPopup({
             })}
             {candidates.length === 0 && (
               <div className="text-sm text-center py-10 text-muted-foreground">
-                Nenhum dublador ou aluno online no momento
+                Nenhum dublador online no momento
               </div>
             )}
           </div>

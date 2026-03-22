@@ -31,7 +31,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const platformRole = normalizePlatformRole(sessionUser.role);
   sessionUser.role = platformRole;
-  if (sessionUser.status === "pending" && platformRole !== "platform_owner") {
+  if (sessionUser.status === "pending" && platformRole !== "owner") {
     return res.status(403).json({ message: "Conta aguardando aprovacao" });
   }
 
@@ -48,9 +48,9 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
 
-  if (platformRole !== "platform_owner" && !isMaster) {
+  if (platformRole !== "owner" && !isMaster) {
     logger.warn("Unauthorized admin access attempt", { userId: user?.id, path: req.path });
-    return res.status(403).json({ message: "Forbidden: platform_owner role required" });
+    return res.status(403).json({ message: "Forbidden: owner role required" });
   }
   next();
 }
@@ -69,9 +69,9 @@ export async function requireStudioAccess(req: Request, res: Response, next: Nex
   const email = String(user?.email || "").toLowerCase().trim();
   const isMaster = email === "borbaggabriel@gmail.com";
 
-  if (normalizePlatformRole(user.role) === "platform_owner" || isMaster) {
-    req.studioRole = "platform_owner";
-    req.studioRoles = ["platform_owner"];
+  if (normalizePlatformRole(user.role) === "owner" || isMaster) {
+    req.studioRole = "owner";
+    req.studioRoles = ["owner"];
     return next();
   }
 
@@ -102,9 +102,9 @@ export function requireStudioRole(...allowedRoles: string[]) {
     const email = String(user?.email || "").toLowerCase().trim();
     const isMaster = email === "borbaggabriel@gmail.com";
 
-    if (normalizePlatformRole(user.role) === "platform_owner" || isMaster) {
-      req.studioRole = "platform_owner";
-      req.studioRoles = ["platform_owner"];
+    if (normalizePlatformRole(user.role) === "owner" || isMaster) {
+      req.studioRole = "owner";
+      req.studioRoles = ["owner"];
       return next();
     }
 

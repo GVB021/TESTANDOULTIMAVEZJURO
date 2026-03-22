@@ -8,6 +8,8 @@ import { setupRealtime, broadcastInvalidate } from "./realtime";
 import { registerMeRestore } from "./me-restore";
 import { registerVoiceJobs } from "./voice-jobs";
 import { registerHubAlignRoutes } from "./hubalign-routes";
+import platformAdminRoutes from "./platform-admin-routes";
+import studioAdminRoutes from "./studio-admin-routes";
 import { pool } from "./db";
 import { configureSupabase } from "./lib/supabase";
 import path from "path";
@@ -218,6 +220,8 @@ app.use((req, res, next) => {
     registerHubAlignRoutes(app);
     registerVoiceJobs(app);
     registerMeRestore(app);
+    app.use("/api/platform-admin", platformAdminRoutes);
+    app.use("/api/studio-admin", studioAdminRoutes);
     await registerRoutes(httpServer, app);
     setupVideoSync(httpServer);
     setupRealtime(app);

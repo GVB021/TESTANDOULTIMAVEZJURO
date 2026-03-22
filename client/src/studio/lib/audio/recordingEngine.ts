@@ -138,10 +138,16 @@ export function revokePreviewUrl(url: string): void {
   URL.revokeObjectURL(url);
 }
 
+interface BeepOptions {
+  frequency?: number;
+  duration?: number;
+  volume?: number;
+  type?: OscillatorType;
+}
+
 export function playCountdownBeep(
   audioContext: AudioContext,
-  frequency: number = 880,
-  duration: number = 0.12
+  { frequency = 880, duration = 0.12, volume = 0.09, type = "sine" }: BeepOptions = {}
 ): void {
   // 🔒 CRITICAL FIX: Prevent crash when audioContext is invalid
   if (!audioContext || audioContext.state === "closed") {
@@ -152,9 +158,9 @@ export function playCountdownBeep(
   try {
     const osc = audioContext.createOscillator();
     const env = audioContext.createGain();
-    osc.type = "sine";
+    osc.type = type;
     osc.frequency.setValueAtTime(frequency, audioContext.currentTime);
-    env.gain.setValueAtTime(0.3, audioContext.currentTime);
+    env.gain.setValueAtTime(volume, audioContext.currentTime);
     env.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + duration);
     osc.connect(env);
     env.connect(audioContext.destination);

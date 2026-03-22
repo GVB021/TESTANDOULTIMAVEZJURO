@@ -55,9 +55,8 @@ const Staff = memo(function Staff({ studioId }: { studioId: string }) {
                       <SelectValue placeholder="Selecionar papel..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="voice_actor">{pt.roles.dublador}</SelectItem>
-                      <SelectItem value="director">{pt.roles.diretor}</SelectItem>
-                      <SelectItem value="engineer">{pt.roles.engenheiro_audio}</SelectItem>
+                      <SelectItem value="dubber">{pt.roles.dubber}</SelectItem>
+                      <SelectItem value="director">{pt.roles.director}</SelectItem>
                     </SelectContent>
                   </Select>
                 </FieldGroup>

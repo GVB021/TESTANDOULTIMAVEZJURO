@@ -36,7 +36,7 @@ const StudioMain = memo(function StudioMain({ studioId }: { studioId: string }) 
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<AdminTab>("sessions");
 
-  // Proteção: apenas studio_admin pode acessar
+  // Proteção: apenas admin pode acessar
   if (!canManageMembers) {
     return (
       <PageSection>

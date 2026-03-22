@@ -531,9 +531,9 @@ const Takes = memo(function Takes({ studioId }: { studioId: string }) {
   const { user } = useAuth();
   const { hasMinRole } = useStudioRole(studioId);
   const { toast } = useToast();
-  const isPlatformOwner = user?.role === "platform_owner";
-  const canManageAudio = hasMinRole("engenheiro_audio");
-  const hasAccess = isPlatformOwner || canManageAudio;
+  const isOwner = user?.role === "owner";
+  const canManageAudio = hasMinRole("director");
+  const hasAccess = isOwner || canManageAudio;
 
   const { data: takesRaw, isLoading } = useQuery<TakeDetail[]>({
     queryKey: ["/api/studios", studioId, "takes", "grouped"],

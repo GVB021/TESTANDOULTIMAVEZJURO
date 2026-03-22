@@ -35,17 +35,16 @@ export function keyLabel(code: string) {
   return code;
 }
 
-export function normalizeRoomRole(role: unknown) {
-  const value = String(role || "").trim().toLowerCase().replace(/\s+/g, "_");
-  if (
-    value === "director" ||
-    value === "diretor" ||
-    value === "studio_admin" ||
-    value === "platform_owner" ||
-    value === "master"
-  )
-    return "diretor";
-  return "dublador";
+export function normalizeRoomRole(role: unknown): string {
+  const str = String(role || "").trim().toLowerCase();
+  switch (str) {
+    case "owner":
+    case "admin":
+    case "director":
+      return str;
+    default:
+      return "dubber";
+  }
 }
 
 export type UiRole = "viewer" | "text_controller" | "audio_controller" | "admin";
@@ -58,17 +57,35 @@ export const UI_ROLE_PERMISSIONS: Record<UiRole, UiPermission[]> = {
   admin: ["text_control", "audio_control", "approve_take", "dashboard_access", "presence_view"],
 };
 
+const PRIVILEGED_ROLES = new Set([
+  "owner",
+  "admin", 
+  "director",
+]);
+
 export function resolveUiRole(role: unknown, controlledText: boolean): UiRole {
   const normalized = normalizeRoomRole(role);
-  if (normalized === "diretor") return "admin";
+  if (normalized === "director") return "admin";
   if (controlledText) return "text_controller";
   return "audio_controller";
 }
 
-export function hasUiPermission(role: UiRole, permission: UiPermission) {
-  return UI_ROLE_PERMISSIONS[role].includes(permission);
+export function hasUiPermission(role: string | undefined, permission: UiPermission): boolean {
+  if (!role) return false;
+  
+  // Directors and admins can do most things
+  if (PRIVILEGED_ROLES.has(role)) {
+    return true;
+  }
+  
+  // Dubbers can only view presence
+  if (permission === "presence_view" && role === "dubber") {
+    return true;
+  }
+  
+  return false;
 }
 
 export function canReceiveTextControl(role: unknown) {
-  return normalizeRoomRole(role) !== "diretor";
+  return normalizeRoomRole(role) !== "director";
 }

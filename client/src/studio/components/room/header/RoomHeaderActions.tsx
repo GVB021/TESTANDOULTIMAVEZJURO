@@ -6,11 +6,12 @@ import { ThemeTogglePill } from "@studio/components/ui/ThemeTogglePill";
 
 interface RoomHeaderActionsProps {
   isMobile: boolean;
+  isDubberView: boolean;
   recordingStatus: RecordingStatus;
   canViewOnlineUsers: boolean;
   canTextControl: boolean;
   canAccessDashboard: boolean;
-  roomUsers: Array<{ displayName?: string; fullName?: string; name?: string; userId: string; [key: string]: any }>;
+  roomUsers: any[];
   studioId: string;
   onRecordOrStop: () => void;
   onOpenMenu: () => void;
@@ -23,6 +24,7 @@ interface RoomHeaderActionsProps {
 
 export function RoomHeaderActions({
   isMobile,
+  isDubberView,
   recordingStatus,
   canViewOnlineUsers,
   canTextControl,
@@ -61,12 +63,14 @@ export function RoomHeaderActions({
       {isMobile ? (
         <>
           <button
-            onClick={onRecordOrStop}
+            onClick={isDubberView ? undefined : onRecordOrStop}
+            disabled={isDubberView}
             className={cn(
               "w-14 h-14 flex items-center justify-center rounded-full transition-all",
-              isRecording
+              isRecording && !isDubberView
                 ? "bg-red-500 text-white shadow-lg shadow-red-500/50 animate-pulse"
-                : "bg-primary text-primary-foreground"
+                : "bg-primary text-primary-foreground",
+              isDubberView && "opacity-40 cursor-not-allowed"
             )}
             aria-label={isRecording ? "Parar Gravação" : "Iniciar Gravação"}
           >
@@ -83,57 +87,60 @@ export function RoomHeaderActions({
       ) : (
         <>
           <ThemeTogglePill />
-          
-          <button
-            onClick={onOpenRecordings}
-            className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1"
-            data-testid="button-room-recordings"
-          >
-            <ListMusic className="w-3.5 h-3.5" />
-            Gravações
-          </button>
-
-          {canTextControl && (
-            <button
-              onClick={onOpenTextControl}
-              className="h-7 px-2 rounded-md bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 flex items-center gap-1"
-              data-testid="button-room-release-text"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Permitir Controle
-            </button>
-          )}
-
-          <button
-            onClick={onOpenDeviceSettings}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Configurações de dispositivos"
-            data-testid="button-open-device-settings"
-          >
-            <Monitor className="w-4 h-4" />
-          </button>
-
-          {canAccessDashboard && (
-            <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
+          {!isDubberView && (
+            <>
               <button
-                onClick={onPanelClick}
+                onClick={onOpenRecordings}
                 className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1"
-                data-testid="button-room-panel"
+                data-testid="button-room-recordings"
               >
-                <Monitor className="w-3.5 h-3.5" />
-                PAINEL
+                <ListMusic className="w-3.5 h-3.5" />
+                Gravações
               </button>
-            </Link>
-          )}
 
-          <button
-            onClick={onOpenShortcuts}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Atalhos de teclado"
-            data-testid="button-open-shortcuts"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+              {canTextControl && (
+                <button
+                  onClick={onOpenTextControl}
+                  className="h-7 px-2 rounded-md bg-primary/10 border border-primary/20 text-[11px] text-primary hover:bg-primary/20 flex items-center gap-1"
+                  data-testid="button-room-release-text"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  Permitir Controle
+                </button>
+              )}
+
+              <button
+                onClick={onOpenDeviceSettings}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Configurações de dispositivos"
+                data-testid="button-open-device-settings"
+              >
+                <Monitor className="w-4 h-4" />
+              </button>
+
+              {canAccessDashboard && (
+                <Link to={`/hub-dub/studio/${studioId}/dashboard`}>
+                  <button
+                    onClick={onPanelClick}
+                    className="h-7 px-2 rounded-md bg-muted/40 border border-border/60 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted/60 flex items-center gap-1"
+                    data-testid="button-room-panel"
+                  >
+                    <Monitor className="w-3.5 h-3.5" />
+                    PAINEL
+                  </button>
+                </Link>
+              )}
+
+              <button
+                onClick={onOpenShortcuts}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/40 border border-border/60 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Atalhos de teclado"
+                data-testid="button-open-shortcuts"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </>
       )}
     </>
